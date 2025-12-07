@@ -513,16 +513,6 @@ sequenceDiagram
 | +0 min | Auto-complete triggered | Platform |
 | +0 min | Review prompt shown | Both |
 
-### Review Categories
-
-| Category | Description | Weight |
-|----------|-------------|--------|
-| Overall Experience | General satisfaction | 20% |
-| Teaching Quality | How well tutor explained | 25% |
-| Communication | Clear and responsive | 20% |
-| Punctuality | On time for session | 15% |
-| Preparation | Was tutor prepared | 20% |
-
 ---
 
 ## 1.5 Student Subscription & Monthly Billing
@@ -705,15 +695,6 @@ flowchart LR
 
     G --> H[Mark Resolved]
 ```
-
-#### FAQs (Student)
-
-| Question | Answer |
-|----------|--------|
-| How do I cancel a session? | Go to Sessions → Select session → Cancel |
-| How do I change my subscription? | Go to Subscriptions → Change Plan |
-| How do I request a new tutor? | Go to Support → Request new tutor |
-| When am I billed? | 1st of each month for previous month's sessions |
 
 ---
 
