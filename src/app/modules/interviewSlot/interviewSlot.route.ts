@@ -1,0 +1,119 @@
+import express from 'express';
+import { USER_ROLES } from '../../../enums/user';
+import auth from '../../middlewares/auth';
+import validateRequest from '../../middlewares/validateRequest';
+import { InterviewSlotController } from './interviewSlot.controller';
+import { InterviewSlotValidation } from './interviewSlot.validation';
+
+const router = express.Router();
+
+// ============ APPLICANT ROUTES ============
+
+/**
+ * @route   GET /api/v1/interview-slots
+ * @desc    Get available interview slots (Applicants see only AVAILABLE)
+ * @access  Applicant
+ * @query   ?page=1&limit=10&sort=-startTime
+ */
+router.get(
+  '/',
+  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.getAllInterviewSlots
+);
+
+/**
+ * @route   GET /api/v1/interview-slots/:id
+ * @desc    Get single interview slot details
+ * @access  Applicant or Admin
+ */
+router.get(
+  '/:id',
+  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.getSingleInterviewSlot
+);
+
+/**
+ * @route   PATCH /api/v1/interview-slots/:id/book
+ * @desc    Book an available interview slot
+ * @access  Applicant only
+ * @body    { applicationId: string }
+ * @note    Application must be in DOCUMENTS_REVIEWED status
+ * @note    Applicant can only have one booked slot at a time
+ * @note    Updates application status to INTERVIEW_SCHEDULED
+ */
+router.patch(
+  '/:id/book',
+  auth(USER_ROLES.APPLICANT),
+  validateRequest(InterviewSlotValidation.bookInterviewSlotZodSchema),
+  InterviewSlotController.bookInterviewSlot
+);
+
+/**
+ * @route   PATCH /api/v1/interview-slots/:id/cancel
+ * @desc    Cancel a booked interview slot
+ * @access  Applicant or Admin (must be owner of slot)
+ * @body    { cancellationReason: string }
+ * @note    Reverts application status to DOCUMENTS_REVIEWED
+ */
+router.patch(
+  '/:id/cancel',
+  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  validateRequest(InterviewSlotValidation.cancelInterviewSlotZodSchema),
+  InterviewSlotController.cancelInterviewSlot
+);
+
+// ============ ADMIN ROUTES ============
+
+/**
+ * @route   POST /api/v1/interview-slots
+ * @desc    Create new interview slot
+ * @access  Admin only
+ * @body    { startTime: Date, endTime: Date, notes?: string }
+ * @note    Prevents overlapping slots for same admin
+ */
+router.post(
+  '/',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(InterviewSlotValidation.createInterviewSlotZodSchema),
+  InterviewSlotController.createInterviewSlot
+);
+
+/**
+ * @route   PATCH /api/v1/interview-slots/:id/complete
+ * @desc    Mark interview as completed
+ * @access  Admin only
+ * @note    Updates application status to INTERVIEW_DONE
+ */
+router.patch(
+  '/:id/complete',
+  auth(USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.markAsCompleted
+);
+
+/**
+ * @route   PATCH /api/v1/interview-slots/:id
+ * @desc    Update interview slot (only AVAILABLE slots)
+ * @access  Admin only
+ * @body    { startTime?, endTime?, notes?, status? }
+ * @note    Cannot update booked/completed/cancelled slots
+ */
+router.patch(
+  '/:id',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(InterviewSlotValidation.updateInterviewSlotZodSchema),
+  InterviewSlotController.updateInterviewSlot
+);
+
+/**
+ * @route   DELETE /api/v1/interview-slots/:id
+ * @desc    Delete interview slot
+ * @access  Admin only
+ * @note    Cannot delete booked slots (cancel first)
+ */
+router.delete(
+  '/:id',
+  auth(USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.deleteInterviewSlot
+);
+
+export const InterviewSlotRoutes = router;
