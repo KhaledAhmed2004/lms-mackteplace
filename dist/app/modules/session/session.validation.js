@@ -1,0 +1,97 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SessionValidation = void 0;
+const zod_1 = require("zod");
+// Propose session validation (Tutor sends in chat)
+const proposeSessionZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        chatId: zod_1.z
+            .string({
+            required_error: 'Chat ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid chat ID format'),
+        subject: zod_1.z
+            .string({
+            required_error: 'Subject is required',
+        })
+            .trim()
+            .min(2, 'Subject must be at least 2 characters'),
+        startTime: zod_1.z
+            .string({
+            required_error: 'Start time is required',
+        })
+            .refine(date => !isNaN(Date.parse(date)), {
+            message: 'Invalid start time format',
+        })
+            .refine(date => new Date(date) > new Date(), {
+            message: 'Start time must be in the future',
+        }),
+        endTime: zod_1.z
+            .string({
+            required_error: 'End time is required',
+        })
+            .refine(date => !isNaN(Date.parse(date)), {
+            message: 'Invalid end time format',
+        }),
+        description: zod_1.z.string().trim().optional(),
+    }).refine(data => new Date(data.endTime) > new Date(data.startTime), {
+        message: 'End time must be after start time',
+        path: ['endTime'],
+    }),
+});
+// Accept session proposal validation (Student accepts)
+const acceptSessionProposalZodSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        messageId: zod_1.z
+            .string({
+            required_error: 'Message ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid message ID format'),
+    }),
+});
+// Reject session proposal validation (Student rejects)
+const rejectSessionProposalZodSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        messageId: zod_1.z
+            .string({
+            required_error: 'Message ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid message ID format'),
+    }),
+    body: zod_1.z.object({
+        rejectionReason: zod_1.z
+            .string({
+            required_error: 'Rejection reason is required',
+        })
+            .trim()
+            .min(10, 'Rejection reason must be at least 10 characters'),
+    }),
+});
+// Cancel session validation
+const cancelSessionZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        cancellationReason: zod_1.z
+            .string({
+            required_error: 'Cancellation reason is required',
+        })
+            .trim()
+            .min(10, 'Cancellation reason must be at least 10 characters'),
+    }),
+});
+// Mark session as completed validation (Manual completion)
+const completeSessionZodSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z
+            .string({
+            required_error: 'Session ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid session ID format'),
+    }),
+});
+exports.SessionValidation = {
+    proposeSessionZodSchema,
+    acceptSessionProposalZodSchema,
+    rejectSessionProposalZodSchema,
+    cancelSessionZodSchema,
+    completeSessionZodSchema,
+};

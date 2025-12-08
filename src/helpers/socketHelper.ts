@@ -6,6 +6,10 @@ import config from '../config';
 import { Message } from '../app/modules/message/message.model';
 import { Chat } from '../app/modules/chat/chat.model';
 import NodeCache from 'node-cache';
+import { CallService } from '../app/modules/call/call.service';
+import { WhiteboardService } from '../app/modules/whiteboard/whiteboard.service';
+import { CallType } from '../app/modules/call/call.interface';
+import { User } from '../app/modules/user/user.model';
 import {
   setOnline,
   setOffline,
@@ -325,6 +329,274 @@ const socket = (io: Server) => {
           logger.error(colors.red(`❌ READ_ACK error: ${String(err)}`));
         }
       });
+
+      // ---------------------------------------------
+      // 🔹 Call Events (Agora Integration)
+      // ---------------------------------------------
+
+      // Initiate a call
+      socket.on(
+        'CALL_INITIATE',
+        async ({
+          receiverId,
+          callType,
+          chatId,
+        }: {
+          receiverId: string;
+          callType: CallType;
+          chatId?: string;
+        }) => {
+          try {
+            const { call, token, channelName, uid } =
+              await CallService.initiateCall(userId, receiverId, callType, chatId);
+
+            // Get caller info for receiver
+            const caller = await User.findById(userId).select(
+              'name profilePicture'
+            );
+
+            // Send to caller
+            socket.emit('CALL_INITIATED', {
+              callId: call._id,
+              channelName,
+              token,
+              uid,
+              callType,
+            });
+
+            // Send to receiver
+            io.to(USER_ROOM(receiverId)).emit('INCOMING_CALL', {
+              callId: call._id,
+              channelName,
+              callType,
+              caller: {
+                id: userId,
+                name: caller?.name,
+                profilePicture: caller?.profilePicture,
+              },
+            });
+
+            handleEventProcessed(
+              'CALL_INITIATE',
+              `to: ${receiverId}, type: ${callType}`
+            );
+          } catch (err) {
+            socket.emit('CALL_ERROR', { message: String(err) });
+            logger.error(colors.red(`CALL_INITIATE error: ${String(err)}`));
+          }
+        }
+      );
+
+      // Accept a call
+      socket.on('CALL_ACCEPT', async ({ callId }: { callId: string }) => {
+        try {
+          const { call, token, uid } = await CallService.acceptCall(
+            callId,
+            userId
+          );
+
+          // Send token to acceptor
+          socket.emit('CALL_ACCEPTED', {
+            callId,
+            channelName: call.channelName,
+            token,
+            uid,
+          });
+
+          // Notify caller that call was accepted
+          io.to(USER_ROOM(call.initiator.toString())).emit(
+            'CALL_ACCEPTED_BY_RECEIVER',
+            { callId }
+          );
+
+          handleEventProcessed('CALL_ACCEPT', `callId: ${callId}`);
+        } catch (err) {
+          socket.emit('CALL_ERROR', { message: String(err) });
+          logger.error(colors.red(`CALL_ACCEPT error: ${String(err)}`));
+        }
+      });
+
+      // Reject a call
+      socket.on('CALL_REJECT', async ({ callId }: { callId: string }) => {
+        try {
+          const call = await CallService.rejectCall(callId, userId);
+
+          // Notify caller
+          io.to(USER_ROOM(call.initiator.toString())).emit('CALL_REJECTED', {
+            callId,
+          });
+
+          handleEventProcessed('CALL_REJECT', `callId: ${callId}`);
+        } catch (err) {
+          socket.emit('CALL_ERROR', { message: String(err) });
+          logger.error(colors.red(`CALL_REJECT error: ${String(err)}`));
+        }
+      });
+
+      // End a call
+      socket.on('CALL_END', async ({ callId }: { callId: string }) => {
+        try {
+          const call = await CallService.endCall(callId, userId);
+
+          // Notify all participants
+          call.participants.forEach(participantId => {
+            if (participantId.toString() !== userId) {
+              io.to(USER_ROOM(participantId.toString())).emit('CALL_ENDED', {
+                callId,
+                duration: call.duration,
+              });
+            }
+          });
+
+          handleEventProcessed('CALL_END', `callId: ${callId}`);
+        } catch (err) {
+          socket.emit('CALL_ERROR', { message: String(err) });
+          logger.error(colors.red(`CALL_END error: ${String(err)}`));
+        }
+      });
+
+      // Cancel a call (before accepted)
+      socket.on('CALL_CANCEL', async ({ callId }: { callId: string }) => {
+        try {
+          const call = await CallService.cancelCall(callId, userId);
+
+          // Notify receiver
+          io.to(USER_ROOM(call.receiver.toString())).emit('CALL_CANCELLED', {
+            callId,
+          });
+
+          handleEventProcessed('CALL_CANCEL', `callId: ${callId}`);
+        } catch (err) {
+          socket.emit('CALL_ERROR', { message: String(err) });
+          logger.error(colors.red(`CALL_CANCEL error: ${String(err)}`));
+        }
+      });
+
+      // User joined Agora channel
+      socket.on(
+        'CALL_USER_JOINED_CHANNEL',
+        async ({ callId, agoraUid }: { callId: string; agoraUid: number }) => {
+          try {
+            const { call, activeCount } = await CallService.recordParticipantJoin(
+              callId,
+              userId,
+              agoraUid
+            );
+
+            // Notify all participants
+            call.participants.forEach(participantId => {
+              io.to(USER_ROOM(participantId.toString())).emit(
+                'CALL_PARTICIPANT_JOINED',
+                {
+                  callId,
+                  userId,
+                  agoraUid,
+                  activeParticipants: activeCount,
+                }
+              );
+            });
+
+            // If both joined, notify
+            if (activeCount >= 2) {
+              call.participants.forEach(participantId => {
+                io.to(USER_ROOM(participantId.toString())).emit(
+                  'CALL_BOTH_CONNECTED',
+                  {
+                    callId,
+                    message: 'Both participants are now connected',
+                  }
+                );
+              });
+            }
+
+            handleEventProcessed(
+              'CALL_USER_JOINED_CHANNEL',
+              `callId: ${callId}, userId: ${userId}`
+            );
+          } catch (err) {
+            socket.emit('CALL_ERROR', { message: String(err) });
+            logger.error(
+              colors.red(`CALL_USER_JOINED_CHANNEL error: ${String(err)}`)
+            );
+          }
+        }
+      );
+
+      // User left Agora channel
+      socket.on(
+        'CALL_USER_LEFT_CHANNEL',
+        async ({ callId }: { callId: string }) => {
+          try {
+            const { call, activeCount } = await CallService.recordParticipantLeave(
+              callId,
+              userId
+            );
+
+            // Notify remaining participants
+            call.participants.forEach(participantId => {
+              if (participantId.toString() !== userId) {
+                io.to(USER_ROOM(participantId.toString())).emit(
+                  'CALL_PARTICIPANT_LEFT',
+                  {
+                    callId,
+                    userId,
+                    activeParticipants: activeCount,
+                  }
+                );
+              }
+            });
+
+            handleEventProcessed(
+              'CALL_USER_LEFT_CHANNEL',
+              `callId: ${callId}, userId: ${userId}`
+            );
+          } catch (err) {
+            socket.emit('CALL_ERROR', { message: String(err) });
+            logger.error(
+              colors.red(`CALL_USER_LEFT_CHANNEL error: ${String(err)}`)
+            );
+          }
+        }
+      );
+
+      // Enable whiteboard for a call
+      socket.on(
+        'CALL_ENABLE_WHITEBOARD',
+        async ({ callId }: { callId: string }) => {
+          try {
+            const { room, token, isNew } =
+              await WhiteboardService.getOrCreateRoomForCall(callId, userId);
+
+            // Notify all call participants about whiteboard
+            const call = await CallService.getCallById(callId, userId);
+
+            call.participants.forEach((participantId: any) => {
+              io.to(
+                USER_ROOM(
+                  typeof participantId === 'object'
+                    ? participantId._id.toString()
+                    : participantId.toString()
+                )
+              ).emit('WHITEBOARD_ENABLED', {
+                callId,
+                roomUuid: room.uuid,
+                roomToken: token,
+                isNew,
+              });
+            });
+
+            handleEventProcessed(
+              'CALL_ENABLE_WHITEBOARD',
+              `callId: ${callId}, roomUuid: ${room.uuid}`
+            );
+          } catch (err) {
+            socket.emit('CALL_ERROR', { message: String(err) });
+            logger.error(
+              colors.red(`CALL_ENABLE_WHITEBOARD error: ${String(err)}`)
+            );
+          }
+        }
+      );
 
       // ---------------------------------------------
       // 🔹 Handle Disconnect Event

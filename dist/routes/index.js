@@ -1,0 +1,106 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const auth_route_1 = require("../app/modules/auth/auth.route");
+const user_route_1 = require("../app/modules/user/user.route");
+const chat_route_1 = require("../app/modules/chat/chat.route");
+const message_route_1 = require("../app/modules/message/message.route");
+const payment_routes_1 = require("../app/modules/payment/payment.routes");
+const bookmark_route_1 = require("../app/modules/bookmark/bookmark.route");
+const notification_routes_1 = require("../app/modules/notification/notification.routes");
+const subject_route_1 = require("../app/modules/subject/subject.route");
+const tutorApplication_route_1 = require("../app/modules/tutorApplication/tutorApplication.route");
+const interviewSlot_route_1 = require("../app/modules/interviewSlot/interviewSlot.route");
+const trialRequest_route_1 = require("../app/modules/trialRequest/trialRequest.route");
+const session_route_1 = require("../app/modules/session/session.route");
+const studentSubscription_route_1 = require("../app/modules/studentSubscription/studentSubscription.route");
+const monthlyBilling_route_1 = require("../app/modules/monthlyBilling/monthlyBilling.route");
+const tutorEarnings_route_1 = require("../app/modules/tutorEarnings/tutorEarnings.route");
+const admin_route_1 = require("../app/modules/admin/admin.route");
+const sessionReview_route_1 = require("../app/modules/sessionReview/sessionReview.route");
+const call_route_1 = require("../app/modules/call/call.route");
+const whiteboard_route_1 = require("../app/modules/whiteboard/whiteboard.route");
+const router = express_1.default.Router();
+const apiRoutes = [
+    {
+        path: '/user',
+        route: user_route_1.UserRoutes,
+    },
+    {
+        path: '/auth',
+        route: auth_route_1.AuthRoutes,
+    },
+    {
+        path: '/chats',
+        route: chat_route_1.ChatRoutes,
+    },
+    {
+        path: '/messages',
+        route: message_route_1.MessageRoutes,
+    },
+    {
+        path: '/payments',
+        route: payment_routes_1.PaymentRoutes,
+    },
+    {
+        path: '/bookmarks',
+        route: bookmark_route_1.BookmarkRoutes,
+    },
+    {
+        path: '/notifications',
+        route: notification_routes_1.NotificationRoutes,
+    },
+    {
+        path: '/subjects',
+        route: subject_route_1.SubjectRoutes,
+    },
+    {
+        path: '/applications',
+        route: tutorApplication_route_1.TutorApplicationRoutes,
+    },
+    {
+        path: '/interview-slots',
+        route: interviewSlot_route_1.InterviewSlotRoutes,
+    },
+    {
+        path: '/trial-requests',
+        route: trialRequest_route_1.TrialRequestRoutes,
+    },
+    {
+        path: '/sessions',
+        route: session_route_1.SessionRoutes,
+    },
+    {
+        path: '/subscriptions',
+        route: studentSubscription_route_1.StudentSubscriptionRoutes,
+    },
+    {
+        path: '/billings',
+        route: monthlyBilling_route_1.MonthlyBillingRoutes,
+    },
+    {
+        path: '/earnings',
+        route: tutorEarnings_route_1.TutorEarningsRoutes,
+    },
+    {
+        path: '/admin',
+        route: admin_route_1.AdminRoutes,
+    },
+    {
+        path: '/reviews',
+        route: sessionReview_route_1.SessionReviewRoutes,
+    },
+    {
+        path: '/calls',
+        route: call_route_1.CallRoutes,
+    },
+    {
+        path: '/whiteboard',
+        route: whiteboard_route_1.WhiteboardRoutes,
+    },
+];
+apiRoutes.forEach(route => router.use(route.path, route.route));
+exports.default = router;

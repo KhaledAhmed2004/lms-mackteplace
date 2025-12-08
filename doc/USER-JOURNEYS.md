@@ -758,37 +758,6 @@ Invoice PDF Contains:
 
 ---
 
-### 👤 Profile Page
-
-#### Page Structure
-
-```mermaid
-flowchart TD
-    A[Profile Page] --> B[Section 1: Profile Photo & Basic]
-    A --> C[Section 2: Personal Information]
-    A --> D[Section 3: Address]
-    A --> E[Section 4: Security]
-```
-
----
-
-### 🔔 Notifications
-
-> Student Dashboard এ Notification bell icon থাকবে
-
-#### Notification Types
-
-| Type             | Icon | Message Example              | Action           |
-| ---------------- | ---- | ---------------------------- | ---------------- |
-| Session Reminder | 🎥   | "Session starting in 15 min" | [Join Now]       |
-| Session Proposed | 📅   | "New session proposed"       | [Accept/Decline] |
-| Invoice Ready    | 💳   | "November invoice ready"     | [Pay Now]        |
-| Payment Success  | ✅   | "Payment confirmed"          | [View Receipt]   |
-| Tutor Message    | 💬   | "New message from John"      | [Reply]          |
-| Support Update   | 🆘   | "Ticket #123 updated"        | [View]           |
-
----
-
 ### 🆘 Support Page (Updated)
 
 > Support এ click করলে নিচের options দেখাবে
@@ -1259,7 +1228,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Click "View Details"] --> B[Modal Opens]
+    A[Click View Details] --> B[Modal Opens]
 
     B --> C[See Student Info]
     C --> D[Read Learning Goal]
@@ -1432,7 +1401,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[💬 Chat with student] --> B[🖱️ Click "Propose Session"]
+    A[💬 Chat with student] --> B[🖱️ Click Propose Session]
 
     subgraph Propose[Session Proposal]
         B --> B1[📅 Select Date]

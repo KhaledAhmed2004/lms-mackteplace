@@ -16,6 +16,8 @@ import { MonthlyBillingRoutes } from '../app/modules/monthlyBilling/monthlyBilli
 import { TutorEarningsRoutes } from '../app/modules/tutorEarnings/tutorEarnings.route';
 import { AdminRoutes } from '../app/modules/admin/admin.route';
 import { SessionReviewRoutes } from '../app/modules/sessionReview/sessionReview.route';
+import { CallRoutes } from '../app/modules/call/call.route';
+import { WhiteboardRoutes } from '../app/modules/whiteboard/whiteboard.route';
 
 const router = express.Router();
 
@@ -87,6 +89,14 @@ const apiRoutes = [
   {
     path: '/reviews',
     route: SessionReviewRoutes,
+  },
+  {
+    path: '/calls',
+    route: CallRoutes,
+  },
+  {
+    path: '/whiteboard',
+    route: WhiteboardRoutes,
   },
 ];
 

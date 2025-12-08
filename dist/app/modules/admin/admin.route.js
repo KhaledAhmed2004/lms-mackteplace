@@ -1,0 +1,106 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AdminRoutes = void 0;
+const express_1 = __importDefault(require("express"));
+const user_1 = require("../../../enums/user");
+const auth_1 = __importDefault(require("../../middlewares/auth"));
+const admin_controller_1 = require("./admin.controller");
+const export_controller_1 = require("./export.controller");
+const router = express_1.default.Router();
+// ============ DASHBOARD & STATISTICS ============
+/**
+ * @route   GET /api/v1/admin/dashboard
+ * @desc    Get comprehensive dashboard statistics
+ * @access  Admin only
+ * @returns User stats, application stats, session stats, revenue stats, subscription stats
+ */
+router.get('/dashboard', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getDashboardStats);
+/**
+ * @route   GET /api/v1/admin/revenue-by-month
+ * @desc    Get revenue statistics by month
+ * @access  Admin only
+ * @query   ?year=2024&months=1,2,3 (optional, defaults to current year, all months)
+ */
+router.get('/revenue-by-month', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getRevenueByMonth);
+/**
+ * @route   GET /api/v1/admin/popular-subjects
+ * @desc    Get most popular subjects by session count
+ * @access  Admin only
+ * @query   ?limit=10 (default: 10)
+ */
+router.get('/popular-subjects', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getPopularSubjects);
+/**
+ * @route   GET /api/v1/admin/top-tutors
+ * @desc    Get top tutors by sessions or earnings
+ * @access  Admin only
+ * @query   ?limit=10&sortBy=sessions (sortBy: sessions|earnings, default: sessions)
+ */
+router.get('/top-tutors', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getTopTutors);
+/**
+ * @route   GET /api/v1/admin/top-students
+ * @desc    Get top students by spending or sessions
+ * @access  Admin only
+ * @query   ?limit=10&sortBy=spending (sortBy: spending|sessions, default: spending)
+ */
+router.get('/top-students', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getTopStudents);
+/**
+ * @route   GET /api/v1/admin/user-growth
+ * @desc    Get user growth statistics by month
+ * @access  Admin only
+ * @query   ?year=2024&months=1,2,3 (optional, defaults to current year, all months)
+ */
+router.get('/user-growth', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getUserGrowth);
+// ============ CSV EXPORT ============
+/**
+ * @route   GET /api/v1/admin/export/users
+ * @desc    Export users to CSV
+ * @access  Admin only
+ * @query   ?role=STUDENT (optional: filter by role)
+ */
+router.get('/export/users', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportUsers);
+/**
+ * @route   GET /api/v1/admin/export/applications
+ * @desc    Export tutor applications to CSV
+ * @access  Admin only
+ * @query   ?status=SUBMITTED (optional: filter by status)
+ */
+router.get('/export/applications', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportApplications);
+/**
+ * @route   GET /api/v1/admin/export/sessions
+ * @desc    Export sessions to CSV
+ * @access  Admin only
+ * @query   ?status=COMPLETED&startDate=2024-01-01&endDate=2024-12-31
+ */
+router.get('/export/sessions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportSessions);
+/**
+ * @route   GET /api/v1/admin/export/billings
+ * @desc    Export monthly billings to CSV
+ * @access  Admin only
+ * @query   ?status=PAID&year=2024&month=1
+ */
+router.get('/export/billings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportBillings);
+/**
+ * @route   GET /api/v1/admin/export/earnings
+ * @desc    Export tutor earnings to CSV
+ * @access  Admin only
+ * @query   ?status=PAID&year=2024&month=1
+ */
+router.get('/export/earnings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportEarnings);
+/**
+ * @route   GET /api/v1/admin/export/subscriptions
+ * @desc    Export subscriptions to CSV
+ * @access  Admin only
+ * @query   ?status=ACTIVE (optional: filter by status)
+ */
+router.get('/export/subscriptions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportSubscriptions);
+/**
+ * @route   GET /api/v1/admin/export/trial-requests
+ * @desc    Export trial requests to CSV
+ * @access  Admin only
+ * @query   ?status=PENDING (optional: filter by status)
+ */
+router.get('/export/trial-requests', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportTrialRequests);
+exports.AdminRoutes = router;

@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SESSION_STATUS = void 0;
+var SESSION_STATUS;
+(function (SESSION_STATUS) {
+    SESSION_STATUS["SCHEDULED"] = "SCHEDULED";
+    SESSION_STATUS["IN_PROGRESS"] = "IN_PROGRESS";
+    SESSION_STATUS["COMPLETED"] = "COMPLETED";
+    SESSION_STATUS["CANCELLED"] = "CANCELLED";
+    SESSION_STATUS["NO_SHOW"] = "NO_SHOW";
+})(SESSION_STATUS || (exports.SESSION_STATUS = SESSION_STATUS = {}));

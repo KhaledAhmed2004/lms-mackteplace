@@ -31,4 +31,13 @@ export default {
   google_redirect_uri: process.env.GOOGLE_REDIRECT_URI,
   firebase_api_key_base64: process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
   firebase_web_push_credentials: process.env.FIREBASE_WEB_PUSH_CREDENTIALS,
+  agora: {
+    appId: process.env.AGORA_APP_ID,
+    appCertificate: process.env.AGORA_APP_CERTIFICATE,
+    whiteboard: {
+      appId: process.env.AGORA_WHITEBOARD_APP_ID,
+      sdkToken: process.env.AGORA_WHITEBOARD_SDK_TOKEN,
+      region: process.env.AGORA_WHITEBOARD_REGION || 'us-sv',
+    },
+  },
 };
