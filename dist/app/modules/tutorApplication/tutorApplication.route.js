@@ -11,7 +11,6 @@ const validateRequest_1 = __importDefault(require("../../middlewares/validateReq
 const tutorApplication_controller_1 = require("./tutorApplication.controller");
 const tutorApplication_validation_1 = require("./tutorApplication.validation");
 const router = express_1.default.Router();
-// ============ APPLICANT ROUTES ============
 /**
  * @route   POST /api/v1/applications
  * @desc    Submit tutor application

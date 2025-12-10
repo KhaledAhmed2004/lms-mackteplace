@@ -5,10 +5,14 @@ import sendResponse from '../../../shared/sendResponse';
 import { TrialRequestService } from './trialRequest.service';
 
 /**
- * Create trial request (Student)
+ * Create trial request (Student or Guest)
+ * Can be used by:
+ * - Logged-in students (auth token required)
+ * - Guest users (no auth required, studentInfo must be complete)
  */
 const createTrialRequest = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  // studentId will be null for guest users
+  const studentId = req.user?.id || null;
   const result = await TrialRequestService.createTrialRequest(studentId, req.body);
 
   sendResponse(res, {
@@ -23,7 +27,7 @@ const createTrialRequest = catchAsync(async (req: Request, res: Response) => {
  * Get matching trial requests for tutor
  */
 const getMatchingTrialRequests = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user?.id;
+  const tutorId = req.user!.id as string;
   const result = await TrialRequestService.getMatchingTrialRequests(tutorId, req.query);
 
   sendResponse(res, {
@@ -31,7 +35,7 @@ const getMatchingTrialRequests = catchAsync(async (req: Request, res: Response) 
     statusCode: StatusCodes.OK,
     message: 'Matching trial requests retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -39,7 +43,7 @@ const getMatchingTrialRequests = catchAsync(async (req: Request, res: Response) 
  * Get student's own trial requests
  */
 const getMyTrialRequests = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await TrialRequestService.getMyTrialRequests(studentId, req.query);
 
   sendResponse(res, {
@@ -47,7 +51,7 @@ const getMyTrialRequests = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Your trial requests retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -62,7 +66,7 @@ const getAllTrialRequests = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Trial requests retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -86,7 +90,7 @@ const getSingleTrialRequest = catchAsync(async (req: Request, res: Response) => 
  */
 const acceptTrialRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const tutorId = req.user?.id;
+  const tutorId = req.user!.id as string;
   const result = await TrialRequestService.acceptTrialRequest(id, tutorId);
 
   sendResponse(res, {
@@ -102,7 +106,7 @@ const acceptTrialRequest = catchAsync(async (req: Request, res: Response) => {
  */
 const cancelTrialRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const { cancellationReason } = req.body;
 
   const result = await TrialRequestService.cancelTrialRequest(

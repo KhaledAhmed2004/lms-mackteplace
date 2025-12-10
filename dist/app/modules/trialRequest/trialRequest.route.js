@@ -7,21 +7,36 @@ exports.TrialRequestRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const user_1 = require("../../../enums/user");
 const auth_1 = __importDefault(require("../../middlewares/auth"));
+const optionalAuth_1 = __importDefault(require("../../middlewares/optionalAuth"));
 const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
 const trialRequest_controller_1 = require("./trialRequest.controller");
 const trialRequest_validation_1 = require("./trialRequest.validation");
 const router = express_1.default.Router();
-// ============ STUDENT ROUTES ============
+// ============ PUBLIC / GUEST ROUTES ============
 /**
  * @route   POST /api/v1/trial-requests
  * @desc    Create trial request (Uber-style request)
- * @access  Student only
- * @body    { subject: string, description: string, preferredLanguage: 'ENGLISH' | 'GERMAN', preferredDateTime?: Date }
- * @note    Student can only have one pending request at a time
+ * @access  Public (Guest or Student)
+ * @body    {
+ *   studentInfo: { firstName, lastName, email, isUnder18, dateOfBirth? },
+ *   subject: ObjectId (Subject ID),
+ *   gradeLevel: GRADE_LEVEL enum,
+ *   schoolType: SCHOOL_TYPE enum,
+ *   description: string,
+ *   preferredLanguage: 'ENGLISH' | 'GERMAN',
+ *   learningGoals?: string,
+ *   documents?: string[],
+ *   guardianInfo?: { name, email, phone, relationship? } (Required if under 18),
+ *   preferredDateTime?: Date
+ * }
+ * @note    Guest users can create requests without authentication
+ * @note    Student can only have one pending request at a time (checked by studentId or email)
  * @note    Request expires after 24 hours
- * @note    Increments student's trialRequestsCount
+ * @note    Guardian info required for students under 18
  */
-router.post('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(trialRequest_validation_1.TrialRequestValidation.createTrialRequestZodSchema), trialRequest_controller_1.TrialRequestController.createTrialRequest);
+router.post('/', optionalAuth_1.default, // Allow both authenticated and guest users
+(0, validateRequest_1.default)(trialRequest_validation_1.TrialRequestValidation.createTrialRequestZodSchema), trialRequest_controller_1.TrialRequestController.createTrialRequest);
+// ============ STUDENT ROUTES ============
 /**
  * @route   GET /api/v1/trial-requests/my-requests
  * @desc    Get student's own trial requests

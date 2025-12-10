@@ -23,9 +23,7 @@ const generateRtcToken = (channelName, uid, role = 'publisher', tokenExpirationI
     return agora_token_1.RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, rtcRole, tokenExpirationInSeconds, privilegeExpirationInSeconds);
 };
 exports.generateRtcToken = generateRtcToken;
-/**
- * Unique Channel Name Generate করে
- */
+// Unique Channel Name Generate করে
 const generateChannelName = () => {
     return `call_${(0, uuid_1.v4)().replace(/-/g, '').substring(0, 16)}`;
 };

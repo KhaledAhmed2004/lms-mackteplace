@@ -5,6 +5,7 @@ import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { Chat } from '../chat/chat.model';
+import { Subject } from '../subject/subject.model';
 import {
   ITrialRequest,
   TRIAL_REQUEST_STATUS,
@@ -12,49 +13,111 @@ import {
 import { TrialRequest } from './trialRequest.model';
 
 /**
- * Create trial request (Student)
+ * Create trial request (Student or Guest)
+ * This endpoint can be used by:
+ * 1. Logged-in students (studentId provided)
+ * 2. Guest users (no studentId, studentInfo required)
  */
 const createTrialRequest = async (
-  studentId: string,
+  studentId: string | null,
   payload: Partial<ITrialRequest>
 ): Promise<ITrialRequest> => {
-  // Verify student exists and has STUDENT role
-  const student = await User.findById(studentId);
-  if (!student) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
+  // Validate subject exists
+  const subjectExists = await Subject.findById(payload.subject);
+  if (!subjectExists) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Subject not found');
   }
 
-  if (student.role !== USER_ROLES.STUDENT) {
-    throw new ApiError(
-      StatusCodes.FORBIDDEN,
-      'Only students can create trial requests'
-    );
+  // Validate based on age
+  // Under 18: guardian info required
+  // 18+: student email/password required
+  if (payload.studentInfo?.isUnder18) {
+    if (!payload.studentInfo?.guardianInfo) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Guardian information is required for students under 18'
+      );
+    }
+  } else {
+    if (!payload.studentInfo?.email) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Email is required for students 18 and above'
+      );
+    }
+    if (!payload.studentInfo?.password) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Password is required for students 18 and above'
+      );
+    }
   }
 
-  // Check if student has pending trial request
-  const pendingRequest = await TrialRequest.findOne({
-    studentId: new Types.ObjectId(studentId),
-    status: TRIAL_REQUEST_STATUS.PENDING,
-  });
+  // If logged-in student, verify and check for pending requests
+  if (studentId) {
+    const student = await User.findById(studentId);
+    if (!student) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
+    }
 
-  if (pendingRequest) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'You already have a pending trial request. Please wait for a tutor to accept or cancel it.'
-    );
+    if (student.role !== USER_ROLES.STUDENT) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Only students can create trial requests'
+      );
+    }
+
+    // Check if student has pending trial request
+    const pendingRequest = await TrialRequest.findOne({
+      studentId: new Types.ObjectId(studentId),
+      status: TRIAL_REQUEST_STATUS.PENDING,
+    });
+
+    if (pendingRequest) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'You already have a pending trial request. Please wait for a tutor to accept or cancel it.'
+      );
+    }
+  } else {
+    // Guest user - check by email for pending requests
+    // For under 18: check guardian email
+    // For 18+: check student email
+    const emailToCheck = payload.studentInfo?.isUnder18
+      ? payload.studentInfo?.guardianInfo?.email
+      : payload.studentInfo?.email;
+
+    if (emailToCheck) {
+      const pendingRequest = await TrialRequest.findOne({
+        $or: [
+          { 'studentInfo.email': emailToCheck },
+          { 'studentInfo.guardianInfo.email': emailToCheck },
+        ],
+        status: TRIAL_REQUEST_STATUS.PENDING,
+      });
+
+      if (pendingRequest) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          'A pending trial request already exists for this email. Please wait for a tutor to accept or cancel it.'
+        );
+      }
+    }
   }
 
   // Create trial request
   const trialRequest = await TrialRequest.create({
     ...payload,
-    studentId: new Types.ObjectId(studentId),
+    studentId: studentId ? new Types.ObjectId(studentId) : undefined,
     status: TRIAL_REQUEST_STATUS.PENDING,
   });
 
-  // Increment student trial request count
-  await User.findByIdAndUpdate(studentId, {
-    $inc: { 'studentProfile.trialRequestsCount': 1 },
-  });
+  // Increment student trial request count if logged in
+  if (studentId) {
+    await User.findByIdAndUpdate(studentId, {
+      $inc: { 'studentProfile.trialRequestsCount': 1 },
+    });
+  }
 
   // TODO: Send real-time notification to matching tutors
   // const matchingTutors = await User.find({
@@ -69,7 +132,15 @@ const createTrialRequest = async (
   //   to: ADMIN_EMAIL,
   //   subject: 'New Trial Request',
   //   template: 'new-trial-request',
-  //   data: { studentName: student.name, subject: payload.subject }
+  //   data: { studentName: payload.studentInfo?.firstName, subject: subjectExists.name }
+  // });
+
+  // TODO: Send confirmation email to student
+  // await sendEmail({
+  //   to: payload.studentInfo?.email,
+  //   subject: 'Trial Request Submitted',
+  //   template: 'trial-request-confirmation',
+  //   data: { name: payload.studentInfo?.firstName, subject: subjectExists.name }
   // });
 
   return trialRequest;
@@ -101,7 +172,9 @@ const getMatchingTrialRequests = async (
       subject: { $in: tutorSubjects },
       status: TRIAL_REQUEST_STATUS.PENDING,
       expiresAt: { $gt: new Date() }, // Not expired
-    }).populate('studentId', 'name profilePicture'),
+    })
+      .populate('studentId', 'name profilePicture')
+      .populate('subject', 'name icon'),
     query
   )
     .filter()
@@ -110,7 +183,7 @@ const getMatchingTrialRequests = async (
     .fields();
 
   const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.countTotal();
+  const meta = await requestQuery.getPaginationInfo();
 
   return {
     meta,
@@ -128,6 +201,7 @@ const getMyTrialRequests = async (
   const requestQuery = new QueryBuilder(
     TrialRequest.find({ studentId: new Types.ObjectId(studentId) })
       .populate('acceptedTutorId', 'name profilePicture')
+      .populate('subject', 'name icon')
       .populate('chatId'),
     query
   )
@@ -137,7 +211,7 @@ const getMyTrialRequests = async (
     .fields();
 
   const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.countTotal();
+  const meta = await requestQuery.getPaginationInfo();
 
   return {
     meta,
@@ -153,17 +227,18 @@ const getAllTrialRequests = async (query: Record<string, unknown>) => {
     TrialRequest.find()
       .populate('studentId', 'name email profilePicture')
       .populate('acceptedTutorId', 'name email profilePicture')
+      .populate('subject', 'name icon')
       .populate('chatId'),
     query
   )
-    .search(['subject', 'description'])
+    .search(['description', 'studentInfo.firstName', 'studentInfo.lastName', 'studentInfo.email'])
     .filter()
     .sort()
     .paginate()
     .fields();
 
   const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.countTotal();
+  const meta = await requestQuery.getPaginationInfo();
 
   return {
     meta,
@@ -178,6 +253,7 @@ const getSingleTrialRequest = async (id: string): Promise<ITrialRequest | null> 
   const request = await TrialRequest.findById(id)
     .populate('studentId', 'name email profilePicture phone')
     .populate('acceptedTutorId', 'name email profilePicture phone')
+    .populate('subject', 'name icon description')
     .populate('chatId');
 
   if (!request) {
@@ -196,7 +272,7 @@ const acceptTrialRequest = async (
   tutorId: string
 ): Promise<ITrialRequest | null> => {
   // Verify request exists and is pending
-  const request = await TrialRequest.findById(requestId);
+  const request = await TrialRequest.findById(requestId).populate('subject', 'name');
   if (!request) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Trial request not found');
   }
@@ -225,18 +301,25 @@ const acceptTrialRequest = async (
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only verified tutors can accept requests');
   }
 
-  // Verify tutor teaches this subject
-  if (!tutor.tutorProfile?.subjects?.includes(request.subject)) {
+  // Verify tutor teaches this subject (compare ObjectId)
+  const tutorSubjectIds = tutor.tutorProfile?.subjects?.map(s => s.toString()) || [];
+  if (!tutorSubjectIds.includes(request.subject.toString())) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'You do not teach this subject'
     );
   }
 
+  // Prepare chat participants
+  // If studentId exists (logged-in user), use it; otherwise, create chat with tutor only for now
+  const chatParticipants = request.studentId
+    ? [request.studentId, new Types.ObjectId(tutorId)]
+    : [new Types.ObjectId(tutorId)];
+
   // Create chat between student and tutor
   const chat = await Chat.create({
-    participants: [request.studentId, new Types.ObjectId(tutorId)],
-    // You can add more chat metadata here
+    participants: chatParticipants,
+    trialRequestId: request._id, // Link chat to trial request
   });
 
   // Update trial request
@@ -247,17 +330,23 @@ const acceptTrialRequest = async (
   await request.save();
 
   // TODO: Send real-time notification to student
-  // io.to(request.studentId.toString()).emit('trialAccepted', {
-  //   tutorName: tutor.name,
-  //   chatId: chat._id
-  // });
+  // if (request.studentId) {
+  //   io.to(request.studentId.toString()).emit('trialAccepted', {
+  //     tutorName: tutor.name,
+  //     chatId: chat._id
+  //   });
+  // }
 
-  // TODO: Send email to student
+  // TODO: Send email to student (using studentInfo.email)
   // await sendEmail({
-  //   to: student.email,
+  //   to: request.studentInfo.email,
   //   subject: 'Your Trial Request Was Accepted!',
   //   template: 'trial-accepted',
-  //   data: { tutorName: tutor.name, subject: request.subject }
+  //   data: {
+  //     studentName: request.studentInfo.firstName,
+  //     tutorName: tutor.name,
+  //     subject: request.subject
+  //   }
   // });
 
   return request;
@@ -265,10 +354,11 @@ const acceptTrialRequest = async (
 
 /**
  * Cancel trial request (Student)
+ * Can be cancelled by studentId (logged-in) or by email (guest)
  */
 const cancelTrialRequest = async (
   requestId: string,
-  studentId: string,
+  studentIdOrEmail: string,
   cancellationReason: string
 ): Promise<ITrialRequest | null> => {
   const request = await TrialRequest.findById(requestId);
@@ -277,8 +367,13 @@ const cancelTrialRequest = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Trial request not found');
   }
 
-  // Verify ownership
-  if (request.studentId.toString() !== studentId) {
+  // Verify ownership - check both studentId and studentInfo.email
+  const isOwnerByStudentId =
+    request.studentId && request.studentId.toString() === studentIdOrEmail;
+  const isOwnerByEmail =
+    request.studentInfo?.email?.toLowerCase() === studentIdOrEmail.toLowerCase();
+
+  if (!isOwnerByStudentId && !isOwnerByEmail) {
     throw new ApiError(
       StatusCodes.FORBIDDEN,
       'You can only cancel your own trial requests'

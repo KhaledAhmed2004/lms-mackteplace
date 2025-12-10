@@ -228,18 +228,23 @@ const exportTrialRequests = async (status?: string): Promise<string> => {
   const query = status ? { status } : {};
   const requests = await TrialRequest.find(query)
     .populate('studentId', 'name email')
-    .populate('acceptedBy', 'name email')
-    .select('studentId subject level status acceptedBy createdAt expiresAt');
+    .populate('acceptedTutorId', 'name email')
+    .populate('subject', 'name');
 
   const data = requests.map(req => ({
-    studentName: (req.studentId as any)?.name || 'N/A',
-    studentEmail: (req.studentId as any)?.email || 'N/A',
-    subject: req.subject,
-    level: req.level,
+    studentName: req.studentInfo?.name || 'N/A',
+    studentEmail: req.studentInfo?.email || 'N/A',
+    isUnder18: req.studentInfo?.isUnder18 ? 'Yes' : 'No',
+    guardianName: req.studentInfo?.guardianInfo?.name || 'N/A',
+    guardianEmail: req.studentInfo?.guardianInfo?.email || 'N/A',
+    guardianPhone: req.studentInfo?.guardianInfo?.phone || 'N/A',
+    subject: (req.subject as any)?.name || 'N/A',
+    gradeLevel: req.gradeLevel || 'N/A',
+    schoolType: req.schoolType || 'N/A',
     status: req.status,
-    acceptedByName: (req.acceptedBy as any)?.name || 'N/A',
-    acceptedByEmail: (req.acceptedBy as any)?.email || 'N/A',
-    createdAt: req.createdAt?.toISOString().split('T')[0],
+    acceptedTutorName: (req.acceptedTutorId as any)?.name || 'N/A',
+    acceptedTutorEmail: (req.acceptedTutorId as any)?.email || 'N/A',
+    createdAt: (req as any).createdAt?.toISOString().split('T')[0] || 'N/A',
     expiresAt: req.expiresAt?.toISOString().split('T')[0] || 'N/A',
   }));
 

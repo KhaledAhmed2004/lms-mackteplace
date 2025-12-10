@@ -20,34 +20,62 @@ const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
 const chat_model_1 = require("../chat/chat.model");
+const subject_model_1 = require("../subject/subject.model");
 const trialRequest_interface_1 = require("./trialRequest.interface");
 const trialRequest_model_1 = require("./trialRequest.model");
 /**
- * Create trial request (Student)
+ * Create trial request (Student or Guest)
+ * This endpoint can be used by:
+ * 1. Logged-in students (studentId provided)
+ * 2. Guest users (no studentId, studentInfo required)
  */
 const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
-    // Verify student exists and has STUDENT role
-    const student = yield user_model_1.User.findById(studentId);
-    if (!student) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Student not found');
+    var _a, _b;
+    // Validate subject exists
+    const subjectExists = yield subject_model_1.Subject.findById(payload.subject);
+    if (!subjectExists) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
     }
-    if (student.role !== user_1.USER_ROLES.STUDENT) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only students can create trial requests');
+    // Validate guardian info for under 18
+    if (((_a = payload.studentInfo) === null || _a === void 0 ? void 0 : _a.isUnder18) && !payload.guardianInfo) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Guardian information is required for students under 18');
     }
-    // Check if student has pending trial request
-    const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
-        studentId: new mongoose_1.Types.ObjectId(studentId),
-        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
-    });
-    if (pendingRequest) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You already have a pending trial request. Please wait for a tutor to accept or cancel it.');
+    // If logged-in student, verify and check for pending requests
+    if (studentId) {
+        const student = yield user_model_1.User.findById(studentId);
+        if (!student) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Student not found');
+        }
+        if (student.role !== user_1.USER_ROLES.STUDENT) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only students can create trial requests');
+        }
+        // Check if student has pending trial request
+        const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
+            studentId: new mongoose_1.Types.ObjectId(studentId),
+            status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        });
+        if (pendingRequest) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You already have a pending trial request. Please wait for a tutor to accept or cancel it.');
+        }
+    }
+    else {
+        // Guest user - check by email for pending requests
+        const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
+            'studentInfo.email': (_b = payload.studentInfo) === null || _b === void 0 ? void 0 : _b.email,
+            status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        });
+        if (pendingRequest) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'A pending trial request already exists for this email. Please wait for a tutor to accept or cancel it.');
+        }
     }
     // Create trial request
-    const trialRequest = yield trialRequest_model_1.TrialRequest.create(Object.assign(Object.assign({}, payload), { studentId: new mongoose_1.Types.ObjectId(studentId), status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING }));
-    // Increment student trial request count
-    yield user_model_1.User.findByIdAndUpdate(studentId, {
-        $inc: { 'studentProfile.trialRequestsCount': 1 },
-    });
+    const trialRequest = yield trialRequest_model_1.TrialRequest.create(Object.assign(Object.assign({}, payload), { studentId: studentId ? new mongoose_1.Types.ObjectId(studentId) : undefined, status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING }));
+    // Increment student trial request count if logged in
+    if (studentId) {
+        yield user_model_1.User.findByIdAndUpdate(studentId, {
+            $inc: { 'studentProfile.trialRequestsCount': 1 },
+        });
+    }
     // TODO: Send real-time notification to matching tutors
     // const matchingTutors = await User.find({
     //   role: USER_ROLES.TUTOR,
@@ -60,7 +88,14 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
     //   to: ADMIN_EMAIL,
     //   subject: 'New Trial Request',
     //   template: 'new-trial-request',
-    //   data: { studentName: student.name, subject: payload.subject }
+    //   data: { studentName: payload.studentInfo?.firstName, subject: subjectExists.name }
+    // });
+    // TODO: Send confirmation email to student
+    // await sendEmail({
+    //   to: payload.studentInfo?.email,
+    //   subject: 'Trial Request Submitted',
+    //   template: 'trial-request-confirmation',
+    //   data: { name: payload.studentInfo?.firstName, subject: subjectExists.name }
     // });
     return trialRequest;
 });
@@ -84,7 +119,9 @@ const getMatchingTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, v
         subject: { $in: tutorSubjects },
         status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
         expiresAt: { $gt: new Date() }, // Not expired
-    }).populate('studentId', 'name profilePicture'), query)
+    })
+        .populate('studentId', 'name profilePicture')
+        .populate('subject', 'name icon'), query)
         .filter()
         .sort()
         .paginate()
@@ -102,6 +139,7 @@ const getMatchingTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, v
 const getMyTrialRequests = (studentId, query) => __awaiter(void 0, void 0, void 0, function* () {
     const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find({ studentId: new mongoose_1.Types.ObjectId(studentId) })
         .populate('acceptedTutorId', 'name profilePicture')
+        .populate('subject', 'name icon')
         .populate('chatId'), query)
         .filter()
         .sort()
@@ -121,8 +159,9 @@ const getAllTrialRequests = (query) => __awaiter(void 0, void 0, void 0, functio
     const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find()
         .populate('studentId', 'name email profilePicture')
         .populate('acceptedTutorId', 'name email profilePicture')
+        .populate('subject', 'name icon')
         .populate('chatId'), query)
-        .search(['subject', 'description'])
+        .search(['description', 'studentInfo.firstName', 'studentInfo.lastName', 'studentInfo.email'])
         .filter()
         .sort()
         .paginate()
@@ -141,6 +180,7 @@ const getSingleTrialRequest = (id) => __awaiter(void 0, void 0, void 0, function
     const request = yield trialRequest_model_1.TrialRequest.findById(id)
         .populate('studentId', 'name email profilePicture phone')
         .populate('acceptedTutorId', 'name email profilePicture phone')
+        .populate('subject', 'name icon description')
         .populate('chatId');
     if (!request) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Trial request not found');
@@ -154,7 +194,7 @@ const getSingleTrialRequest = (id) => __awaiter(void 0, void 0, void 0, function
 const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     // Verify request exists and is pending
-    const request = yield trialRequest_model_1.TrialRequest.findById(requestId);
+    const request = yield trialRequest_model_1.TrialRequest.findById(requestId).populate('subject', 'name');
     if (!request) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Trial request not found');
     }
@@ -175,14 +215,20 @@ const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, voi
     if (!((_a = tutor.tutorProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only verified tutors can accept requests');
     }
-    // Verify tutor teaches this subject
-    if (!((_c = (_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) === null || _c === void 0 ? void 0 : _c.includes(request.subject))) {
+    // Verify tutor teaches this subject (compare ObjectId)
+    const tutorSubjectIds = ((_c = (_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) === null || _c === void 0 ? void 0 : _c.map(s => s.toString())) || [];
+    if (!tutorSubjectIds.includes(request.subject.toString())) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You do not teach this subject');
     }
+    // Prepare chat participants
+    // If studentId exists (logged-in user), use it; otherwise, create chat with tutor only for now
+    const chatParticipants = request.studentId
+        ? [request.studentId, new mongoose_1.Types.ObjectId(tutorId)]
+        : [new mongoose_1.Types.ObjectId(tutorId)];
     // Create chat between student and tutor
     const chat = yield chat_model_1.Chat.create({
-        participants: [request.studentId, new mongoose_1.Types.ObjectId(tutorId)],
-        // You can add more chat metadata here
+        participants: chatParticipants,
+        trialRequestId: request._id, // Link chat to trial request
     });
     // Update trial request
     request.status = trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED;
@@ -191,29 +237,39 @@ const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, voi
     request.acceptedAt = new Date();
     yield request.save();
     // TODO: Send real-time notification to student
-    // io.to(request.studentId.toString()).emit('trialAccepted', {
-    //   tutorName: tutor.name,
-    //   chatId: chat._id
-    // });
-    // TODO: Send email to student
+    // if (request.studentId) {
+    //   io.to(request.studentId.toString()).emit('trialAccepted', {
+    //     tutorName: tutor.name,
+    //     chatId: chat._id
+    //   });
+    // }
+    // TODO: Send email to student (using studentInfo.email)
     // await sendEmail({
-    //   to: student.email,
+    //   to: request.studentInfo.email,
     //   subject: 'Your Trial Request Was Accepted!',
     //   template: 'trial-accepted',
-    //   data: { tutorName: tutor.name, subject: request.subject }
+    //   data: {
+    //     studentName: request.studentInfo.firstName,
+    //     tutorName: tutor.name,
+    //     subject: request.subject
+    //   }
     // });
     return request;
 });
 /**
  * Cancel trial request (Student)
+ * Can be cancelled by studentId (logged-in) or by email (guest)
  */
-const cancelTrialRequest = (requestId, studentId, cancellationReason) => __awaiter(void 0, void 0, void 0, function* () {
+const cancelTrialRequest = (requestId, studentIdOrEmail, cancellationReason) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     const request = yield trialRequest_model_1.TrialRequest.findById(requestId);
     if (!request) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Trial request not found');
     }
-    // Verify ownership
-    if (request.studentId.toString() !== studentId) {
+    // Verify ownership - check both studentId and studentInfo.email
+    const isOwnerByStudentId = request.studentId && request.studentId.toString() === studentIdOrEmail;
+    const isOwnerByEmail = ((_b = (_a = request.studentInfo) === null || _a === void 0 ? void 0 : _a.email) === null || _b === void 0 ? void 0 : _b.toLowerCase()) === studentIdOrEmail.toLowerCase();
+    if (!isOwnerByStudentId && !isOwnerByEmail) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You can only cancel your own trial requests');
     }
     // Can only cancel PENDING requests

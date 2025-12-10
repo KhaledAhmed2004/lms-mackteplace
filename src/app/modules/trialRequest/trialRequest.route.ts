@@ -1,29 +1,44 @@
 import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
+import optionalAuth from '../../middlewares/optionalAuth';
 import validateRequest from '../../middlewares/validateRequest';
 import { TrialRequestController } from './trialRequest.controller';
 import { TrialRequestValidation } from './trialRequest.validation';
 
 const router = express.Router();
 
-// ============ STUDENT ROUTES ============
+// ============ PUBLIC / GUEST ROUTES ============
 
 /**
  * @route   POST /api/v1/trial-requests
  * @desc    Create trial request (Uber-style request)
- * @access  Student only
- * @body    { subject: string, description: string, preferredLanguage: 'ENGLISH' | 'GERMAN', preferredDateTime?: Date }
- * @note    Student can only have one pending request at a time
+ * @access  Public (Guest or Student)
+ * @body    {
+ *   studentInfo: { firstName, lastName, email, isUnder18, dateOfBirth? },
+ *   subject: ObjectId (Subject ID),
+ *   gradeLevel: GRADE_LEVEL enum,
+ *   schoolType: SCHOOL_TYPE enum,
+ *   description: string,
+ *   preferredLanguage: 'ENGLISH' | 'GERMAN',
+ *   learningGoals?: string,
+ *   documents?: string[],
+ *   guardianInfo?: { name, email, phone, relationship? } (Required if under 18),
+ *   preferredDateTime?: Date
+ * }
+ * @note    Guest users can create requests without authentication
+ * @note    Student can only have one pending request at a time (checked by studentId or email)
  * @note    Request expires after 24 hours
- * @note    Increments student's trialRequestsCount
+ * @note    Guardian info required for students under 18
  */
 router.post(
   '/',
-  auth(USER_ROLES.STUDENT),
+  optionalAuth, // Allow both authenticated and guest users
   validateRequest(TrialRequestValidation.createTrialRequestZodSchema),
   TrialRequestController.createTrialRequest
 );
+
+// ============ STUDENT ROUTES ============
 
 /**
  * @route   GET /api/v1/trial-requests/my-requests

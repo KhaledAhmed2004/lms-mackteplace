@@ -18,11 +18,15 @@ const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const trialRequest_service_1 = require("./trialRequest.service");
 /**
- * Create trial request (Student)
+ * Create trial request (Student or Guest)
+ * Can be used by:
+ * - Logged-in students (auth token required)
+ * - Guest users (no auth required, studentInfo must be complete)
  */
 const createTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    // studentId will be null for guest users
+    const studentId = ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || null;
     const result = yield trialRequest_service_1.TrialRequestService.createTrialRequest(studentId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
