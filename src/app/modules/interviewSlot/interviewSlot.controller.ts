@@ -34,7 +34,7 @@ const getAllInterviewSlots = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Interview slots retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 

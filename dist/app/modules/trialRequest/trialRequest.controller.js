@@ -39,30 +39,28 @@ const createTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
  * Get matching trial requests for tutor
  */
 const getMatchingTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const tutorId = req.user.id;
     const result = yield trialRequest_service_1.TrialRequestService.getMatchingTrialRequests(tutorId, req.query);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Matching trial requests retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
  * Get student's own trial requests
  */
 const getMyTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield trialRequest_service_1.TrialRequestService.getMyTrialRequests(studentId, req.query);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Your trial requests retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
@@ -75,7 +73,7 @@ const getAllTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Trial requests retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
@@ -95,9 +93,8 @@ const getSingleTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(
  * Accept trial request (Tutor)
  */
 const acceptTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const tutorId = req.user.id;
     const result = yield trialRequest_service_1.TrialRequestService.acceptTrialRequest(id, tutorId);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -110,9 +107,8 @@ const acceptTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
  * Cancel trial request (Student)
  */
 const cancelTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const { cancellationReason } = req.body;
     const result = yield trialRequest_service_1.TrialRequestService.cancelTrialRequest(id, studentId, cancellationReason);
     (0, sendResponse_1.default)(res, {

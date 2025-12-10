@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TrialRequest = void 0;
 const mongoose_1 = require("mongoose");
 const trialRequest_interface_1 = require("./trialRequest.interface");
-// Guardian info sub-schema
+// Guardian info sub-schema (nested inside studentInfo)
 const guardianInfoSchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -16,6 +16,10 @@ const guardianInfoSchema = new mongoose_1.Schema({
         trim: true,
         lowercase: true,
     },
+    password: {
+        type: String,
+        required: [true, 'Guardian password is required'],
+    },
     phone: {
         type: String,
         required: [true, 'Guardian phone number is required'],
@@ -27,31 +31,36 @@ const guardianInfoSchema = new mongoose_1.Schema({
         default: 'PARENT',
     },
 }, { _id: false });
-// Student info sub-schema
+// Student info sub-schema (with nested guardianInfo)
+// If under 18: only name required, email/password comes from guardian
+// If 18+: email and password required for the student
 const studentInfoSchema = new mongoose_1.Schema({
-    firstName: {
+    name: {
         type: String,
-        required: [true, 'First name is required'],
-        trim: true,
-    },
-    lastName: {
-        type: String,
-        required: [true, 'Last name is required'],
+        required: [true, 'Name is required'],
         trim: true,
     },
     email: {
         type: String,
-        required: [true, 'Email is required'],
         trim: true,
         lowercase: true,
+        // Required only if 18+ (validated in pre-save hook)
     },
-    dateOfBirth: {
-        type: Date,
+    password: {
+        type: String,
+        // Required only if 18+ (validated in pre-save hook)
     },
     isUnder18: {
         type: Boolean,
         required: [true, 'Age verification is required'],
         default: false,
+    },
+    dateOfBirth: {
+        type: Date,
+    },
+    // Guardian info nested inside studentInfo (required if under 18)
+    guardianInfo: {
+        type: guardianInfoSchema,
     },
 }, { _id: false });
 const trialRequestSchema = new mongoose_1.Schema({
@@ -109,10 +118,6 @@ const trialRequestSchema = new mongoose_1.Schema({
             trim: true,
         },
     ],
-    // Guardian Information (Required if student is under 18)
-    guardianInfo: {
-        type: guardianInfoSchema,
-    },
     // Request Status
     status: {
         type: String,
@@ -166,12 +171,28 @@ trialRequestSchema.pre('save', function (next) {
     }
     next();
 });
-// Pre-save: Validate guardian info for under 18
+// Pre-save: Validate based on age
+// Under 18: guardian info required, student email/password not needed
+// 18+: student email/password required, guardian info not needed
 trialRequestSchema.pre('save', function (next) {
-    var _a;
-    if (((_a = this.studentInfo) === null || _a === void 0 ? void 0 : _a.isUnder18) && !this.guardianInfo) {
-        const error = new Error('Guardian information is required for students under 18');
-        return next(error);
+    const studentInfo = this.studentInfo;
+    if (studentInfo === null || studentInfo === void 0 ? void 0 : studentInfo.isUnder18) {
+        // Under 18: Guardian info is required
+        if (!(studentInfo === null || studentInfo === void 0 ? void 0 : studentInfo.guardianInfo)) {
+            const error = new Error('Guardian information is required for students under 18');
+            return next(error);
+        }
+    }
+    else {
+        // 18+: Student email and password are required
+        if (!(studentInfo === null || studentInfo === void 0 ? void 0 : studentInfo.email)) {
+            const error = new Error('Email is required for students 18 and above');
+            return next(error);
+        }
+        if (!(studentInfo === null || studentInfo === void 0 ? void 0 : studentInfo.password)) {
+            const error = new Error('Password is required for students 18 and above');
+            return next(error);
+        }
     }
     next();
 });

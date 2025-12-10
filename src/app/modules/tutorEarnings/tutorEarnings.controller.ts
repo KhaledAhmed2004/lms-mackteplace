@@ -35,7 +35,7 @@ const getMyEarnings = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Earnings history retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -50,7 +50,7 @@ const getAllEarnings = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Earnings retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 

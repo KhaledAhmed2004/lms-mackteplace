@@ -31,7 +31,7 @@ const getMyBillings = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Billing history retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -46,7 +46,7 @@ const getAllBillings = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Billings retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 

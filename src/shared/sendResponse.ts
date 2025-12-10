@@ -1,15 +1,17 @@
 import { Response } from 'express';
 
+type IPagination = {
+  page: number;
+  limit: number;
+  totalPage: number;
+  total: number;
+};
+
 type IData<T> = {
   success: boolean;
   statusCode: number;
   message?: string;
-  pagination?: {
-    page: number;
-    limit: number;
-    totalPage: number;
-    total: number;
-  };
+  pagination?: IPagination;
   data?: T;
 };
 

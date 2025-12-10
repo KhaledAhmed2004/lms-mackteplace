@@ -47,7 +47,7 @@ const getAllApplications = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Applications retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 

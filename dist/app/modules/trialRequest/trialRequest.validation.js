@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TrialRequestValidation = void 0;
 const zod_1 = require("zod");
 const trialRequest_interface_1 = require("./trialRequest.interface");
-// Guardian info schema (required for students under 18)
+// Guardian info schema (nested inside studentInfo, required for students under 18)
 const guardianInfoSchema = zod_1.z.object({
     name: zod_1.z
         .string({
@@ -18,6 +18,11 @@ const guardianInfoSchema = zod_1.z.object({
     })
         .trim()
         .email('Invalid guardian email format'),
+    password: zod_1.z
+        .string({
+        required_error: 'Guardian password is required',
+    })
+        .min(6, 'Guardian password must be at least 6 characters'),
     phone: zod_1.z
         .string({
         required_error: 'Guardian phone number is required',
@@ -32,51 +37,79 @@ const guardianInfoSchema = zod_1.z.object({
         .optional()
         .default('PARENT'),
 });
-// Student info schema
-const studentInfoSchema = zod_1.z.object({
-    firstName: zod_1.z
+// Student info schema (with nested guardianInfo)
+// Under 18: only name required, email/password comes from guardian
+// 18+: email and password required for the student
+const studentInfoSchema = zod_1.z
+    .object({
+    name: zod_1.z
         .string({
-        required_error: 'First name is required',
+        required_error: 'Name is required',
     })
         .trim()
-        .min(2, 'First name must be at least 2 characters')
-        .max(50, 'First name cannot exceed 50 characters'),
-    lastName: zod_1.z
-        .string({
-        required_error: 'Last name is required',
-    })
-        .trim()
-        .min(2, 'Last name must be at least 2 characters')
-        .max(50, 'Last name cannot exceed 50 characters'),
-    email: zod_1.z
-        .string({
-        required_error: 'Email is required',
-    })
-        .trim()
-        .email('Invalid email format'),
+        .min(2, 'Name must be at least 2 characters')
+        .max(100, 'Name cannot exceed 100 characters'),
+    // Email: Required only if 18+
+    email: zod_1.z.string().trim().email('Invalid email format').optional(),
+    // Password: Required only if 18+
+    password: zod_1.z
+        .string()
+        .min(6, 'Password must be at least 6 characters')
+        .optional(),
+    isUnder18: zod_1.z.boolean({
+        required_error: 'Please specify if student is under 18',
+    }),
     dateOfBirth: zod_1.z
         .string()
         .refine(date => !isNaN(Date.parse(date)), {
         message: 'Invalid date of birth format',
     })
         .optional(),
-    isUnder18: zod_1.z.boolean({
-        required_error: 'Please specify if student is under 18',
-    }),
+    // Guardian info nested inside studentInfo (required if under 18)
+    guardianInfo: guardianInfoSchema.optional(),
+})
+    .refine(data => {
+    // If student is under 18, guardian info is required
+    if (data.isUnder18 && !data.guardianInfo) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Guardian information is required for students under 18',
+    path: ['guardianInfo'],
+})
+    .refine(data => {
+    // If student is 18+, email is required
+    if (!data.isUnder18 && !data.email) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Email is required for students 18 and above',
+    path: ['email'],
+})
+    .refine(data => {
+    // If student is 18+, password is required
+    if (!data.isUnder18 && !data.password) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Password is required for students 18 and above',
+    path: ['password'],
 });
 // Create trial request validation (Student/Guest)
 const createTrialRequestZodSchema = zod_1.z.object({
-    body: zod_1.z
-        .object({
-        // Student Information (Required)
+    body: zod_1.z.object({
+        // Student Information (Required) - with nested guardianInfo
         studentInfo: studentInfoSchema,
         // Academic Information (Required)
         subject: zod_1.z
             .string({
-            required_error: 'Subject ID is required',
+            required_error: 'Subject is required',
         })
             .trim()
-            .min(1, 'Subject ID is required'),
+            .min(1, 'Subject is required'),
         gradeLevel: zod_1.z.nativeEnum(trialRequest_interface_1.GRADE_LEVEL, {
             required_error: 'Grade level is required',
             invalid_type_error: 'Invalid grade level',
@@ -108,19 +141,7 @@ const createTrialRequestZodSchema = zod_1.z.object({
         })
             .optional(),
         // Documents (Optional)
-        documents: zod_1.z.array(zod_1.z.string().url('Invalid document URL')).optional(),
-        // Guardian Information (Conditionally required)
-        guardianInfo: guardianInfoSchema.optional(),
-    })
-        .refine(data => {
-        // If student is under 18, guardian info is required
-        if (data.studentInfo.isUnder18 && !data.guardianInfo) {
-            return false;
-        }
-        return true;
-    }, {
-        message: 'Guardian information is required for students under 18',
-        path: ['guardianInfo'],
+        documents: zod_1.z.array(zod_1.z.string()).optional(),
     }),
 });
 // Cancel trial request validation (Student)

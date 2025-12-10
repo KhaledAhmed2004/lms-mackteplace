@@ -221,20 +221,25 @@ const exportTrialRequests = (status) => __awaiter(void 0, void 0, void 0, functi
     const query = status ? { status } : {};
     const requests = yield trialRequest_model_1.TrialRequest.find(query)
         .populate('studentId', 'name email')
-        .populate('acceptedBy', 'name email')
-        .select('studentId subject level status acceptedBy createdAt expiresAt');
+        .populate('acceptedTutorId', 'name email')
+        .populate('subject', 'name');
     const data = requests.map(req => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
         return ({
-            studentName: ((_a = req.studentId) === null || _a === void 0 ? void 0 : _a.name) || 'N/A',
-            studentEmail: ((_b = req.studentId) === null || _b === void 0 ? void 0 : _b.email) || 'N/A',
-            subject: req.subject,
-            level: req.level,
+            studentName: ((_a = req.studentInfo) === null || _a === void 0 ? void 0 : _a.name) || 'N/A',
+            studentEmail: ((_b = req.studentInfo) === null || _b === void 0 ? void 0 : _b.email) || 'N/A',
+            isUnder18: ((_c = req.studentInfo) === null || _c === void 0 ? void 0 : _c.isUnder18) ? 'Yes' : 'No',
+            guardianName: ((_e = (_d = req.studentInfo) === null || _d === void 0 ? void 0 : _d.guardianInfo) === null || _e === void 0 ? void 0 : _e.name) || 'N/A',
+            guardianEmail: ((_g = (_f = req.studentInfo) === null || _f === void 0 ? void 0 : _f.guardianInfo) === null || _g === void 0 ? void 0 : _g.email) || 'N/A',
+            guardianPhone: ((_j = (_h = req.studentInfo) === null || _h === void 0 ? void 0 : _h.guardianInfo) === null || _j === void 0 ? void 0 : _j.phone) || 'N/A',
+            subject: ((_k = req.subject) === null || _k === void 0 ? void 0 : _k.name) || 'N/A',
+            gradeLevel: req.gradeLevel || 'N/A',
+            schoolType: req.schoolType || 'N/A',
             status: req.status,
-            acceptedByName: ((_c = req.acceptedBy) === null || _c === void 0 ? void 0 : _c.name) || 'N/A',
-            acceptedByEmail: ((_d = req.acceptedBy) === null || _d === void 0 ? void 0 : _d.email) || 'N/A',
-            createdAt: (_e = req.createdAt) === null || _e === void 0 ? void 0 : _e.toISOString().split('T')[0],
-            expiresAt: ((_f = req.expiresAt) === null || _f === void 0 ? void 0 : _f.toISOString().split('T')[0]) || 'N/A',
+            acceptedTutorName: ((_l = req.acceptedTutorId) === null || _l === void 0 ? void 0 : _l.name) || 'N/A',
+            acceptedTutorEmail: ((_m = req.acceptedTutorId) === null || _m === void 0 ? void 0 : _m.email) || 'N/A',
+            createdAt: ((_o = req.createdAt) === null || _o === void 0 ? void 0 : _o.toISOString().split('T')[0]) || 'N/A',
+            expiresAt: ((_p = req.expiresAt) === null || _p === void 0 ? void 0 : _p.toISOString().split('T')[0]) || 'N/A',
         });
     });
     return jsonToCSV(data);

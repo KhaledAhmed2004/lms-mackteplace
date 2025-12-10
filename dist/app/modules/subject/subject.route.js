@@ -18,18 +18,21 @@ const router = express_1.default.Router();
  * @access  Public
  */
 router.get('/active', subject_controller_1.SubjectController.getActiveSubjects);
+// /**
+//  * @route   GET /api/v1/subjects/slug/:slug
+//  * @desc    Get single subject by slug (e.g., /slug/mathematics)
+//  * @access  Public
+//  */
+// router.get(
+//   '/slug/:slug',
+//   SubjectController.getSubjectBySlug
+// );
 /**
- * @route   GET /api/v1/subjects/slug/:slug
- * @desc    Get single subject by slug (e.g., /slug/mathematics)
- * @access  Public
- */
-router.get('/slug/:slug', subject_controller_1.SubjectController.getSubjectBySlug);
-/**
- * @route   GET /api/v1/subjects/:id
+ * @route   GET /api/v1/subjects/:subjectId
  * @desc    Get single subject by ID
  * @access  Public
  */
-router.get('/:id', subject_controller_1.SubjectController.getSingleSubject);
+router.get('/:subjectId', subject_controller_1.SubjectController.getSingleSubject);
 /**
  * @route   GET /api/v1/subjects
  * @desc    Get all subjects with filtering, searching, pagination

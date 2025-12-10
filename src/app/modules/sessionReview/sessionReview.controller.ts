@@ -31,7 +31,7 @@ const getMyReviews = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Reviews retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 
@@ -52,7 +52,7 @@ const getTutorReviews = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Tutor reviews retrieved successfully',
     data: result.data,
-    meta: result.meta,
+    pagination: result.meta,
   });
 });
 

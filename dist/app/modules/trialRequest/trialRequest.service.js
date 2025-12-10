@@ -30,15 +30,27 @@ const trialRequest_model_1 = require("./trialRequest.model");
  * 2. Guest users (no studentId, studentInfo required)
  */
 const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     // Validate subject exists
     const subjectExists = yield subject_model_1.Subject.findById(payload.subject);
     if (!subjectExists) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
     }
-    // Validate guardian info for under 18
-    if (((_a = payload.studentInfo) === null || _a === void 0 ? void 0 : _a.isUnder18) && !payload.guardianInfo) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Guardian information is required for students under 18');
+    // Validate based on age
+    // Under 18: guardian info required
+    // 18+: student email/password required
+    if ((_a = payload.studentInfo) === null || _a === void 0 ? void 0 : _a.isUnder18) {
+        if (!((_b = payload.studentInfo) === null || _b === void 0 ? void 0 : _b.guardianInfo)) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Guardian information is required for students under 18');
+        }
+    }
+    else {
+        if (!((_c = payload.studentInfo) === null || _c === void 0 ? void 0 : _c.email)) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Email is required for students 18 and above');
+        }
+        if (!((_d = payload.studentInfo) === null || _d === void 0 ? void 0 : _d.password)) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Password is required for students 18 and above');
+        }
     }
     // If logged-in student, verify and check for pending requests
     if (studentId) {
@@ -60,12 +72,22 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
     }
     else {
         // Guest user - check by email for pending requests
-        const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
-            'studentInfo.email': (_b = payload.studentInfo) === null || _b === void 0 ? void 0 : _b.email,
-            status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
-        });
-        if (pendingRequest) {
-            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'A pending trial request already exists for this email. Please wait for a tutor to accept or cancel it.');
+        // For under 18: check guardian email
+        // For 18+: check student email
+        const emailToCheck = ((_e = payload.studentInfo) === null || _e === void 0 ? void 0 : _e.isUnder18)
+            ? (_g = (_f = payload.studentInfo) === null || _f === void 0 ? void 0 : _f.guardianInfo) === null || _g === void 0 ? void 0 : _g.email
+            : (_h = payload.studentInfo) === null || _h === void 0 ? void 0 : _h.email;
+        if (emailToCheck) {
+            const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
+                $or: [
+                    { 'studentInfo.email': emailToCheck },
+                    { 'studentInfo.guardianInfo.email': emailToCheck },
+                ],
+                status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+            });
+            if (pendingRequest) {
+                throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'A pending trial request already exists for this email. Please wait for a tutor to accept or cancel it.');
+            }
         }
     }
     // Create trial request
@@ -127,7 +149,7 @@ const getMatchingTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, v
         .paginate()
         .fields();
     const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.countTotal();
+    const meta = yield requestQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -146,7 +168,7 @@ const getMyTrialRequests = (studentId, query) => __awaiter(void 0, void 0, void 
         .paginate()
         .fields();
     const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.countTotal();
+    const meta = yield requestQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -167,7 +189,7 @@ const getAllTrialRequests = (query) => __awaiter(void 0, void 0, void 0, functio
         .paginate()
         .fields();
     const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.countTotal();
+    const meta = yield requestQuery.getPaginationInfo();
     return {
         meta,
         data: result,
