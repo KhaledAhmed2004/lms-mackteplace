@@ -24,14 +24,14 @@ const getAllSubjects = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Subjects retrieved successfully',
     data: result.data,
-    pagination: result.meta,
+    pagination: result.pagination,
   });
 });
 
 // Get single subject
 const getSingleSubject = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await SubjectService.getSingleSubject(id);
+  const { subjectId } = req.params;
+  const result = await SubjectService.getSingleSubject(subjectId);
 
   sendResponse(res, {
     success: true,
@@ -43,8 +43,8 @@ const getSingleSubject = catchAsync(async (req: Request, res: Response) => {
 
 // Update subject
 const updateSubject = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await SubjectService.updateSubject(id, req.body);
+  const { subjectId } = req.params;
+  const result = await SubjectService.updateSubject(subjectId, req.body);
 
   sendResponse(res, {
     success: true,
@@ -56,8 +56,8 @@ const updateSubject = catchAsync(async (req: Request, res: Response) => {
 
 // Delete subject
 const deleteSubject = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await SubjectService.deleteSubject(id);
+  const { subjectId } = req.params;
+  const result = await SubjectService.deleteSubject(subjectId);
 
   sendResponse(res, {
     success: true,

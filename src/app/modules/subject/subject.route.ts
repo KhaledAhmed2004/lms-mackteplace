@@ -47,13 +47,13 @@ router.post(
 );
 
 /**
- * @route   PATCH /api/v1/subjects/:id
+ * @route   PATCH /api/v1/subjects/:subjectId
  * @desc    Update subject
  * @access  Admin only
  * @body    { name?, isActive? }
  */
 router.patch(
-  '/:id',
+  '/:subjectId',
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(SubjectValidation.updateSubjectZodSchema),
   SubjectController.updateSubject
@@ -65,7 +65,7 @@ router.patch(
  * @access  Admin only
  */
 router.delete(
-  '/:id',
+  '/:subjectId',
   auth(USER_ROLES.SUPER_ADMIN),
   SubjectController.deleteSubject
 );

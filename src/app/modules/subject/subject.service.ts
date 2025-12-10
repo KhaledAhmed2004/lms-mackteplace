@@ -21,15 +21,19 @@ const createSubject = async (payload: ISubject): Promise<ISubject> => {
 // Get all subjects with filtering, searching, pagination
 const getAllSubjects = async (query: Record<string, unknown>) => {
   const subjectQuery = new QueryBuilder(Subject.find(), query)
-    .search(['name', 'description']) // Text search
-    .filter() // Apply filters
-    .sort() // Sort
-    .paginate() // Pagination
-    .fields(); // Field selection
+    .search(['name'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
 
-  const result = await subjectQuery.modelQuery.lean();
+  const data = await subjectQuery.modelQuery.lean();
+  const pagination = await subjectQuery.getPaginationInfo();
 
-  return result;
+  return {
+    data,
+    pagination,
+  };
 };
 
 // Get single subject by ID
@@ -54,13 +58,13 @@ const updateSubject = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Subject not found');
   }
 
-  // If updating slug, check for uniqueness
-  if (payload.slug && payload.slug !== subject.slug) {
-    const existingSubject = await Subject.findOne({ slug: payload.slug });
+  // If updating name, check for uniqueness
+  if (payload.name && payload.name !== subject.name) {
+    const existingSubject = await Subject.findOne({ name: payload.name });
     if (existingSubject) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        'Subject with this slug already exists'
+        'Subject with this name already exists'
       );
     }
   }
@@ -90,7 +94,7 @@ const deleteSubject = async (id: string): Promise<ISubject | null> => {
   return result;
 };
 
-const getActiveSubjects = async () => {
+const getActiveSubjects = async (): Promise<ISubject[]> => {
   const result = await Subject.find({ isActive: true })
     .sort({ name: 1 })
     .lean();
