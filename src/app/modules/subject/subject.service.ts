@@ -4,12 +4,14 @@ import ApiError from '../../../errors/ApiError';
 import { ISubject } from './subject.interface';
 import { Subject } from './subject.model';
 
-// Create subject
 const createSubject = async (payload: ISubject): Promise<ISubject> => {
-  // Check if subject with this slug already exists
-  const existingSubject = await Subject.findOne({ slug: payload.slug });
+  // Check if subject with the same name already exists
+  const existingSubject = await Subject.findOne({ name: payload.name });
   if (existingSubject) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Subject with this slug already exists');
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Subject with this same name already exists'
+    );
   }
 
   const result = await Subject.create(payload);
@@ -25,29 +27,14 @@ const getAllSubjects = async (query: Record<string, unknown>) => {
     .paginate() // Pagination
     .fields(); // Field selection
 
-  const result = await subjectQuery.modelQuery;
-  const meta = await subjectQuery.countTotal();
+  const result = await subjectQuery.modelQuery.lean();
 
-  return {
-    meta,
-    data: result,
-  };
+  return result;
 };
 
 // Get single subject by ID
 const getSingleSubject = async (id: string): Promise<ISubject | null> => {
   const result = await Subject.findById(id);
-
-  if (!result) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Subject not found');
-  }
-
-  return result;
-};
-
-// Get subject by slug
-const getSubjectBySlug = async (slug: string): Promise<ISubject | null> => {
-  const result = await Subject.findOne({ slug });
 
   if (!result) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Subject not found');
@@ -71,7 +58,10 @@ const updateSubject = async (
   if (payload.slug && payload.slug !== subject.slug) {
     const existingSubject = await Subject.findOne({ slug: payload.slug });
     if (existingSubject) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Subject with this slug already exists');
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Subject with this slug already exists'
+      );
     }
   }
 
@@ -100,9 +90,10 @@ const deleteSubject = async (id: string): Promise<ISubject | null> => {
   return result;
 };
 
-// Get active subjects only (for public use)
 const getActiveSubjects = async () => {
-  const result = await Subject.find({ isActive: true }).sort({ name: 1 });
+  const result = await Subject.find({ isActive: true })
+    .sort({ name: 1 })
+    .lean();
   return result;
 };
 
@@ -110,7 +101,6 @@ export const SubjectService = {
   createSubject,
   getAllSubjects,
   getSingleSubject,
-  getSubjectBySlug,
   updateSubject,
   deleteSubject,
   getActiveSubjects,

@@ -14,30 +14,14 @@ const router = express.Router();
  * @desc    Get all active subjects (for students/tutors to see available subjects)
  * @access  Public
  */
-router.get(
-  '/active',
-  SubjectController.getActiveSubjects
-);
-
-// /**
-//  * @route   GET /api/v1/subjects/slug/:slug
-//  * @desc    Get single subject by slug (e.g., /slug/mathematics)
-//  * @access  Public
-//  */
-// router.get(
-//   '/slug/:slug',
-//   SubjectController.getSubjectBySlug
-// );
+router.get('/active', SubjectController.getActiveSubjects);
 
 /**
  * @route   GET /api/v1/subjects/:subjectId
  * @desc    Get single subject by ID
  * @access  Public
  */
-router.get(
-  '/:subjectId',
-  SubjectController.getSingleSubject
-);
+router.get('/:subjectId', SubjectController.getSingleSubject);
 
 /**
  * @route   GET /api/v1/subjects
@@ -45,10 +29,7 @@ router.get(
  * @access  Public
  * @query   ?page=1&limit=10&searchTerm=math&isActive=true
  */
-router.get(
-  '/',
-  SubjectController.getAllSubjects
-);
+router.get('/', SubjectController.getAllSubjects);
 
 // ============ ADMIN ONLY ROUTES ============
 
@@ -56,7 +37,7 @@ router.get(
  * @route   POST /api/v1/subjects
  * @desc    Create new subject
  * @access  Admin only
- * @body    { name: "Mathematics", slug: "mathematics", icon?: "url", description?: "text" }
+ * @body    { name: "Mathematics", isActive?: true }
  */
 router.post(
   '/',
@@ -69,7 +50,7 @@ router.post(
  * @route   PATCH /api/v1/subjects/:id
  * @desc    Update subject
  * @access  Admin only
- * @body    { name?, slug?, icon?, description?, isActive? }
+ * @body    { name?, isActive? }
  */
 router.patch(
   '/:id',
@@ -79,7 +60,7 @@ router.patch(
 );
 
 /**
- * @route   DELETE /api/v1/subjects/:id
+ * @route   DELETE /api/v1/subjects/:subjectId
  * @desc    Delete subject (soft delete - sets isActive to false)
  * @access  Admin only
  */

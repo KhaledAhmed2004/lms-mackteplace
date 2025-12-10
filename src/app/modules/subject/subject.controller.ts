@@ -4,7 +4,6 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { SubjectService } from './subject.service';
 
-// Create subject
 const createSubject = catchAsync(async (req: Request, res: Response) => {
   const result = await SubjectService.createSubject(req.body);
 
@@ -42,19 +41,6 @@ const getSingleSubject = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Get subject by slug
-const getSubjectBySlug = catchAsync(async (req: Request, res: Response) => {
-  const { slug } = req.params;
-  const result = await SubjectService.getSubjectBySlug(slug);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Subject retrieved successfully',
-    data: result,
-  });
-});
-
 // Update subject
 const updateSubject = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -82,7 +68,7 @@ const deleteSubject = catchAsync(async (req: Request, res: Response) => {
 });
 
 // Get active subjects
-const getActiveSubjects = catchAsync(async (req: Request, res: Response) => {
+const getActiveSubjects = catchAsync(async (_req: Request, res: Response) => {
   const result = await SubjectService.getActiveSubjects();
 
   sendResponse(res, {
@@ -97,7 +83,6 @@ export const SubjectController = {
   createSubject,
   getAllSubjects,
   getSingleSubject,
-  getSubjectBySlug,
   updateSubject,
   deleteSubject,
   getActiveSubjects,
