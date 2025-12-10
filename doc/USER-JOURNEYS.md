@@ -12,7 +12,7 @@
 
 # 0. Complete Platform Flow (Mega All-in-One Diagram)
 
-এই diagram এ পুরো platform এর সব flows একসাথে দেখানো হয়েছে - Student, Tutor, Admin journeys এবং তারা কিভাবে Session, Payment, ও Review system এ connect হয়।
+This diagram shows all the platform flows together — the Student, Tutor, and Admin journeys, and how they connect to the Session, Payment, and Review systems.
 
 ```mermaid
 flowchart TB
@@ -150,18 +150,6 @@ flowchart TB
 | 🟡 Yellow | Session | #fef3c7 |
 | 🟠 Orange | Payment | #fed7aa |
 | 🩷 Pink | Review | #fce7f3 |
-
-### Key Connection Points
-
-| From | To | Connection |
-|------|-----|------------|
-| Student Trial Request | Tutor Accept | 🔗 Match - Chat opens |
-| Tutor Propose Session | Student Accept | 📅 Session scheduled |
-| Both in Google Meet | Session In Progress | 🎥 Teaching happens |
-| Session Ends | Review System | ⭐ Both must review |
-| Session Completed | Payment Tracking | 💰 Hours counted |
-| Tutor Application | Admin Review | 📥 Approval flow |
-| Admin Approve | Tutor Dashboard | ✅ Can accept students |
 
 ---
 
@@ -517,11 +505,11 @@ sequenceDiagram
 
 ## 1.5 Student Subscription & Monthly Billing
 
-| Plan      | Price  | Commitment          | Best For              |
-| --------- | ------ | ------------------- | --------------------- |
-| Flexible  | €30/hr | None                | চেষ্টা করে দেখতে চায় |
-| Regular   | €28/hr | 1 month, min 4 hrs  | Regular study         |
-| Long-term | €25/hr | 3 months, min 4 hrs | Exam preparation      |
+| Plan      | Price  | Commitment          | Best For               |
+| --------- | ------ | ------------------- | ---------------------- |
+| Flexible  | €30/hr | None                | Trying out the platform |
+| Regular   | €28/hr | 1 month, min 4 hrs  | Regular study          |
+| Long-term | €25/hr | 3 months, min 4 hrs | Exam preparation       |
 
 ### Billing Flow Diagram
 
@@ -550,11 +538,11 @@ flowchart TD
 
 ## 1.6 Student Dashboard Pages (After Payment)
 
-> Payment করার পরে Student Dashboard এ redirect হবে
+> After completing the payment, the student will be redirected to the Student Dashboard.
 
 ### Page Overview
 
-| Page          | কি দেখবে                               | কি করতে পারবে         |
+| Page          | What will be shown                     | What can be done      |
 | ------------- | -------------------------------------- | --------------------- |
 | Home          | Stats, Next session, Pending reviews   | Quick actions         |
 | Messages      | All tutor conversations                | Message, Book session |
@@ -637,8 +625,8 @@ flowchart TD
 
 ### 🆘 Support (Direct Admin Chat)
 
-> Support এ click করলে Report submit করা যাবে।
-> Report submit করলে Admin Dashboard এ যাবে এবং Admin directly chat করে issue solve করবে।
+> Click Support to submit a report.
+> Submitted reports go to Admin Dashboard where Admin can directly chat to resolve issues.
 
 #### Support Flow
 
@@ -760,13 +748,13 @@ Invoice PDF Contains:
 
 ### 🆘 Support Page (Updated)
 
-> Support এ click করলে নিচের options দেখাবে
+> Click Support to see the following options
 
 ---
 
 ### 📚 Resources Page
 
-> Open source educational database থেকে resources search করতে পারবে
+> Search resources from open source educational database
 
 #### Open Source Data Sources
 
@@ -1128,7 +1116,7 @@ flowchart TD
 
 ## 2.4 Tutor Dashboard Overview (After Approval)
 
-> Approve হওয়ার পরে Tutor মূল Dashboard এ যাবে
+> After approval, Tutor goes to the main Dashboard
 
 ### Dashboard Navigation
 
@@ -1148,7 +1136,7 @@ flowchart LR
 
 ### Dashboard Pages Overview
 
-| Page     | কি দেখবে                               | কি করতে পারবে                  |
+| Page     | What to See                            | What to Do                     |
 | -------- | -------------------------------------- | ------------------------------ |
 | Overview | Level, Stats, Earnings, Trial Requests | Accept requests, Quick actions |
 | Sessions | Upcoming & Completed sessions          | Join, Give feedback            |
@@ -1176,7 +1164,7 @@ flowchart TD
 
 ### 📝 Student Feedback (After Session)
 
-> Session complete হওয়ার পরে Tutor student কে feedback দিতে পারবে
+> After session completion, Tutor can give feedback to the student
 
 #### Feedback Flow
 
@@ -1209,7 +1197,7 @@ flowchart TD
 
 ## 2.5 Tutor Views & Accepts Trial Requests
 
-> Tutor Dashboard এ Trial Requests page এ যাবে matching requests দেখতে
+> Tutor goes to Trial Requests page in Dashboard to see matching requests
 
 ### Page Structure
 
@@ -1266,10 +1254,10 @@ flowchart LR
 
 **Review Flow:**
 
-- Session শেষ হলে → "Leave a Review" দেখাবে
-- Review দিলে → "Review Submitted" (অন্যজনের জন্য wait করবে)
-- দুইজনই review দিলে → "Completed" হবে
-- কেউ join না করলে → "Expired" হবে
+- When session ends → Shows "Leave a Review"
+- After reviewing → "Review Submitted" (waiting for other person)
+- When both review → Becomes "Completed"
+- If no one joins → Becomes "Expired"
 
 ### Status Types
 
@@ -1314,13 +1302,13 @@ flowchart LR
 │                                                                  │
 │  🔵 In Progress ──────── Session is currently live              │
 │                                                                  │
-│  📝 Leave a Review ───── Session শেষ, review দিতে হবে            │
+│  📝 Leave a Review ───── Session ended, need to leave review     │
 │                                                                  │
-│  ⏳ Review Submitted ─── অন্যজনের review এর জন্য wait করছেন     │
+│  ⏳ Review Submitted ─── Waiting for other person's review       │
 │                                                                  │
-│  ✅ Completed ─────────── দুইজনই review দিয়েছে, session complete │
+│  ✅ Completed ─────────── Both reviewed, session complete        │
 │                                                                  │
-│  ⚠️ Expired ───────────── কেউ session এ join করেনি              │
+│  ⚠️ Expired ───────────── No one joined the session              │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -1428,32 +1416,32 @@ flowchart TD
 ### Text Flow
 
 ```
-Chat এ Student এর সাথে কথা বলে
+Chat with Student
     │
     ▼
-"Propose Session" করে
+Click "Propose Session"
     • Date
     • Time
     • Duration: 1 hour (Fixed)
     │
     ▼
-Student Accept করলে
+Student Accepts
     │
     ▼
 Session Scheduled
-    • Google Meet link auto create
+    • Google Meet link auto created
     │
     ▼
-Session Time এ Join করে
+Join at Session Time
     │
     ▼
 Session Complete
     │
     ▼
-Student Review দেয়
+Student Gives Review
     │
     ▼
-Tutor এর Rating Update হয়
+Tutor Rating Updated
 ```
 
 ---
@@ -1498,7 +1486,7 @@ flowchart TD
 
 ## 2.8 Tutor Dashboard Pages
 
-| Page          | কি দেখবে                              | কি করতে পারবে              |
+| Page          | What to See                           | What to Do                 |
 | ------------- | ------------------------------------- | -------------------------- |
 | Home          | Stats, New requests, Today's sessions | Quick actions              |
 | Requests      | All trial requests                    | Accept, Skip, View         |
@@ -1514,24 +1502,24 @@ flowchart TD
 
 ### 2.7.1 Earnings Page
 
-> প্রতি মাসের earnings table এ দেখাবে, download করতে পারবে
+> Monthly earnings displayed in table, can be downloaded
 
 #### Monthly Earnings Table Columns
 
-| Column     | Description                        |
-| ---------- | ---------------------------------- |
-| Month      | কোন মাস                            |
-| Hours      | সেই মাসে কত ঘন্টা পড়িয়েছে        |
-| Gross      | মোট আয় (Hours × Hourly Rate)      |
-| Commission | Platform এর 20% কমিশন              |
-| Net Earned | Tutor যা পাবে (Gross - Commission) |
-| Status     | 🟡 Pending / ✅ Paid               |
+| Column     | Description                           |
+| ---------- | ------------------------------------- |
+| Month      | Which month                           |
+| Hours      | Hours taught that month               |
+| Gross      | Total earnings (Hours × Hourly Rate)  |
+| Commission | Platform's 20% commission             |
+| Net Earned | Tutor receives (Gross - Commission)   |
+| Status     | 🟡 Pending / ✅ Paid                  |
 
 ---
 
 ### 2.7.2 Support Page (Direct Admin Chat)
 
-> Tutor এর জন্য support - Report submit করলে Admin Dashboard এ যাবে এবং Admin directly chat করে issue solve করবে।
+> Tutor support - Submitted reports go to Admin Dashboard where Admin can directly chat to resolve issues.
 
 #### Support Flow
 
@@ -1600,7 +1588,7 @@ flowchart LR
 
 ### 2.7.3 Resources Page
 
-> Tutor এর জন্য teaching resources (Same as Student - Open source database)
+> Teaching resources for Tutor (Same as Student - Open source database)
 
 ---
 
@@ -1733,7 +1721,7 @@ flowchart TD
 
 ## 3.6 Admin Handles Support Reports & Chats with Users
 
-> Student/Tutor থেকে আসা সব reports এখানে দেখাবে এবং Admin chat করে issue solve করবে।
+> All reports from Student/Tutor displayed here, Admin chats to solve issues.
 
 ### Reports Flow
 
@@ -1759,21 +1747,21 @@ flowchart TD
 
 | Feature | Description |
 |---------|-------------|
-| All Reports List | সব reports এক জায়গায় |
+| All Reports List | All reports in one place |
 | Filter by Status | Open, In Progress, Resolved, Closed |
 | Filter by Category | Session, Billing, Tutor, Technical, Other |
 | Filter by User Type | Student, Tutor |
-| Search | Report ID, User name দিয়ে search |
+| Search | Search by Report ID, User name |
 | Priority | High, Medium, Low |
 
 ### Report Statuses
 
 | Status | Icon | Meaning |
 |--------|------|---------|
-| Open | 🔴 | নতুন report, কেউ দেখেনি |
-| In Progress | 🟡 | Admin দেখছে/chat করছে |
+| Open | 🔴 | New report, no one has seen |
+| In Progress | 🟡 | Admin viewing/chatting |
 | Resolved | 🟢 | Issue solved |
-| Closed | ⚫ | বন্ধ করা হয়েছে |
+| Closed | ⚫ | Has been closed |
 
 ### Admin Actions on Report
 
@@ -1822,12 +1810,12 @@ sequenceDiagram
 
 ### Report Resolution
 
-Admin report resolve করার সময়:
-1. Issue কি ছিল তা note করবে
-2. কিভাবে solve হলো তা লিখবে
-3. Resolution select করবে (Refund, Credit, Warning, etc.)
-4. Mark as Resolved করবে
-5. User notification পাবে
+When Admin resolves a report:
+1. Note what the issue was
+2. Write how it was solved
+3. Select resolution (Refund, Credit, Warning, etc.)
+4. Mark as Resolved
+5. User receives notification
 
 ### Common Resolutions
 
@@ -1885,9 +1873,9 @@ flowchart LR
 
 ## 4.4 Complete Session Flow (Detailed)
 
-> পুরো site এ Session কিভাবে handle হয় - শুরু থেকে শেষ পর্যন্ত
+> How Sessions are handled across the entire site - from start to finish
 
-### Phase 1: Trial Request থেকে Chat Open
+### Phase 1: From Trial Request to Chat Open
 
 ```mermaid
                 flowchart LR

@@ -7,8 +7,6 @@ import { TutorApplicationValidation } from './tutorApplication.validation';
 
 const router = express.Router();
 
-// ============ APPLICANT ROUTES ============
-
 /**
  * @route   POST /api/v1/applications
  * @desc    Submit tutor application

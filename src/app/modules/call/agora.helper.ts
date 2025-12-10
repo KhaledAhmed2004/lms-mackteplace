@@ -35,9 +35,8 @@ export const generateRtcToken = (
   );
 };
 
-/**
- * Unique Channel Name Generate করে
- */
+// Unique Channel Name Generate করে
+ 
 export const generateChannelName = (): string => {
   return `call_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
 };

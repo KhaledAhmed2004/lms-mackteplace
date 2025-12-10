@@ -1,7 +1,7 @@
 # User Journeys - Tutoring Marketplace
 
-> এই document টি Client এবং UI/UX Designer দের জন্য।
-> সহজ ভাষায় User Journey বোঝানো হয়েছে।
+> This document is for Clients and UI/UX Designers.
+> User Journey explained in simple language.
 
 ---
 
@@ -9,15 +9,15 @@
 
 | User Type | Role | Main Goal |
 |-----------|------|-----------|
-| Student | শিক্ষার্থী | Tutor থেকে শেখা |
-| Tutor | শিক্ষক | Student দের পড়ানো |
-| Admin | Platform Manager | সব কিছু manage করা |
+| Student | Learner | Learn from Tutor |
+| Tutor | Teacher | Teach Students |
+| Admin | Platform Manager | Manage everything |
 
 ---
 
 # Overall Journey Summary
 
-## Platform এক নজরে
+## Platform at a Glance
 
 ```mermaid
 flowchart LR
@@ -282,37 +282,37 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A[🏠 Landing Page<br/>Website এ আসবে] --> B[🆓 Free Trial Button<br/>Click করবে]
+    A[🏠 Landing Page<br/>Visit Website] --> B[🆓 Free Trial Button<br/>Click it]
 
     subgraph Step1[📋 Step 1: Trial Info]
         direction TB
         C1[📚 Subject Select<br/>Math, Physics, Chemistry] --> C2[📊 Grade Select<br/>Class 9, 10, 11, 12]
         C2 --> C3[🏫 School Type<br/>Gymnasium, Realschule]
-        C3 --> C4[📝 Learning Goals<br/>কি শিখতে চায় - optional]
+        C3 --> C4[📝 Learning Goals<br/>What to learn - optional]
     end
 
     subgraph Step2[📝 Step 2: Account Create]
         direction TB
-        D1[👤 Full Name<br/>First & Last Name] --> D2[📧 Email Address<br/>Valid email দিতে হবে]
+        D1[👤 Full Name<br/>First & Last Name] --> D2[📧 Email Address<br/>Must provide valid email]
         D2 --> D3[🔒 Password<br/>Min 8 characters]
-        D3 --> D4[🎂 Date of Birth<br/>Age verify করার জন্য]
+        D3 --> D4[🎂 Date of Birth<br/>For age verification]
     end
 
     subgraph Step3[👨‍👩‍👦 Step 3: Guardian Info]
         direction TB
-        F1[👤 Guardian Name<br/>অভিভাবকের নাম] --> F2[📱 Guardian Phone<br/>Contact number]
-        F2 --> F3[📧 Guardian Email<br/>Invoice পাঠানো হবে]
+        F1[👤 Guardian Name<br/>Parent/Guardian name] --> F2[📱 Guardian Phone<br/>Contact number]
+        F2 --> F3[📧 Guardian Email<br/>Invoice will be sent]
     end
 
     subgraph Verify[✅ Email Verification]
         direction TB
-        G[📧 Check Email<br/>OTP code পাঠানো হবে] --> G1[🔢 Enter OTP<br/>6-digit code]
+        G[📧 Check Email<br/>OTP code will be sent] --> G1[🔢 Enter OTP<br/>6-digit code]
     end
 
     subgraph Success[🎉 Success!]
         direction TB
-        H[✅ Trial Request Created<br/>Request submitted] --> I[🔔 Notify Tutors<br/>Matching tutors কে notify]
-        I --> J[⏳ Wait for Tutor<br/>24 ঘন্টার মধ্যে response]
+        H[✅ Trial Request Created<br/>Request submitted] --> I[🔔 Notify Tutors<br/>Notify matching tutors]
+        I --> J[⏳ Wait for Tutor<br/>Response within 24 hours]
     end
 
     B --> Step1
@@ -351,10 +351,10 @@ Landing Page
     │
     ▼
 Step 1: Trial Info
-    • Subject select করবে (Math, Physics, etc.)
-    • Grade select করবে (Class 9, 10, etc.)
-    • School type select করবে (Gymnasium, Realschule)
-    • কি শিখতে চায় লিখবে (optional)
+    • Select Subject (Math, Physics, etc.)
+    • Select Grade (Class 9, 10, etc.)
+    • Select School type (Gymnasium, Realschule)
+    • Write what you want to learn (optional)
     │
     ▼
 Step 2: Account Create
@@ -371,13 +371,13 @@ Step 3: Guardian Info (if under 18)
     │
     ▼
 Email Verification
-    • Email এ code যাবে
-    • Code enter করবে
+    • Code will be sent to email
+    • Enter the code
     │
     ▼
 Trial Request Created!
-    • System tutor দের notify করবে
-    • Student wait করবে
+    • System notifies tutors
+    • Student waits
 ```
 
 ---
@@ -412,23 +412,23 @@ sequenceDiagram
 ```
 Student                          System                           Tutor
    │                               │                                │
-   │  Trial Request তৈরি করে       │                                │
+   │  Creates Trial Request        │                                │
    │──────────────────────────────>│                                │
    │                               │                                │
-   │                               │  Matching tutors কে notify     │
+   │                               │  Notifies matching tutors      │
    │                               │───────────────────────────────>│
    │                               │                                │
-   │                               │              Tutor Accept করে  │
+   │                               │              Tutor Accepts     │
    │                               │<───────────────────────────────│
    │                               │                                │
    │   Notification: "Tutor found!"│                                │
    │<──────────────────────────────│                                │
    │                               │                                │
-   │                    Chat Auto Open হয়                          │
+   │                    Chat Auto Opens                             │
    │<──────────────────────────────────────────────────────────────>│
 ```
 
-> ⏰ Trial request 24 ঘন্টা পর expire হয়ে যাবে
+> ⏰ Trial request expires after 24 hours
 
 ---
 
@@ -465,23 +465,23 @@ flowchart TD
 ### Text Flow
 
 ```
-Student & Tutor Chat এ কথা বলছে
+Student & Tutor chatting in Chat
     │
     ▼
-Tutor "Propose Session" করবে
+Tutor clicks "Propose Session"
     • Date select
     • Time select
     • Duration select (1hr, 2hr)
     │
     ▼
-Student Chat এ Session Proposal দেখবে
+Student sees Session Proposal in Chat
     │
-    ├── Accept করলে ──> Session Confirmed
-    │                      • Google Meet link auto create
+    ├── If Accept ──> Session Confirmed
+    │                      • Google Meet link auto created
     │                      • Both get notification
     │
-    └── Decline করলে ──> Tutor কে জানানো হবে
-                          • New time propose করতে পারবে
+    └── If Decline ──> Tutor is notified
+                          • Can propose new time
 ```
 
 ---
@@ -615,7 +615,7 @@ flowchart LR
 
 | Plan | Price | Commitment | Best For |
 |------|-------|------------|----------|
-| Flexible | €30/hr | None | চেষ্টা করে দেখতে চায় |
+| Flexible | €30/hr | None | Trying out the platform |
 | Regular | €28/hr | 1 month, min 4 hrs | Regular study |
 | Long-term | €25/hr | 3 months, min 4 hrs | Exam preparation |
 
@@ -645,24 +645,24 @@ flowchart TD
 ### Billing Text Flow
 
 ```
-সারা মাস জুড়ে
+Throughout the month
     │
-    ├── Session নেয় ──> Hours track হয়
-    ├── Session নেয় ──> Hours track হয়
-    └── Session নেয় ──> Hours track হয়
-    │
-    ▼
-মাস শেষে (1st তারিখ)
+    ├── Takes Session ──> Hours tracked
+    ├── Takes Session ──> Hours tracked
+    └── Takes Session ──> Hours tracked
     │
     ▼
-Invoice Generate হয়
+End of month (1st)
+    │
+    ▼
+Invoice Generated
     • Total hours × Rate = Amount
     │
     ▼
-Email এ Invoice পাঠানো হয়
+Invoice sent via Email
     │
     ▼
-Student Pay করে (Stripe)
+Student Pays (Stripe)
     │
     ▼
 Payment Confirmed
@@ -672,7 +672,7 @@ Payment Confirmed
 
 ## 1.6 Student Dashboard Pages
 
-> Payment করার পরে Student Dashboard এ redirect হবে
+> After payment, Student will be redirected to Dashboard
 
 ### Dashboard Navigation
 
@@ -688,7 +688,7 @@ flowchart LR
 
 ### Page Overview
 
-| Page | কি দেখবে | কি করতে পারবে |
+| Page | What to See | What to Do |
 |------|----------|---------------|
 | Home | Stats, Next session, Pending reviews | Quick actions |
 | Messages | All tutor conversations | Message, Book session |
@@ -804,8 +804,8 @@ flowchart TD
 
 ### 🆘 Support Chat (Chatbot)
 
-> Support Chat এ click করলে Basic Chatbot open হবে যেটা common questions handle করবে।
-> Chatbot solve করতে না পারলে Report তৈরি হবে যা Admin Dashboard এ যাবে।
+> Clicking Support Chat opens Basic Chatbot that handles common questions.
+> If Chatbot cannot solve, a Report is created and sent to Admin Dashboard.
 
 #### Support Chat Flow
 
@@ -1462,7 +1462,7 @@ Student Profile {
 
 ### 🔔 Notifications
 
-> Student Dashboard এ Notification bell icon থাকবে
+> Notification bell icon will be in Student Dashboard
 
 #### Notification Bell (Header)
 
@@ -1549,7 +1549,7 @@ Student Profile {
 
 ### 🆘 Support Page (Updated)
 
-> Support এ click করলে নিচের options দেখাবে
+> Clicking Support shows the following options
 
 #### Support Page Layout
 
@@ -1679,7 +1679,7 @@ Student Profile {
 
 ### 📚 Resources Page
 
-> Open source educational database থেকে resources search করতে পারবে
+> Search resources from open source educational database
 
 #### Resources Page Layout
 
@@ -2152,7 +2152,7 @@ flowchart TD
 
 ## 2.4 Tutor Dashboard (After Approval)
 
-> Approve হওয়ার পরে Tutor মূল Dashboard এ যাবে
+> After approval, Tutor goes to the main Dashboard
 
 ### Dashboard Navigation
 
@@ -2172,7 +2172,7 @@ flowchart LR
 
 ### Dashboard Pages Overview
 
-| Page | কি দেখবে | কি করতে পারবে |
+| Page | What to See | What to Do |
 |------|----------|---------------|
 | Overview | Level, Stats, Earnings, Trial Requests | Accept requests, Quick actions |
 | Sessions | Upcoming & Completed sessions | Join, Give feedback |
@@ -2265,7 +2265,7 @@ flowchart TD
 
 ### 📝 Student Feedback (After Session)
 
-> Session complete হওয়ার পরে Tutor student কে feedback দিতে পারবে
+> After session completion, Tutor can give feedback to the student
 
 #### Feedback Flow
 
@@ -2527,7 +2527,7 @@ TutorFeedback {
 
 ## 2.5 Trial Requests Page
 
-> Tutor Dashboard এ Trial Requests page এ যাবে matching requests দেখতে
+> Tutor goes to Trial Requests page in Dashboard to see matching requests
 
 ### Page Structure
 
@@ -2749,10 +2749,10 @@ flowchart LR
 ```
 
 **Review Flow:**
-- Session শেষ হলে → "Leave a Review" দেখাবে
-- Review দিলে → "Review Submitted" (অন্যজনের জন্য wait করবে)
-- দুইজনই review দিলে → "Completed" হবে
-- কেউ join না করলে → "Expired" হবে
+- When session ends → Shows "Leave a Review"
+- After reviewing → "Review Submitted" (waiting for other person)
+- When both review → Becomes "Completed"
+- If no one joins → Becomes "Expired"
 
 ### Status Types
 
@@ -2910,13 +2910,13 @@ flowchart LR
 │                                                                  │
 │  🔵 In Progress ──────── Session is currently live              │
 │                                                                  │
-│  📝 Leave a Review ───── Session শেষ, review দিতে হবে            │
+│  📝 Leave a Review ───── Session ended, need to leave review     │
 │                                                                  │
-│  ⏳ Review Submitted ─── অন্যজনের review এর জন্য wait করছেন     │
+│  ⏳ Review Submitted ─── Waiting for other person's review       │
 │                                                                  │
-│  ✅ Completed ─────────── দুইজনই review দিয়েছে, session complete │
+│  ✅ Completed ─────────── Both reviewed, session complete        │
 │                                                                  │
-│  ⚠️ Expired ───────────── কেউ session এ join করেনি              │
+│  ⚠️ Expired ───────────── No one joined the session              │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -3008,7 +3008,7 @@ sequenceDiagram
 │                        REVIEW FLOW                                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  Session শেষ হলে:                                                   │
+│  When Session Ends:                                                 │
 │  ┌─────────────────┐                                                │
 │  │ 📝 Leave Review │ ← Both Tutor & Student see this               │
 │  └────────┬────────┘                                                │
@@ -3034,7 +3034,7 @@ sequenceDiagram
 │  │  └────────────────────────────────────────────────────────┘ │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  কেউ Join না করলে:                                                  │
+│  If No One Joins:                                                   │
 │  ┌─────────────────┐                                                │
 │  │  ⚠️ Expired     │ → Reschedule option available                  │
 │  └─────────────────┘                                                │
@@ -3046,7 +3046,7 @@ sequenceDiagram
 
 ### Schedule Session Button (From Messages)
 
-> Messages এ accept করার পর automatically chat এ add হয়ে যাবে
+> After accepting in Messages, automatically added to chat
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -3188,32 +3188,32 @@ flowchart TD
 ### Text Flow
 
 ```
-Chat এ Student এর সাথে কথা বলে
+Chat with Student
     │
     ▼
-"Propose Session" করে
+Click "Propose Session"
     • Date
     • Time
     • Duration
     │
     ▼
-Student Accept করলে
+Student Accepts
     │
     ▼
 Session Scheduled
-    • Google Meet link auto create
+    • Google Meet link auto created
     │
     ▼
-Session Time এ Join করে
+Join at Session Time
     │
     ▼
 Session Complete
     │
     ▼
-Student Review দেয়
+Student Gives Review
     │
     ▼
-Tutor এর Rating Update হয়
+Tutor Rating Updated
 ```
 
 ---
@@ -3260,7 +3260,7 @@ flowchart TD
 
 ## 2.8 Tutor Dashboard Pages
 
-| Page | কি দেখবে | কি করতে পারবে |
+| Page | What to See | What to Do |
 |------|----------|---------------|
 | Home | Stats, New requests, Today's sessions | Quick actions |
 | Requests | All trial requests | Accept, Skip, View |
@@ -3276,7 +3276,7 @@ flowchart TD
 
 ### 2.8.1 Earnings Page
 
-> প্রতি মাসের earnings table এ দেখাবে, download করতে পারবে
+> Monthly earnings displayed in table, can be downloaded
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -3335,11 +3335,11 @@ flowchart TD
 
 | Column | Description |
 |--------|-------------|
-| Month | কোন মাস |
-| Hours | সেই মাসে কত ঘন্টা পড়িয়েছে |
-| Gross | মোট আয় (Hours × Hourly Rate) |
-| Commission | Platform এর 20% কমিশন |
-| Net Earned | Tutor যা পাবে (Gross - Commission) |
+| Month | Which month |
+| Hours | Hours taught that month |
+| Gross | Total earnings (Hours × Hourly Rate) |
+| Commission | Platform's 20% commission |
+| Net Earned | Tutor receives (Gross - Commission) |
 | Status | 🟡 Pending / ✅ Paid |
 
 #### Download Options
@@ -3373,7 +3373,7 @@ flowchart TD
 
 ### 2.8.2 Support Page
 
-> Tutor এর জন্য support options (Same structure as Student)
+> Support options for Tutor (Same structure as Student)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -3491,7 +3491,7 @@ flowchart TD
 
 ### 2.8.3 Resources Page
 
-> Tutor এর জন্য teaching resources (Same as Student - Open source database)
+> Teaching resources for Tutor (Same as Student - Open source database)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -3609,18 +3609,18 @@ flowchart TD
 ### Text Flow
 
 ```
-New Application আসে
+New Application Arrives
     │
     ▼
-Admin Documents Review করে
+Admin Reviews Documents
     • CV check
     • Certificates verify
-    • Experience দেখে
+    • Check Experience
     │
     ├── Looks Good ──> Accept
     │                   │
     │                   ▼
-    │               Applicant Interview schedule করতে পারবে
+    │               Applicant can schedule Interview
     │
     └── Not Good ──> Reject with reason
 ```
@@ -3664,25 +3664,25 @@ flowchart TD
 ### Text Flow
 
 ```
-Admin Interview Slots তৈরি করে
+Admin Creates Interview Slots
     • Date
     • Time
     • Duration (30 min)
     │
     ▼
-Approved Applicants Slots দেখে
+Approved Applicants See Slots
     │
     ▼
-Applicant একটা slot book করে
+Applicant Books a Slot
     │
     ▼
-Admin Notification পায়
+Admin Receives Notification
     │
     ▼
-Interview Time এ Google Meet এ Join
+Join Google Meet at Interview Time
     │
     ▼
-Interview Complete করে
+Complete Interview
     │
     ▼
 Decision:
@@ -3948,9 +3948,9 @@ stateDiagram-v2
 
 | # | Question | Why Important |
 |---|----------|---------------|
-| 1 | Platform এর main language? | German / English / Both |
-| 2 | Logo এবং brand colors? | UI design এর জন্য |
-| 3 | Trial session এর duration? | 30 min / 1 hr |
+| 1 | Platform's main language? | German / English / Both |
+| 2 | Logo and brand colors? | For UI design |
+| 3 | Trial session duration? | 30 min / 1 hr |
 | 4 | Maximum subjects per tutor? | Currently 3, change? |
 | 5 | Commission percentage? | Currently 20%, change? |
 | 6 | Payout date? | Currently 5th, change? |
