@@ -19,23 +19,23 @@ router.get(
   SubjectController.getActiveSubjects
 );
 
-/**
- * @route   GET /api/v1/subjects/slug/:slug
- * @desc    Get single subject by slug (e.g., /slug/mathematics)
- * @access  Public
- */
-router.get(
-  '/slug/:slug',
-  SubjectController.getSubjectBySlug
-);
+// /**
+//  * @route   GET /api/v1/subjects/slug/:slug
+//  * @desc    Get single subject by slug (e.g., /slug/mathematics)
+//  * @access  Public
+//  */
+// router.get(
+//   '/slug/:slug',
+//   SubjectController.getSubjectBySlug
+// );
 
 /**
- * @route   GET /api/v1/subjects/:id
+ * @route   GET /api/v1/subjects/:subjectId
  * @desc    Get single subject by ID
  * @access  Public
  */
 router.get(
-  '/:id',
+  '/:subjectId',
   SubjectController.getSingleSubject
 );
 

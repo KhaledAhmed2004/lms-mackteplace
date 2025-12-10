@@ -8,21 +8,6 @@ const subjectSchema = new Schema<ISubject>(
       required: [true, 'Subject name is required'],
       trim: true,
     },
-    slug: {
-      type: String,
-      required: [true, 'Subject slug is required'],
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    icon: {
-      type: String,
-      trim: true,
-    },
-    description: {
-      type: String,
-      trim: true,
-    },
     isActive: {
       type: Boolean,
       default: true,
@@ -32,7 +17,6 @@ const subjectSchema = new Schema<ISubject>(
 );
 
 // Index for faster queries
-subjectSchema.index({ slug: 1 });
 subjectSchema.index({ isActive: 1 });
 
 export const Subject = model<ISubject, SubjectModel>('Subject', subjectSchema);

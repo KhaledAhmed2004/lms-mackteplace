@@ -44,8 +44,8 @@ export enum GRADE_LEVEL {
 // Guardian info for students under 18 (nested inside studentInfo)
 export type IGuardianInfo = {
   name: string;
-  email: string; // Guardian email (used for login if student under 18)
-  password: string; // Guardian password for account creation
+  email: string;
+  password: string;
   phone: string;
   relationship?: 'PARENT' | 'LEGAL_GUARDIAN' | 'OTHER';
 };
