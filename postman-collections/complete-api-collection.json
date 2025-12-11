@@ -610,54 +610,6 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "Create a new user",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/user/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "user"
-              ]
-            },
-            "body": {
-              "mode": "formdata",
-              "formdata": []
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get all users",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/user/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "user"
-              ]
-            }
-          },
-          "response": []
         }
       ],
       "description": "User related endpoints"
@@ -716,31 +668,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "GET - Get All",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/chats/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "chats"
-              ]
-            }
-          },
-          "response": []
         },
         {
           "name": "GET - Get All",
@@ -886,57 +813,6 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "POST - Get All",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/messages/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "messages"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"text\": \"Hello, this is a test message!\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Auto-save message ID",
-                  "const response = pm.response.json();",
-                  "",
-                  "if (response.success && response.data && response.data._id) {",
-                  "  pm.collectionVariables.set(\"messageId\", response.data._id);",
-                  "  console.log(\"✅ Message ID saved:\", response.data._id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
         }
       ],
       "description": "Message related endpoints"
@@ -1331,31 +1207,6 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "GET - Get All",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/payments/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "payments"
-              ]
-            }
-          },
-          "response": []
         }
       ],
       "description": "Payment related endpoints"
@@ -1419,40 +1270,6 @@
                 "bookmarks",
                 "my-bookmarks"
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle bookmark (add if not exists, remove if exists)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/bookmarks/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "bookmarks"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"targetId\": \"{{TARGET_ID}}\",\n  \"targetModel\": \"Task\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
             }
           },
           "response": []
@@ -1654,31 +1471,6 @@
                   "language": "json"
                 }
               }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Fetch notifications + unread count",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/notifications/",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "notifications"
-              ]
             }
           },
           "response": []

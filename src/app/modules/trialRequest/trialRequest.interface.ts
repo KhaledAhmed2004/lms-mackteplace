@@ -1,7 +1,7 @@
 import { Model, Types } from 'mongoose';
 
 export enum TRIAL_REQUEST_STATUS {
-  PENDING = 'PENDING', // Student sent request, waiting for tutor
+  PENDING = 'PENDING', 
   ACCEPTED = 'ACCEPTED', // Tutor accepted, chat opened
   EXPIRED = 'EXPIRED', // No tutor accepted within time limit
   CANCELLED = 'CANCELLED', // Student cancelled before acceptance
