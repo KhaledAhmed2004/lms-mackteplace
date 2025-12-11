@@ -17,7 +17,6 @@ const http_status_codes_1 = require("http-status-codes");
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const subject_service_1 = require("./subject.service");
-// Create subject
 const createSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield subject_service_1.SubjectService.createSubject(req.body);
     (0, sendResponse_1.default)(res, {
@@ -35,24 +34,13 @@ const getAllSubjects = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Subjects retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.pagination,
     });
 }));
 // Get single subject
 const getSingleSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield subject_service_1.SubjectService.getSingleSubject(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Subject retrieved successfully',
-        data: result,
-    });
-}));
-// Get subject by slug
-const getSubjectBySlug = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { slug } = req.params;
-    const result = yield subject_service_1.SubjectService.getSubjectBySlug(slug);
+    const { subjectId } = req.params;
+    const result = yield subject_service_1.SubjectService.getSingleSubject(subjectId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -62,8 +50,8 @@ const getSubjectBySlug = (0, catchAsync_1.default)((req, res) => __awaiter(void 
 }));
 // Update subject
 const updateSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield subject_service_1.SubjectService.updateSubject(id, req.body);
+    const { subjectId } = req.params;
+    const result = yield subject_service_1.SubjectService.updateSubject(subjectId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -73,8 +61,8 @@ const updateSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
 }));
 // Delete subject
 const deleteSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield subject_service_1.SubjectService.deleteSubject(id);
+    const { subjectId } = req.params;
+    const result = yield subject_service_1.SubjectService.deleteSubject(subjectId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -83,7 +71,7 @@ const deleteSubject = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
     });
 }));
 // Get active subjects
-const getActiveSubjects = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getActiveSubjects = (0, catchAsync_1.default)((_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield subject_service_1.SubjectService.getActiveSubjects();
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -96,7 +84,6 @@ exports.SubjectController = {
     createSubject,
     getAllSubjects,
     getSingleSubject,
-    getSubjectBySlug,
     updateSubject,
     deleteSubject,
     getActiveSubjects,

@@ -78,7 +78,7 @@ const getAllSessions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Sessions retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

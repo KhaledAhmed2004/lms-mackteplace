@@ -10,6 +10,7 @@ import { SubjectRoutes } from '../app/modules/subject/subject.route';
 import { TutorApplicationRoutes } from '../app/modules/tutorApplication/tutorApplication.route';
 import { InterviewSlotRoutes } from '../app/modules/interviewSlot/interviewSlot.route';
 import { TrialRequestRoutes } from '../app/modules/trialRequest/trialRequest.route';
+import { SessionRequestRoutes } from '../app/modules/sessionRequest/sessionRequest.route';
 import { SessionRoutes } from '../app/modules/session/session.route';
 import { StudentSubscriptionRoutes } from '../app/modules/studentSubscription/studentSubscription.route';
 import { MonthlyBillingRoutes } from '../app/modules/monthlyBilling/monthlyBilling.route';
@@ -65,6 +66,10 @@ const apiRoutes = [
   {
     path: '/trial-requests',
     route: TrialRequestRoutes,
+  },
+  {
+    path: '/session-requests',
+    route: SessionRequestRoutes,
   },
   {
     path: '/sessions',

@@ -18,15 +18,6 @@ const router = express_1.default.Router();
  * @access  Public
  */
 router.get('/active', subject_controller_1.SubjectController.getActiveSubjects);
-// /**
-//  * @route   GET /api/v1/subjects/slug/:slug
-//  * @desc    Get single subject by slug (e.g., /slug/mathematics)
-//  * @access  Public
-//  */
-// router.get(
-//   '/slug/:slug',
-//   SubjectController.getSubjectBySlug
-// );
 /**
  * @route   GET /api/v1/subjects/:subjectId
  * @desc    Get single subject by ID
@@ -45,20 +36,20 @@ router.get('/', subject_controller_1.SubjectController.getAllSubjects);
  * @route   POST /api/v1/subjects
  * @desc    Create new subject
  * @access  Admin only
- * @body    { name: "Mathematics", slug: "mathematics", icon?: "url", description?: "text" }
+ * @body    { name: "Mathematics", isActive?: true }
  */
 router.post('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(subject_validation_1.SubjectValidation.createSubjectZodSchema), subject_controller_1.SubjectController.createSubject);
 /**
- * @route   PATCH /api/v1/subjects/:id
+ * @route   PATCH /api/v1/subjects/:subjectId
  * @desc    Update subject
  * @access  Admin only
- * @body    { name?, slug?, icon?, description?, isActive? }
+ * @body    { name?, isActive? }
  */
-router.patch('/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(subject_validation_1.SubjectValidation.updateSubjectZodSchema), subject_controller_1.SubjectController.updateSubject);
+router.patch('/:subjectId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(subject_validation_1.SubjectValidation.updateSubjectZodSchema), subject_controller_1.SubjectController.updateSubject);
 /**
- * @route   DELETE /api/v1/subjects/:id
+ * @route   DELETE /api/v1/subjects/:subjectId
  * @desc    Delete subject (soft delete - sets isActive to false)
  * @access  Admin only
  */
-router.delete('/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), subject_controller_1.SubjectController.deleteSubject);
+router.delete('/:subjectId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), subject_controller_1.SubjectController.deleteSubject);
 exports.SubjectRoutes = router;

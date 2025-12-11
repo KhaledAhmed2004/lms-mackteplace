@@ -23,14 +23,14 @@ const chat_model_1 = require("../chat/chat.model");
 const subject_model_1 = require("../subject/subject.model");
 const trialRequest_interface_1 = require("./trialRequest.interface");
 const trialRequest_model_1 = require("./trialRequest.model");
+const sessionRequest_model_1 = require("../sessionRequest/sessionRequest.model");
+const sessionRequest_interface_1 = require("../sessionRequest/sessionRequest.interface");
 /**
- * Create trial request (Student or Guest)
- * This endpoint can be used by:
- * 1. Logged-in students (studentId provided)
- * 2. Guest users (no studentId, studentInfo required)
+ * Create trial request (First-time Student or Guest ONLY)
+ * For returning students, use SessionRequest module instead
  */
 const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     // Validate subject exists
     const subjectExists = yield subject_model_1.Subject.findById(payload.subject);
     if (!subjectExists) {
@@ -52,7 +52,7 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Password is required for students 18 and above');
         }
     }
-    // If logged-in student, verify and check for pending requests
+    // If logged-in student, verify and check eligibility
     if (studentId) {
         const student = yield user_model_1.User.findById(studentId);
         if (!student) {
@@ -61,23 +61,45 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
         if (student.role !== user_1.USER_ROLES.STUDENT) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only students can create trial requests');
         }
+        // Returning students should use SessionRequest, not TrialRequest
+        if ((_e = student.studentProfile) === null || _e === void 0 ? void 0 : _e.hasCompletedTrial) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have already completed a trial. Please use the session request feature for additional tutoring sessions.');
+        }
         // Check if student has pending trial request
-        const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
+        const pendingTrialRequest = yield trialRequest_model_1.TrialRequest.findOne({
             studentId: new mongoose_1.Types.ObjectId(studentId),
             status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
         });
-        if (pendingRequest) {
+        if (pendingTrialRequest) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You already have a pending trial request. Please wait for a tutor to accept or cancel it.');
+        }
+        // Also check for pending session request
+        const pendingSessionRequest = yield sessionRequest_model_1.SessionRequest.findOne({
+            studentId: new mongoose_1.Types.ObjectId(studentId),
+            status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING,
+        });
+        if (pendingSessionRequest) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have a pending session request. Please wait for it to be accepted or cancel it first.');
         }
     }
     else {
-        // Guest user - check by email for pending requests
-        // For under 18: check guardian email
-        // For 18+: check student email
-        const emailToCheck = ((_e = payload.studentInfo) === null || _e === void 0 ? void 0 : _e.isUnder18)
-            ? (_g = (_f = payload.studentInfo) === null || _f === void 0 ? void 0 : _f.guardianInfo) === null || _g === void 0 ? void 0 : _g.email
-            : (_h = payload.studentInfo) === null || _h === void 0 ? void 0 : _h.email;
+        // Guest user - check by email for previous trials and pending requests
+        const emailToCheck = ((_f = payload.studentInfo) === null || _f === void 0 ? void 0 : _f.isUnder18)
+            ? (_h = (_g = payload.studentInfo) === null || _g === void 0 ? void 0 : _g.guardianInfo) === null || _h === void 0 ? void 0 : _h.email
+            : (_j = payload.studentInfo) === null || _j === void 0 ? void 0 : _j.email;
         if (emailToCheck) {
+            // Check if guest has already completed a trial
+            const previousAcceptedTrial = yield trialRequest_model_1.TrialRequest.findOne({
+                $or: [
+                    { 'studentInfo.email': emailToCheck },
+                    { 'studentInfo.guardianInfo.email': emailToCheck },
+                ],
+                status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED,
+            });
+            if (previousAcceptedTrial) {
+                throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have already completed a trial with this email. Please log in to request more sessions.');
+            }
+            // Check for pending requests
             const pendingRequest = yield trialRequest_model_1.TrialRequest.findOne({
                 $or: [
                     { 'studentInfo.email': emailToCheck },
@@ -99,26 +121,8 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
         });
     }
     // TODO: Send real-time notification to matching tutors
-    // const matchingTutors = await User.find({
-    //   role: USER_ROLES.TUTOR,
-    //   'tutorProfile.subjects': payload.subject,
-    //   'tutorProfile.isVerified': true
-    // });
-    // io.to(matchingTutors.map(t => t._id.toString())).emit('newTrialRequest', trialRequest);
     // TODO: Send email notification to admin
-    // await sendEmail({
-    //   to: ADMIN_EMAIL,
-    //   subject: 'New Trial Request',
-    //   template: 'new-trial-request',
-    //   data: { studentName: payload.studentInfo?.firstName, subject: subjectExists.name }
-    // });
     // TODO: Send confirmation email to student
-    // await sendEmail({
-    //   to: payload.studentInfo?.email,
-    //   subject: 'Trial Request Submitted',
-    //   template: 'trial-request-confirmation',
-    //   data: { name: payload.studentInfo?.firstName, subject: subjectExists.name }
-    // });
     return trialRequest;
 });
 /**
@@ -183,7 +187,7 @@ const getAllTrialRequests = (query) => __awaiter(void 0, void 0, void 0, functio
         .populate('acceptedTutorId', 'name email profilePicture')
         .populate('subject', 'name icon')
         .populate('chatId'), query)
-        .search(['description', 'studentInfo.firstName', 'studentInfo.lastName', 'studentInfo.email'])
+        .search(['description', 'studentInfo.name', 'studentInfo.email'])
         .filter()
         .sort()
         .paginate()
@@ -212,6 +216,7 @@ const getSingleTrialRequest = (id) => __awaiter(void 0, void 0, void 0, function
 /**
  * Accept trial request (Tutor)
  * Creates chat and connects student with tutor
+ * Marks student as having completed trial
  */
 const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
@@ -258,24 +263,14 @@ const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, voi
     request.chatId = chat._id;
     request.acceptedAt = new Date();
     yield request.save();
+    // Mark student as having completed trial (so they use SessionRequest next time)
+    if (request.studentId) {
+        yield user_model_1.User.findByIdAndUpdate(request.studentId, {
+            $set: { 'studentProfile.hasCompletedTrial': true },
+        });
+    }
     // TODO: Send real-time notification to student
-    // if (request.studentId) {
-    //   io.to(request.studentId.toString()).emit('trialAccepted', {
-    //     tutorName: tutor.name,
-    //     chatId: chat._id
-    //   });
-    // }
-    // TODO: Send email to student (using studentInfo.email)
-    // await sendEmail({
-    //   to: request.studentInfo.email,
-    //   subject: 'Your Trial Request Was Accepted!',
-    //   template: 'trial-accepted',
-    //   data: {
-    //     studentName: request.studentInfo.firstName,
-    //     tutorName: tutor.name,
-    //     subject: request.subject
-    //   }
-    // });
+    // TODO: Send email to student
     return request;
 });
 /**

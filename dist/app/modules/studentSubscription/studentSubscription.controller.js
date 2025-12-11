@@ -56,7 +56,7 @@ const getAllSubscriptions = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Subscriptions retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

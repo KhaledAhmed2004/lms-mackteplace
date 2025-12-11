@@ -15,6 +15,7 @@ const subject_route_1 = require("../app/modules/subject/subject.route");
 const tutorApplication_route_1 = require("../app/modules/tutorApplication/tutorApplication.route");
 const interviewSlot_route_1 = require("../app/modules/interviewSlot/interviewSlot.route");
 const trialRequest_route_1 = require("../app/modules/trialRequest/trialRequest.route");
+const sessionRequest_route_1 = require("../app/modules/sessionRequest/sessionRequest.route");
 const session_route_1 = require("../app/modules/session/session.route");
 const studentSubscription_route_1 = require("../app/modules/studentSubscription/studentSubscription.route");
 const monthlyBilling_route_1 = require("../app/modules/monthlyBilling/monthlyBilling.route");
@@ -68,6 +69,10 @@ const apiRoutes = [
     {
         path: '/trial-requests',
         route: trialRequest_route_1.TrialRequestRoutes,
+    },
+    {
+        path: '/session-requests',
+        route: sessionRequest_route_1.SessionRequestRoutes,
     },
     {
         path: '/sessions',

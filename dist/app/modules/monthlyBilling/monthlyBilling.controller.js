@@ -42,7 +42,7 @@ const getMyBillings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Billing history retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
@@ -55,7 +55,7 @@ const getAllBillings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Billings retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

@@ -42,7 +42,7 @@ const getMyEarnings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Earnings history retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
@@ -55,7 +55,7 @@ const getAllEarnings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Earnings retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

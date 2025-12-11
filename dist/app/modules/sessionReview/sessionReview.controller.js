@@ -43,7 +43,7 @@ const getMyReviews = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Reviews retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**
@@ -59,7 +59,7 @@ const getTutorReviews = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Tutor reviews retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

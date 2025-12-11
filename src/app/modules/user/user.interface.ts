@@ -37,6 +37,9 @@ export type StudentProfile = {
   preferredGender?: string; // Male/Female/No preference
   preferredAgeRange?: string; // e.g., "20-30"
   hasUsedFreeTrial: boolean; // Track free trial usage
+  hasCompletedTrial: boolean; // True after first accepted trial
+  trialRequestsCount: number; // Total trial requests made
+  sessionRequestsCount: number; // Total session requests made (after trial)
   currentPlan?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' | null;
   totalHoursTaken: number;
   totalSpent: number;

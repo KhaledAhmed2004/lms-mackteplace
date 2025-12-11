@@ -17,12 +17,11 @@ const http_status_codes_1 = require("http-status-codes");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const subject_model_1 = require("./subject.model");
-// Create subject
 const createSubject = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    // Check if subject with this slug already exists
-    const existingSubject = yield subject_model_1.Subject.findOne({ slug: payload.slug });
+    // Check if subject with the same name already exists
+    const existingSubject = yield subject_model_1.Subject.findOne({ name: payload.name });
     if (existingSubject) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Subject with this slug already exists');
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Subject with this same name already exists');
     }
     const result = yield subject_model_1.Subject.create(payload);
     return result;
@@ -30,29 +29,21 @@ const createSubject = (payload) => __awaiter(void 0, void 0, void 0, function* (
 // Get all subjects with filtering, searching, pagination
 const getAllSubjects = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const subjectQuery = new QueryBuilder_1.default(subject_model_1.Subject.find(), query)
-        .search(['name', 'description']) // Text search
-        .filter() // Apply filters
-        .sort() // Sort
-        .paginate() // Pagination
-        .fields(); // Field selection
-    const result = yield subjectQuery.modelQuery;
-    const meta = yield subjectQuery.countTotal();
+        .search(['name'])
+        .filter()
+        .sort()
+        .paginate()
+        .fields();
+    const data = yield subjectQuery.modelQuery.lean();
+    const pagination = yield subjectQuery.getPaginationInfo();
     return {
-        meta,
-        data: result,
+        data,
+        pagination,
     };
 });
 // Get single subject by ID
 const getSingleSubject = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield subject_model_1.Subject.findById(id);
-    if (!result) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
-    }
-    return result;
-});
-// Get subject by slug
-const getSubjectBySlug = (slug) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield subject_model_1.Subject.findOne({ slug });
     if (!result) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
     }
@@ -65,11 +56,11 @@ const updateSubject = (id, payload) => __awaiter(void 0, void 0, void 0, functio
     if (!subject) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
     }
-    // If updating slug, check for uniqueness
-    if (payload.slug && payload.slug !== subject.slug) {
-        const existingSubject = yield subject_model_1.Subject.findOne({ slug: payload.slug });
+    // If updating name, check for uniqueness
+    if (payload.name && payload.name !== subject.name) {
+        const existingSubject = yield subject_model_1.Subject.findOne({ name: payload.name });
         if (existingSubject) {
-            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Subject with this slug already exists');
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Subject with this name already exists');
         }
     }
     const result = yield subject_model_1.Subject.findByIdAndUpdate(id, payload, {
@@ -88,16 +79,16 @@ const deleteSubject = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield subject_model_1.Subject.findByIdAndUpdate(id, { isActive: false }, { new: true });
     return result;
 });
-// Get active subjects only (for public use)
 const getActiveSubjects = () => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield subject_model_1.Subject.find({ isActive: true }).sort({ name: 1 });
+    const result = yield subject_model_1.Subject.find({ isActive: true })
+        .sort({ name: 1 })
+        .lean();
     return result;
 });
 exports.SubjectService = {
     createSubject,
     getAllSubjects,
     getSingleSubject,
-    getSubjectBySlug,
     updateSubject,
     deleteSubject,
     getActiveSubjects,

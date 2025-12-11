@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Smart Postman Collection Generator
+ * Smart Postman Collection Generator v2.0
  *
  * Features:
  * - Auto-detects ALL modules from src/routes/index.ts
  * - Parses route files to extract endpoints
  * - Reads validation files to generate accurate request bodies
  * - Extracts JSDoc comments for descriptions
+ * - Detects auth requirements from route middleware
+ * - Converts :param to {{param}} variables
  * - Generates complete collection with all modules
  *
  * Usage:
@@ -28,19 +30,17 @@ class SmartPostmanGenerator {
    * Main entry point - generates complete collection
    */
   async generateCompleteCollection() {
-    console.log('🚀 Starting Smart Postman Collection Generator...\n');
+    console.log('🚀 Starting Smart Postman Collection Generator v2.0...\n');
 
-    // Step 1: Detect all modules from routes/index.ts
     const modules = this.detectModulesFromRoutes();
     console.log(`📦 Found ${modules.length} modules:\n`);
     modules.forEach(m => console.log(`   - ${m.name} → ${m.path}`));
     console.log('');
 
-    // Step 2: Generate collection structure
     const collection = {
       info: {
         name: 'Complete API Collection',
-        description: 'Auto-generated complete API collection with all modules',
+        description: 'Auto-generated complete API collection with all modules, smart authentication and dynamic variables',
         schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
       },
       item: [],
@@ -48,7 +48,6 @@ class SmartPostmanGenerator {
       event: this.generateCollectionEvents(),
     };
 
-    // Step 3: Process each module
     for (const module of modules) {
       console.log(`📝 Processing: ${module.name}...`);
       try {
@@ -64,7 +63,6 @@ class SmartPostmanGenerator {
       }
     }
 
-    // Step 4: Save collection
     this.ensureOutputDir();
     const outputPath = path.join(this.outputDir, 'complete-api-collection.json');
     fs.writeFileSync(outputPath, JSON.stringify(collection, null, 2));
@@ -82,12 +80,15 @@ class SmartPostmanGenerator {
     console.log(`🚀 Generating collection for module: ${moduleName}\n`);
 
     const modules = this.detectModulesFromRoutes();
-    const module = modules.find(m => m.name.toLowerCase() === moduleName.toLowerCase());
+    const module = modules.find(m =>
+      m.name.toLowerCase() === moduleName.toLowerCase() ||
+      m.folderName.toLowerCase() === moduleName.toLowerCase()
+    );
 
     if (!module) {
       console.log(`❌ Module '${moduleName}' not found!`);
       console.log('\n📋 Available modules:');
-      modules.forEach(m => console.log(`   - ${m.name}`));
+      modules.forEach(m => console.log(`   - ${m.name} (${m.folderName})`));
       return;
     }
 
@@ -127,15 +128,13 @@ class SmartPostmanGenerator {
     }
 
     const content = fs.readFileSync(this.routesIndexPath, 'utf8');
-
-    // Parse apiRoutes array
     const apiRoutesMatch = content.match(/const\s+apiRoutes\s*=\s*\[([\s\S]*?)\];/);
+
     if (!apiRoutesMatch) {
       console.error('❌ Could not find apiRoutes array');
       return modules;
     }
 
-    // Extract path and route entries
     const routeEntryRegex = /{\s*path:\s*['"`]([^'"`]+)['"`]\s*,\s*route:\s*(\w+)/g;
     let match;
 
@@ -143,7 +142,6 @@ class SmartPostmanGenerator {
       const apiPath = match[1];
       const routeName = match[2];
 
-      // Find the import to get module folder name
       const importRegex = new RegExp(
         `import\\s*{\\s*${routeName}\\s*}\\s*from\\s*['"]([^'"]+)['"]`
       );
@@ -151,10 +149,8 @@ class SmartPostmanGenerator {
 
       let moduleFolderName = '';
       if (importMatch) {
-        // Extract folder name from import path
         const importPath = importMatch[1];
         const pathParts = importPath.split('/');
-        // Get the folder name (second to last part)
         moduleFolderName = pathParts[pathParts.length - 2] || '';
       }
 
@@ -179,18 +175,15 @@ class SmartPostmanGenerator {
       return null;
     }
 
-    // Find route file
     const routeFile = this.findRouteFile(modulePath, module.folderName);
     if (!routeFile) {
       return null;
     }
 
-    // Find validation file
     const validationFile = this.findValidationFile(modulePath, module.folderName);
     const validationSchemas = validationFile ? this.parseValidationFile(validationFile) : {};
 
-    // Parse routes
-    const endpoints = this.parseRouteFile(routeFile, module.path, validationSchemas);
+    const endpoints = this.parseRouteFile(routeFile, module.path, validationSchemas, module.folderName);
 
     return {
       name: `${this.capitalize(module.name)} Module`,
@@ -238,25 +231,27 @@ class SmartPostmanGenerator {
   }
 
   /**
-   * Parse validation file to extract schemas
+   * Parse validation file to extract schemas with full body content
    */
   parseValidationFile(filePath) {
     const schemas = {};
     const content = fs.readFileSync(filePath, 'utf8');
 
-    // Find all z.object definitions for body
-    const schemaRegex = /const\s+(\w+)\s*=\s*z\.object\s*\(\s*{([\s\S]*?)}\s*\)/g;
-    let match;
+    // Match each const declaration
+    const schemaBlocks = content.split(/(?=const\s+\w+\s*=\s*z\.object)/);
 
-    while ((match = schemaRegex.exec(content)) !== null) {
-      const schemaName = match[1];
-      const schemaContent = match[2];
+    for (const block of schemaBlocks) {
+      const nameMatch = block.match(/const\s+(\w+)\s*=\s*z\.object/);
+      if (!nameMatch) continue;
 
-      // Try to extract body schema
-      const bodyMatch = schemaContent.match(/body:\s*z\.object\s*\(\s*{([\s\S]*?)}\s*\)/);
+      const schemaName = nameMatch[1];
+
+      // Extract body schema content
+      const bodyMatch = block.match(/body:\s*z\.object\s*\(\s*{([\s\S]*?)}\s*\)/);
       if (bodyMatch) {
-        const bodyFields = this.extractZodFields(bodyMatch[1]);
-        schemas[schemaName] = bodyFields;
+        const bodyContent = bodyMatch[1];
+        const fields = this.extractZodFieldsImproved(bodyContent);
+        schemas[schemaName] = fields;
       }
     }
 
@@ -264,21 +259,38 @@ class SmartPostmanGenerator {
   }
 
   /**
-   * Extract fields from Zod schema
+   * Improved field extraction from Zod schema
    */
-  extractZodFields(schemaContent) {
+  extractZodFieldsImproved(schemaContent) {
     const fields = {};
 
-    // Match field definitions
-    const fieldRegex = /(\w+):\s*z\.(string|number|boolean|array|enum|date)/g;
-    let match;
+    // Match field definitions more accurately
+    const lines = schemaContent.split('\n');
+    let currentField = null;
 
-    while ((match = fieldRegex.exec(schemaContent)) !== null) {
-      const fieldName = match[1];
-      const fieldType = match[2];
+    for (const line of lines) {
+      // Match field start: fieldName: z.something
+      const fieldMatch = line.match(/^\s*(\w+):\s*z\.(string|number|boolean|array|enum|date|object)/);
+      if (fieldMatch) {
+        currentField = fieldMatch[1];
+        const fieldType = fieldMatch[2];
 
-      // Generate sample value based on type
-      fields[fieldName] = this.generateSampleValue(fieldName, fieldType);
+        // Check if it's an array
+        if (fieldType === 'array') {
+          fields[currentField] = this.generateSampleValue(currentField, 'array');
+        } else if (fieldType === 'enum') {
+          // Try to extract enum values
+          const enumMatch = line.match(/z\.enum\s*\(\s*\[([\s\S]*?)\]/);
+          if (enumMatch) {
+            const firstValue = enumMatch[1].match(/['"]([^'"]+)['"]/);
+            fields[currentField] = firstValue ? firstValue[1] : 'value';
+          } else {
+            fields[currentField] = 'value';
+          }
+        } else {
+          fields[currentField] = this.generateSampleValue(currentField, fieldType);
+        }
+      }
     }
 
     return fields;
@@ -288,38 +300,85 @@ class SmartPostmanGenerator {
    * Generate sample value for field
    */
   generateSampleValue(fieldName, fieldType) {
-    // Field-specific samples
+    // Field-specific samples with Postman variables
     const fieldSamples = {
+      // IDs - use Postman variables
       email: '{{TEST_EMAIL}}',
       password: '{{TEST_PASSWORD}}',
       newPassword: '{{NEW_PASSWORD}}',
       confirmPassword: '{{NEW_PASSWORD}}',
       currentPassword: '{{TEST_PASSWORD}}',
+
+      // Common fields
       name: '{{TEST_NAME}}',
       title: 'Sample Title',
       description: 'Sample description text',
+
+      // Reference IDs - use variables
       chatId: '{{chatId}}',
       messageId: '{{messageId}}',
       userId: '{{userId}}',
       sessionId: '{{sessionId}}',
       paymentId: '{{paymentId}}',
+      subjectId: '{{subjectId}}',
+      applicationId: '{{applicationId}}',
+      subscriptionId: '{{subscriptionId}}',
+      billingId: '{{billingId}}',
+      reviewId: '{{reviewId}}',
+      tutorId: '{{tutorId}}',
+      studentId: '{{studentId}}',
+      slotId: '{{slotId}}',
+
+      // Subject/Tutor Application
       subject: 'Mathematics',
+      subjects: ['Mathematics', 'Physics'],
+
+      // Contact info
+      phone: '+49123456789',
+      address: '123 Main Street, Berlin, Germany',
+
+      // Dates
+      birthDate: '1995-05-15',
+      startTime: '{{START_TIME}}',
+      endTime: '{{END_TIME}}',
+      date: '{{DATE}}',
+
+      // URLs
+      cvUrl: 'https://example.com/cv.pdf',
+      abiturCertificateUrl: 'https://example.com/abitur.pdf',
+      educationProofUrls: ['https://example.com/proof1.pdf'],
+
+      // Status/Reason
+      status: 'SUBMITTED',
+      reason: 'Sample reason text',
+      rejectionReason: 'Application does not meet requirements',
+      cancellationReason: 'Need to reschedule the session',
+      adminNotes: 'Admin notes here',
+
+      // Codes
       oneTimeCode: 123456,
-      startTime: new Date(Date.now() + 86400000).toISOString(),
-      endTime: new Date(Date.now() + 90000000).toISOString(),
-      reason: 'Sample reason',
-      rejectionReason: 'Sample rejection reason',
-      cancellationReason: 'Sample cancellation reason',
+
+      // Ratings
       rating: 5,
-      comment: 'Sample comment',
+      overallRating: 5,
+      teachingQuality: 5,
+      communication: 5,
+      punctuality: 5,
+      preparedness: 5,
+
+      // Other
+      comment: 'This is a sample comment',
       text: 'Sample text message',
       targetId: '{{TARGET_ID}}',
       targetModel: 'Task',
       businessType: 'individual',
       country: 'US',
+      isActive: true,
+      isRecommended: true,
+      isPublic: true,
     };
 
-    if (fieldSamples[fieldName]) {
+    if (fieldSamples[fieldName] !== undefined) {
       return fieldSamples[fieldName];
     }
 
@@ -333,6 +392,8 @@ class SmartPostmanGenerator {
         return true;
       case 'array':
         return [];
+      case 'date':
+        return new Date().toISOString();
       default:
         return '';
     }
@@ -341,7 +402,7 @@ class SmartPostmanGenerator {
   /**
    * Parse route file and extract endpoints
    */
-  parseRouteFile(filePath, basePath, validationSchemas) {
+  parseRouteFile(filePath, basePath, validationSchemas, moduleName) {
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n');
     const endpoints = [];
@@ -355,27 +416,31 @@ class SmartPostmanGenerator {
       const routePath = match[2];
       const matchIndex = match.index;
 
-      // Extract JSDoc comment and inline comment
+      // Get the full route definition block (until next router. or end)
+      const routeEndIndex = content.indexOf('router.', matchIndex + 1);
+      const routeBlock = content.slice(matchIndex, routeEndIndex > 0 ? routeEndIndex : undefined);
+
+      // Extract info
       const { description, access } = this.extractRouteInfo(content, matchIndex, lines);
+      const requiresAuth = this.checkAuthRequired(routeBlock);
+      const schemaName = this.extractValidationSchema(routeBlock);
 
-      // Find validation schema reference
-      const validationMatch = content.slice(matchIndex, matchIndex + 500).match(
-        /validateRequest\s*\(\s*\w+\.(\w+)\s*\)/
-      );
-      const schemaName = validationMatch ? validationMatch[1] : null;
-
-      // Build full path
+      // Build full path with variables
       const fullPath = `/api/v1${basePath}${routePath === '/' ? '' : routePath}`;
+      const pathWithVariables = this.convertParamsToVariables(fullPath);
 
-      // Generate request
+      // Generate endpoint
       const endpoint = this.createEndpoint({
         method,
         path: routePath,
         fullPath,
+        pathWithVariables,
         description,
         access,
+        requiresAuth,
         schemaName,
         validationSchemas,
+        moduleName,
       });
 
       endpoints.push(endpoint);
@@ -385,37 +450,54 @@ class SmartPostmanGenerator {
   }
 
   /**
+   * Check if route requires authentication
+   */
+  checkAuthRequired(routeBlock) {
+    // Check for auth() middleware
+    return routeBlock.includes('auth(') || routeBlock.includes('auth,');
+  }
+
+  /**
+   * Extract validation schema name from route block
+   */
+  extractValidationSchema(routeBlock) {
+    const match = routeBlock.match(/validateRequest\s*\(\s*\w+\.(\w+)\s*\)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Convert :param to {{param}} for Postman
+   */
+  convertParamsToVariables(path) {
+    return path.replace(/:(\w+)/g, '{{$1}}');
+  }
+
+  /**
    * Extract route info from JSDoc comments
    */
   extractRouteInfo(content, matchIndex, lines) {
     let description = '';
     let access = 'Private';
 
-    // Find the line number
     const beforeMatch = content.substring(0, matchIndex);
     const lineNumber = beforeMatch.split('\n').length - 1;
 
-    // Look backwards for JSDoc or inline comment
     for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 20); i--) {
       const line = lines[i].trim();
 
-      // Stop at another route definition
       if (line.startsWith('router.')) break;
 
-      // Extract @desc
       if (line.includes('@desc')) {
         const descMatch = line.match(/@desc\s+(.+)/);
         if (descMatch) description = descMatch[1].trim();
       }
 
-      // Extract @access
       if (line.includes('@access')) {
         const accessMatch = line.match(/@access\s+(.+)/);
         if (accessMatch) access = accessMatch[1].trim();
       }
 
-      // Simple inline comment
-      if (line.startsWith('//') && !description) {
+      if (line.startsWith('//') && !description && !line.includes('@')) {
         description = line.replace('//', '').trim();
       }
     }
@@ -426,12 +508,9 @@ class SmartPostmanGenerator {
   /**
    * Create Postman endpoint object
    */
-  createEndpoint({ method, path, fullPath, description, access, schemaName, validationSchemas }) {
+  createEndpoint({ method, path, fullPath, pathWithVariables, description, access, requiresAuth, schemaName, validationSchemas, moduleName }) {
     const name = description || this.generateEndpointName(method, path);
-
-    // Parse URL with path parameters
-    const urlParts = fullPath.split('/').filter(p => p);
-    const pathWithVariables = fullPath.replace(/:(\w+)/g, ':$1');
+    const urlParts = pathWithVariables.split('/').filter(p => p);
 
     const endpoint = {
       name,
@@ -447,22 +526,43 @@ class SmartPostmanGenerator {
         url: {
           raw: `{{BASE_URL}}${pathWithVariables}`,
           host: ['{{BASE_URL}}'],
-          path: urlParts.map(p => p.startsWith(':') ? p : p),
+          path: urlParts,
         },
       },
       response: [],
     };
 
+    // Add auth if required
+    if (requiresAuth) {
+      endpoint.request.auth = {
+        type: 'bearer',
+        bearer: [
+          {
+            key: 'token',
+            value: '{{accessToken}}',
+            type: 'string',
+          },
+        ],
+      };
+    } else {
+      // Mark as no auth
+      endpoint.request.auth = {
+        type: 'noauth',
+      };
+    }
+
     // Add body for POST, PUT, PATCH
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
       let bodyContent = {};
 
-      // Try to get body from validation schema
+      // Try validation schema first
       if (schemaName && validationSchemas[schemaName]) {
         bodyContent = validationSchemas[schemaName];
-      } else {
-        // Generate default body based on endpoint
-        bodyContent = this.generateDefaultBody(path, method);
+      }
+
+      // If empty, use defaults
+      if (Object.keys(bodyContent).length === 0) {
+        bodyContent = this.generateDefaultBody(path, method, moduleName);
       }
 
       endpoint.request.body = {
@@ -476,8 +576,8 @@ class SmartPostmanGenerator {
       };
     }
 
-    // Add test script for auto-saving IDs
-    const testScript = this.generateTestScript(path, method);
+    // Add test scripts
+    const testScript = this.generateTestScript(path, method, moduleName);
     if (testScript) {
       endpoint.event = [
         {
@@ -496,7 +596,7 @@ class SmartPostmanGenerator {
   /**
    * Generate default body for common endpoints
    */
-  generateDefaultBody(path, method) {
+  generateDefaultBody(path, method, moduleName) {
     // Auth endpoints
     if (path.includes('login')) {
       return { email: '{{TEST_EMAIL}}', password: '{{TEST_PASSWORD}}' };
@@ -517,49 +617,156 @@ class SmartPostmanGenerator {
     if (path.includes('verify-email')) {
       return { email: '{{TEST_EMAIL}}', oneTimeCode: 123456 };
     }
+    if (path.includes('refresh-token')) {
+      return {};
+    }
+    if (path.includes('logout')) {
+      return {};
+    }
 
-    // Chat/Message
-    if (path.includes('message') || path.includes('chat')) {
-      return { chatId: '{{chatId}}', text: 'Hello, this is a test message!' };
+    // Subject
+    if (moduleName === 'subject') {
+      if (method === 'POST') {
+        return { name: 'Mathematics', isActive: true };
+      }
+      if (method === 'PATCH') {
+        return { name: 'Updated Subject Name', isActive: true };
+      }
+    }
+
+    // Tutor Application
+    if (moduleName === 'tutorApplication') {
+      if (path.includes('reject')) {
+        return { rejectionReason: 'Application does not meet requirements' };
+      }
+      if (path.includes('approve') || path.includes('phase')) {
+        return { adminNotes: 'Approved for next phase' };
+      }
+      if (method === 'POST' && path === '/') {
+        return {
+          subjects: ['Mathematics', 'Physics'],
+          name: '{{TEST_NAME}}',
+          email: '{{TEST_EMAIL}}',
+          phone: '+49123456789',
+          address: '123 Main Street, Berlin',
+          birthDate: '1995-05-15',
+          cvUrl: 'https://example.com/cv.pdf',
+          abiturCertificateUrl: 'https://example.com/abitur.pdf',
+        };
+      }
+    }
+
+    // Interview Slots
+    if (moduleName === 'interviewSlot') {
+      if (method === 'POST') {
+        return {
+          startTime: '{{START_TIME}}',
+          endTime: '{{END_TIME}}',
+          date: '{{DATE}}',
+        };
+      }
+      if (path.includes('book')) {
+        return { applicationId: '{{applicationId}}' };
+      }
+    }
+
+    // Trial Request
+    if (moduleName === 'trialRequest') {
+      if (method === 'POST' && path === '/') {
+        return {
+          subject: 'Mathematics',
+          description: 'I need help with calculus',
+          preferredTime: '{{START_TIME}}',
+        };
+      }
+      if (path.includes('accept')) {
+        return {};
+      }
     }
 
     // Session
-    if (path.includes('propose')) {
-      return {
-        chatId: '{{chatId}}',
-        subject: 'Mathematics',
-        startTime: new Date(Date.now() + 86400000).toISOString(),
-        endTime: new Date(Date.now() + 90000000).toISOString(),
-        description: 'Session description',
-      };
+    if (moduleName === 'session') {
+      if (path.includes('propose')) {
+        return {
+          chatId: '{{chatId}}',
+          subject: 'Mathematics',
+          startTime: '{{START_TIME}}',
+          endTime: '{{END_TIME}}',
+          description: 'Session for calculus review',
+        };
+      }
+      if (path.includes('reject')) {
+        return { rejectionReason: 'Not available at this time' };
+      }
+      if (path.includes('cancel')) {
+        return { cancellationReason: 'Need to reschedule' };
+      }
     }
-    if (path.includes('reject')) {
-      return { rejectionReason: 'Not available at this time' };
+
+    // Subscription
+    if (moduleName === 'studentSubscription') {
+      if (method === 'POST') {
+        return {
+          plan: 'REGULAR',
+          tutorId: '{{tutorId}}',
+        };
+      }
     }
-    if (path.includes('cancel')) {
-      return { cancellationReason: 'Need to reschedule' };
+
+    // Review
+    if (moduleName === 'sessionReview') {
+      if (method === 'POST') {
+        return {
+          sessionId: '{{sessionId}}',
+          overallRating: 5,
+          teachingQuality: 5,
+          communication: 5,
+          punctuality: 5,
+          preparedness: 5,
+          comment: 'Excellent tutor!',
+          isRecommended: true,
+        };
+      }
+      if (method === 'PATCH') {
+        return {
+          overallRating: 4,
+          comment: 'Updated review',
+        };
+      }
+    }
+
+    // Chat/Message
+    if (path.includes('message') || moduleName === 'message') {
+      return { chatId: '{{chatId}}', text: 'Hello, this is a test message!' };
     }
 
     // Bookmark
-    if (path.includes('bookmark')) {
+    if (path.includes('bookmark') || moduleName === 'bookmark') {
       return { targetId: '{{TARGET_ID}}', targetModel: 'Task' };
     }
 
     // Payment
-    if (path.includes('refund')) {
-      return { reason: 'Refund requested by customer' };
+    if (moduleName === 'payment') {
+      if (path.includes('refund')) {
+        return { reason: 'Refund requested by customer' };
+      }
+      if (path.includes('account')) {
+        return { businessType: 'individual', country: 'US' };
+      }
     }
-    if (path.includes('account')) {
-      return { businessType: 'individual', country: 'US' };
+
+    // Notification
+    if (path.includes('read')) {
+      return {};
     }
 
     return {};
   }
 
   /**
-   * Generate test script for auto-saving IDs
+   * Generate test scripts for auto-saving IDs
    */
-  generateTestScript(path, method) {
+  generateTestScript(path, method, moduleName) {
     // Login - save tokens
     if (path.includes('login') && method === 'POST') {
       return [
@@ -585,65 +792,44 @@ class SmartPostmanGenerator {
       ];
     }
 
-    // Chat creation - save chat ID
-    if ((path.includes('chat') || path === '/') && method === 'POST') {
-      return [
-        '// Auto-save chat ID',
-        'const response = pm.response.json();',
-        '',
-        'if (response.success && response.data && response.data._id) {',
-        '  pm.collectionVariables.set("chatId", response.data._id);',
-        '  console.log("✅ Chat ID saved:", response.data._id);',
-        '}',
-      ];
-    }
-
-    // Message - save message ID
-    if (path.includes('message') && method === 'POST') {
-      return [
-        '// Auto-save message ID',
-        'const response = pm.response.json();',
-        '',
-        'if (response.success && response.data && response.data._id) {',
-        '  pm.collectionVariables.set("messageId", response.data._id);',
-        '  console.log("✅ Message ID saved:", response.data._id);',
-        '}',
-      ];
-    }
-
-    // Payment - save payment ID
-    if (path.includes('payment') && method === 'POST') {
-      return [
-        '// Auto-save payment ID',
-        'const response = pm.response.json();',
-        '',
-        'if (response.success && response.data) {',
-        '  if (response.data._id) {',
-        '    pm.collectionVariables.set("paymentId", response.data._id);',
-        '    console.log("✅ Payment ID saved:", response.data._id);',
-        '  }',
-        '  if (response.data.clientSecret) {',
-        '    pm.collectionVariables.set("clientSecret", response.data.clientSecret);',
-        '    console.log("✅ Client secret saved");',
-        '  }',
-        '}',
-      ];
-    }
-
-    // Session - save session ID
-    if (path.includes('session') && method === 'POST') {
-      return [
-        '// Auto-save session ID',
-        'const response = pm.response.json();',
-        '',
-        'if (response.success && response.data && response.data._id) {',
-        '  pm.collectionVariables.set("sessionId", response.data._id);',
-        '  console.log("✅ Session ID saved:", response.data._id);',
-        '}',
-      ];
+    // Generic ID saving for POST create endpoints
+    if (method === 'POST' && (path === '/' || path.match(/^\/[^/]*$/))) {
+      const idVar = this.getIdVariableForModule(moduleName);
+      if (idVar) {
+        return [
+          `// Auto-save ${idVar}`,
+          'const response = pm.response.json();',
+          '',
+          'if (response.success && response.data && response.data._id) {',
+          `  pm.collectionVariables.set("${idVar}", response.data._id);`,
+          `  console.log("✅ ${idVar} saved:", response.data._id);`,
+          '}',
+        ];
+      }
     }
 
     return null;
+  }
+
+  /**
+   * Get ID variable name for module
+   */
+  getIdVariableForModule(moduleName) {
+    const moduleIdMap = {
+      'chat': 'chatId',
+      'message': 'messageId',
+      'payment': 'paymentId',
+      'session': 'sessionId',
+      'subject': 'subjectId',
+      'tutorApplication': 'applicationId',
+      'interviewSlot': 'slotId',
+      'trialRequest': 'trialRequestId',
+      'studentSubscription': 'subscriptionId',
+      'monthlyBilling': 'billingId',
+      'tutorEarnings': 'earningsId',
+      'sessionReview': 'reviewId',
+    };
+    return moduleIdMap[moduleName] || null;
   }
 
   /**
@@ -651,13 +837,12 @@ class SmartPostmanGenerator {
    */
   generateEndpointName(method, path) {
     if (path === '/') {
-      return `${method} - Get All`;
+      if (method === 'GET') return 'Get All';
+      if (method === 'POST') return 'Create';
+      return `${method} - Root`;
     }
 
-    // Replace :param with {param}
     const readablePath = path.replace(/:(\w+)/g, '{$1}');
-
-    // Convert to title case
     const parts = readablePath.split('/').filter(p => p);
     const name = parts
       .map(part => {
@@ -677,26 +862,46 @@ class SmartPostmanGenerator {
    */
   generateVariables() {
     return [
+      // Base URL
       { key: 'BASE_URL', value: 'http://localhost:5000', type: 'string' },
+
+      // Auth tokens
       { key: 'accessToken', value: '', type: 'string' },
       { key: 'refreshToken', value: '', type: 'string' },
+
+      // User IDs
       { key: 'userId', value: '', type: 'string' },
+      { key: 'tutorId', value: '', type: 'string' },
+      { key: 'studentId', value: '', type: 'string' },
+
+      // Resource IDs
       { key: 'chatId', value: '', type: 'string' },
       { key: 'messageId', value: '', type: 'string' },
       { key: 'sessionId', value: '', type: 'string' },
       { key: 'paymentId', value: '', type: 'string' },
       { key: 'clientSecret', value: '', type: 'string' },
-      { key: 'applicationId', value: '', type: 'string' },
       { key: 'subjectId', value: '', type: 'string' },
+      { key: 'applicationId', value: '', type: 'string' },
+      { key: 'slotId', value: '', type: 'string' },
+      { key: 'trialRequestId', value: '', type: 'string' },
       { key: 'subscriptionId', value: '', type: 'string' },
       { key: 'billingId', value: '', type: 'string' },
+      { key: 'earningsId', value: '', type: 'string' },
       { key: 'reviewId', value: '', type: 'string' },
+      { key: 'notificationId', value: '', type: 'string' },
       { key: 'TARGET_ID', value: '', type: 'string' },
+
+      // Test data
       { key: 'TEST_EMAIL', value: 'test@example.com', type: 'string' },
       { key: 'TEST_PASSWORD', value: 'SecurePass123!', type: 'string' },
       { key: 'TEST_NAME', value: 'John Doe', type: 'string' },
       { key: 'NEW_PASSWORD', value: 'NewSecure123!', type: 'string' },
       { key: 'UPDATED_NAME', value: 'Updated Name', type: 'string' },
+
+      // Date/Time (will need to be set manually or via pre-request script)
+      { key: 'START_TIME', value: new Date(Date.now() + 86400000).toISOString(), type: 'string' },
+      { key: 'END_TIME', value: new Date(Date.now() + 90000000).toISOString(), type: 'string' },
+      { key: 'DATE', value: new Date(Date.now() + 86400000).toISOString().split('T')[0], type: 'string' },
     ];
   }
 
@@ -710,15 +915,24 @@ class SmartPostmanGenerator {
         script: {
           type: 'text/javascript',
           exec: [
-            '// Auto-inject Bearer token if available',
+            '// Auto-inject Bearer token if available and not already set',
             'const token = pm.collectionVariables.get("accessToken");',
             '',
-            'if (token) {',
+            'if (token && !pm.request.headers.has("Authorization")) {',
             '  pm.request.headers.add({',
             '    key: "Authorization",',
             '    value: "Bearer " + token',
             '  });',
             '}',
+            '',
+            '// Update dynamic timestamps',
+            'const now = new Date();',
+            'const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);',
+            'const dayAfter = new Date(now.getTime() + 25 * 60 * 60 * 1000);',
+            '',
+            'pm.collectionVariables.set("START_TIME", tomorrow.toISOString());',
+            'pm.collectionVariables.set("END_TIME", dayAfter.toISOString());',
+            'pm.collectionVariables.set("DATE", tomorrow.toISOString().split("T")[0]);',
           ],
         },
       },
@@ -777,25 +991,29 @@ async function main() {
   const generator = new SmartPostmanGenerator();
 
   if (args.length === 0) {
-    // Generate complete collection
     await generator.generateCompleteCollection();
   } else if (args[0] === '--help' || args[0] === '-h') {
-    console.log('Smart Postman Collection Generator');
+    console.log('Smart Postman Collection Generator v2.0');
     console.log('');
     console.log('Usage:');
     console.log('  node scripts/generate-postman-collection.js           Generate complete collection');
     console.log('  node scripts/generate-postman-collection.js <module>  Generate single module');
     console.log('  node scripts/generate-postman-collection.js --help    Show this help');
     console.log('');
+    console.log('Features:');
+    console.log('  - Auto-detects all modules from routes/index.ts');
+    console.log('  - Reads validation files for request bodies');
+    console.log('  - Detects auth requirements from middleware');
+    console.log('  - Converts :param to {{param}} variables');
+    console.log('  - Auto-saves tokens and IDs in test scripts');
+    console.log('');
     console.log('Examples:');
     console.log('  node scripts/generate-postman-collection.js');
     console.log('  node scripts/generate-postman-collection.js auth');
-    console.log('  node scripts/generate-postman-collection.js session');
+    console.log('  node scripts/generate-postman-collection.js subject');
   } else {
-    // Generate single module
     await generator.generateSingleModule(args[0]);
   }
 }
 
-// Run
 main().catch(console.error);

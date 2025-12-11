@@ -57,7 +57,7 @@ const getAllApplications = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Applications retrieved successfully',
         data: result.data,
-        meta: result.meta,
+        pagination: result.meta,
     });
 }));
 /**

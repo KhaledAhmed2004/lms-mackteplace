@@ -6,17 +6,14 @@ import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { Chat } from '../chat/chat.model';
 import { Subject } from '../subject/subject.model';
-import {
-  ITrialRequest,
-  TRIAL_REQUEST_STATUS,
-} from './trialRequest.interface';
+import { ITrialRequest, TRIAL_REQUEST_STATUS } from './trialRequest.interface';
 import { TrialRequest } from './trialRequest.model';
+import { SessionRequest } from '../sessionRequest/sessionRequest.model';
+import { SESSION_REQUEST_STATUS } from '../sessionRequest/sessionRequest.interface';
 
 /**
- * Create trial request (Student or Guest)
- * This endpoint can be used by:
- * 1. Logged-in students (studentId provided)
- * 2. Guest users (no studentId, studentInfo required)
+ * Create trial request (First-time Student or Guest ONLY)
+ * For returning students, use SessionRequest module instead
  */
 const createTrialRequest = async (
   studentId: string | null,
@@ -53,7 +50,7 @@ const createTrialRequest = async (
     }
   }
 
-  // If logged-in student, verify and check for pending requests
+  // If logged-in student, verify and check eligibility
   if (studentId) {
     const student = await User.findById(studentId);
     if (!student) {
@@ -67,27 +64,63 @@ const createTrialRequest = async (
       );
     }
 
+    // Returning students should use SessionRequest, not TrialRequest
+    if (student.studentProfile?.hasCompletedTrial) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'You have already completed a trial. Please use the session request feature for additional tutoring sessions.'
+      );
+    }
+
     // Check if student has pending trial request
-    const pendingRequest = await TrialRequest.findOne({
+    const pendingTrialRequest = await TrialRequest.findOne({
       studentId: new Types.ObjectId(studentId),
       status: TRIAL_REQUEST_STATUS.PENDING,
     });
 
-    if (pendingRequest) {
+    if (pendingTrialRequest) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
         'You already have a pending trial request. Please wait for a tutor to accept or cancel it.'
       );
     }
+
+    // Also check for pending session request
+    const pendingSessionRequest = await SessionRequest.findOne({
+      studentId: new Types.ObjectId(studentId),
+      status: SESSION_REQUEST_STATUS.PENDING,
+    });
+
+    if (pendingSessionRequest) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'You have a pending session request. Please wait for it to be accepted or cancel it first.'
+      );
+    }
   } else {
-    // Guest user - check by email for pending requests
-    // For under 18: check guardian email
-    // For 18+: check student email
+    // Guest user - check by email for previous trials and pending requests
     const emailToCheck = payload.studentInfo?.isUnder18
       ? payload.studentInfo?.guardianInfo?.email
       : payload.studentInfo?.email;
 
     if (emailToCheck) {
+      // Check if guest has already completed a trial
+      const previousAcceptedTrial = await TrialRequest.findOne({
+        $or: [
+          { 'studentInfo.email': emailToCheck },
+          { 'studentInfo.guardianInfo.email': emailToCheck },
+        ],
+        status: TRIAL_REQUEST_STATUS.ACCEPTED,
+      });
+
+      if (previousAcceptedTrial) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          'You have already completed a trial with this email. Please log in to request more sessions.'
+        );
+      }
+
+      // Check for pending requests
       const pendingRequest = await TrialRequest.findOne({
         $or: [
           { 'studentInfo.email': emailToCheck },
@@ -120,28 +153,8 @@ const createTrialRequest = async (
   }
 
   // TODO: Send real-time notification to matching tutors
-  // const matchingTutors = await User.find({
-  //   role: USER_ROLES.TUTOR,
-  //   'tutorProfile.subjects': payload.subject,
-  //   'tutorProfile.isVerified': true
-  // });
-  // io.to(matchingTutors.map(t => t._id.toString())).emit('newTrialRequest', trialRequest);
-
   // TODO: Send email notification to admin
-  // await sendEmail({
-  //   to: ADMIN_EMAIL,
-  //   subject: 'New Trial Request',
-  //   template: 'new-trial-request',
-  //   data: { studentName: payload.studentInfo?.firstName, subject: subjectExists.name }
-  // });
-
   // TODO: Send confirmation email to student
-  // await sendEmail({
-  //   to: payload.studentInfo?.email,
-  //   subject: 'Trial Request Submitted',
-  //   template: 'trial-request-confirmation',
-  //   data: { name: payload.studentInfo?.firstName, subject: subjectExists.name }
-  // });
 
   return trialRequest;
 };
@@ -231,7 +244,7 @@ const getAllTrialRequests = async (query: Record<string, unknown>) => {
       .populate('chatId'),
     query
   )
-    .search(['description', 'studentInfo.firstName', 'studentInfo.lastName', 'studentInfo.email'])
+    .search(['description', 'studentInfo.name', 'studentInfo.email'])
     .filter()
     .sort()
     .paginate()
@@ -266,6 +279,7 @@ const getSingleTrialRequest = async (id: string): Promise<ITrialRequest | null> 
 /**
  * Accept trial request (Tutor)
  * Creates chat and connects student with tutor
+ * Marks student as having completed trial
  */
 const acceptTrialRequest = async (
   requestId: string,
@@ -329,25 +343,15 @@ const acceptTrialRequest = async (
   request.acceptedAt = new Date();
   await request.save();
 
-  // TODO: Send real-time notification to student
-  // if (request.studentId) {
-  //   io.to(request.studentId.toString()).emit('trialAccepted', {
-  //     tutorName: tutor.name,
-  //     chatId: chat._id
-  //   });
-  // }
+  // Mark student as having completed trial (so they use SessionRequest next time)
+  if (request.studentId) {
+    await User.findByIdAndUpdate(request.studentId, {
+      $set: { 'studentProfile.hasCompletedTrial': true },
+    });
+  }
 
-  // TODO: Send email to student (using studentInfo.email)
-  // await sendEmail({
-  //   to: request.studentInfo.email,
-  //   subject: 'Your Trial Request Was Accepted!',
-  //   template: 'trial-accepted',
-  //   data: {
-  //     studentName: request.studentInfo.firstName,
-  //     tutorName: tutor.name,
-  //     subject: request.subject
-  //   }
-  // });
+  // TODO: Send real-time notification to student
+  // TODO: Send email to student
 
   return request;
 };

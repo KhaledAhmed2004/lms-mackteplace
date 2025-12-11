@@ -98,6 +98,18 @@ const userSchema = new Schema<IUser>(
           type: Boolean,
           default: false,
         },
+        hasCompletedTrial: {
+          type: Boolean,
+          default: false,
+        },
+        trialRequestsCount: {
+          type: Number,
+          default: 0,
+        },
+        sessionRequestsCount: {
+          type: Number,
+          default: 0,
+        },
         currentPlan: {
           type: String,
           enum: ['FLEXIBLE', 'REGULAR', 'LONG_TERM', null],
