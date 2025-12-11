@@ -27,7 +27,7 @@ const getAllSubjects = async (query: Record<string, unknown>) => {
     .paginate()
     .fields();
 
-  const data = await subjectQuery.modelQuery.lean();
+  const data = await subjectQuery.modelQuery;
   const pagination = await subjectQuery.getPaginationInfo();
 
   return {

@@ -73,7 +73,7 @@ flowchart TB
         SF4 --> SF5[⭐ Leave Review]
         SF5 --> SF6[✅ Review Submitted]
         SF6 --> SF7[🏁 Completed]
-        SF4 -.->|No one joins| SF8[❌ Expired]
+        
     end
 
     %% ==================== PAYMENT FLOW ====================
@@ -316,10 +316,18 @@ flowchart LR
         G[📧 Check Email<br/>OTP code will be sent] --> G1[🔢 Enter OTP<br/>6-digit code]
     end
 
+    subgraph PendingTutor[⏳ Wait for Tutor Response]
+        direction TB
+        I1[Request Pending for 1 week ] --> I2{1 week passed?}
+        I2 -->|Yes| I3[📧 Send Reminder Email to Student]
+        I3 --> I4{Request Expired after 2-4 weeks?}
+        I4 -->|Yes| I5[❌ Expire Request + Notify Student]
+        I4 -->|No| I1
+    end
+
     subgraph Success[🎉 Success!]
         direction TB
-        H[✅ Trial Request Created<br/>Request submitted] --> I[🔔 Notify Tutors<br/>Matching tutors notified]
-        I --> J[⏳ Wait for Tutor<br/>Response within 24 hours]
+        H[✅ Trial Request Created<br/>Request Submitted] --> I[Waiting for Tutor Response or Expired]
     end
 
     B --> Step1
@@ -327,7 +335,8 @@ flowchart LR
     E -->|Yes - Minor| Step2
     E -->|No - Adult| Verify
     Step2 --> Verify
-    Verify --> Success
+    Verify --> H
+    H --> PendingTutor
 
     %% Colors
     classDef startStyle fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#92400e
@@ -336,13 +345,15 @@ flowchart LR
     classDef verifyStyle fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#9d174d
     classDef successStyle fill:#dcfce7,stroke:#22c55e,stroke-width:2px,color:#166534
     classDef decisionStyle fill:#fef9c3,stroke:#eab308,stroke-width:2px,color:#854d0e
+    classDef pendingStyle fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#9a3412
 
     class A,B startStyle
     class C1,C2,C3,C4,D1,D2,D3,D4 step1Style
     class F1,F2,F3 step2Style
     class G,G1 verifyStyle
-    class H,I,J successStyle
+    class H successStyle
     class E decisionStyle
+    class I1,I2,I3,I4,I5 pendingStyle
 ```
 
 ---
@@ -425,13 +436,13 @@ sequenceDiagram
         Note over S,T: PHASE 1 - Before Session
         P-->>S: Reminder 24 hours before
         P-->>T: Reminder 24 hours before
-        P-->>S: Reminder 1 hour before
-        P-->>T: Reminder 1 hour before
+        P-->>S: Reminder 30 minutes before
+        P-->>T: Reminder 30 minutes before
         Note over S: Dashboard shows countdown timer
     end
 
     rect rgb(254, 249, 195)
-        Note over S,T: PHASE 2 - Join Session (15 min before)
+        Note over S,T: PHASE 2 - Join Session
         P->>S: Join Meeting button becomes active
         P->>T: Join Meeting button becomes active
         S->>P: Clicks Join Meeting
@@ -454,10 +465,7 @@ sequenceDiagram
         T->>G: Ends the meeting
         G-->>P: Meeting ended signal
         P->>P: Auto-mark session COMPLETED
-        P->>P: Calculate session duration
         P->>P: Track hours for billing
-        P-->>S: Session completed notification
-        P-->>T: Session completed notification
     end
 
     rect rgb(254, 226, 226)
