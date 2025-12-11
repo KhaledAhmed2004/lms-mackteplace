@@ -24,6 +24,7 @@ class EnhancedPostmanGenerator {
   constructor() {
     this.baseUrl = '{{BASE_URL}}';
     this.apiPrefix = '/api/v1';
+    this.routesIndexPath = path.join(process.cwd(), 'src', 'routes', 'index.ts');
     this.collection = {
       info: {
         name: 'Complete API Collection',
@@ -37,16 +38,58 @@ class EnhancedPostmanGenerator {
       event: [], // Collection-level scripts
     };
 
-    // Module configurations
-    this.moduleConfig = {
-      auth: { path: '/auth', priority: 1 },
-      user: { path: '/user', priority: 2 },
-      chat: { path: '/chats', priority: 3 },
-      message: { path: '/messages', priority: 4 },
-      payment: { path: '/payments', priority: 5 },
-      bookmark: { path: '/bookmarks', priority: 6 },
-      notification: { path: '/notifications', priority: 7 },
-    };
+    // Module configurations - auto-detected from routes/index.ts
+    this.moduleConfig = this.detectModulesFromRoutes();
+  }
+
+  /**
+   * Auto-detect modules from src/routes/index.ts
+   */
+  detectModulesFromRoutes() {
+    const modules = {};
+
+    if (!fs.existsSync(this.routesIndexPath)) {
+      console.error('❌ Routes index file not found:', this.routesIndexPath);
+      return modules;
+    }
+
+    const content = fs.readFileSync(this.routesIndexPath, 'utf8');
+    const apiRoutesMatch = content.match(/const\s+apiRoutes\s*=\s*\[([\s\S]*?)\];/);
+
+    if (!apiRoutesMatch) {
+      console.error('❌ Could not find apiRoutes array');
+      return modules;
+    }
+
+    const routeEntryRegex = /{\s*path:\s*['"`]([^'"`]+)['"`]\s*,\s*route:\s*(\w+)/g;
+    let match;
+    let priority = 1;
+
+    while ((match = routeEntryRegex.exec(apiRoutesMatch[1])) !== null) {
+      const apiPath = match[1];
+      const routeName = match[2];
+
+      // Find the import to get module folder name
+      const importRegex = new RegExp(
+        `import\\s*{\\s*${routeName}\\s*}\\s*from\\s*['"]([^'"]+)['"]`
+      );
+      const importMatch = content.match(importRegex);
+
+      let moduleFolderName = '';
+      if (importMatch) {
+        const importPath = importMatch[1];
+        const pathParts = importPath.split('/');
+        moduleFolderName = pathParts[pathParts.length - 2] || '';
+      }
+
+      modules[moduleFolderName] = {
+        path: apiPath,
+        priority: priority++,
+        folderName: moduleFolderName,
+      };
+    }
+
+    return modules;
   }
 
   /**
@@ -138,7 +181,7 @@ Features:
   ✅ Collection variables
   ✅ Automatic backups
 
-Available Modules:
+Available Modules (auto-detected from routes/index.ts):
   ${Object.keys(this.moduleConfig).join(', ')}
 `);
   }
@@ -591,11 +634,10 @@ Available Modules:
           password: '{{TEST_PASSWORD}}',
         },
         '/': {
-          // Register
           name: '{{TEST_NAME}}',
           email: '{{TEST_EMAIL}}',
           password: '{{TEST_PASSWORD}}',
-          role: 'TASKER',
+          role: 'STUDENT',
         },
         '/forget-password': { email: '{{TEST_EMAIL}}' },
         '/reset-password': {
@@ -620,7 +662,7 @@ Available Modules:
           name: '{{TEST_NAME}}',
           email: '{{TEST_EMAIL}}',
           password: '{{TEST_PASSWORD}}',
-          role: 'TASKER',
+          role: 'STUDENT',
         },
         '/profile': {
           name: '{{UPDATED_NAME}}',
@@ -648,10 +690,91 @@ Available Modules:
           targetModel: 'Task',
         },
       },
+      // New tutoring marketplace modules
+      subject: {
+        '/': {
+          name: 'Mathematics',
+          isActive: true,
+        },
+      },
+      tutorApplication: {
+        '/': {
+          subjects: ['Mathematics', 'Physics'],
+          name: '{{TEST_NAME}}',
+          email: '{{TEST_EMAIL}}',
+          phone: '+49123456789',
+          address: '123 Main Street, Berlin',
+          birthDate: '1995-05-15',
+          cvUrl: 'https://example.com/cv.pdf',
+          abiturCertificateUrl: 'https://example.com/abitur.pdf',
+        },
+      },
+      interviewSlot: {
+        '/': {
+          startTime: '{{START_TIME}}',
+          endTime: '{{END_TIME}}',
+          date: '{{DATE}}',
+        },
+      },
+      trialRequest: {
+        '/': {
+          subject: 'Mathematics',
+          description: 'I need help with calculus',
+          preferredTime: '{{START_TIME}}',
+        },
+      },
+      sessionRequest: {
+        '/': {
+          subject: 'Mathematics',
+          description: 'Session request description',
+          preferredTime: '{{START_TIME}}',
+        },
+      },
+      session: {
+        '/propose': {
+          chatId: '{{chatId}}',
+          subject: 'Mathematics',
+          startTime: '{{START_TIME}}',
+          endTime: '{{END_TIME}}',
+          description: 'Session for calculus review',
+        },
+      },
+      studentSubscription: {
+        '/': {
+          plan: 'REGULAR',
+          tutorId: '{{tutorId}}',
+        },
+      },
+      sessionReview: {
+        '/': {
+          sessionId: '{{sessionId}}',
+          overallRating: 5,
+          teachingQuality: 5,
+          communication: 5,
+          punctuality: 5,
+          preparedness: 5,
+          comment: 'Excellent tutor!',
+          isRecommended: true,
+        },
+      },
     };
 
     if (sampleBodies[moduleName] && sampleBodies[moduleName][route.path]) {
       return sampleBodies[moduleName][route.path];
+    }
+
+    // Generic body based on path patterns
+    if (route.path.includes('reject')) {
+      return { rejectionReason: 'Application does not meet requirements' };
+    }
+    if (route.path.includes('cancel')) {
+      return { cancellationReason: 'Need to reschedule' };
+    }
+    if (route.path.includes('approve') || route.path.includes('phase')) {
+      return { adminNotes: 'Approved for next phase' };
+    }
+    if (route.path.includes('book')) {
+      return { applicationId: '{{applicationId}}' };
     }
 
     return {};
@@ -868,20 +991,47 @@ if (response.success && response.data) {
    */
   addCollectionVariables(existingCollection) {
     const defaultVariables = [
-      { key: 'BASE_URL', value: 'http://localhost:5000/api/v1', type: 'string' },
+      // Base URL
+      { key: 'BASE_URL', value: 'http://localhost:5000', type: 'string' },
+
+      // Auth tokens
       { key: 'accessToken', value: '', type: 'string' },
       { key: 'refreshToken', value: '', type: 'string' },
+
+      // User IDs
       { key: 'userId', value: '', type: 'string' },
+      { key: 'tutorId', value: '', type: 'string' },
+      { key: 'studentId', value: '', type: 'string' },
+
+      // Resource IDs
       { key: 'chatId', value: '', type: 'string' },
       { key: 'messageId', value: '', type: 'string' },
+      { key: 'sessionId', value: '', type: 'string' },
       { key: 'paymentId', value: '', type: 'string' },
       { key: 'clientSecret', value: '', type: 'string' },
+      { key: 'subjectId', value: '', type: 'string' },
+      { key: 'applicationId', value: '', type: 'string' },
+      { key: 'slotId', value: '', type: 'string' },
+      { key: 'trialRequestId', value: '', type: 'string' },
+      { key: 'sessionRequestId', value: '', type: 'string' },
+      { key: 'subscriptionId', value: '', type: 'string' },
+      { key: 'billingId', value: '', type: 'string' },
+      { key: 'earningsId', value: '', type: 'string' },
+      { key: 'reviewId', value: '', type: 'string' },
+      { key: 'notificationId', value: '', type: 'string' },
       { key: 'TARGET_ID', value: '', type: 'string' },
+
+      // Test data
       { key: 'TEST_EMAIL', value: 'test@example.com', type: 'string' },
       { key: 'TEST_PASSWORD', value: 'SecurePass123!', type: 'string' },
       { key: 'TEST_NAME', value: 'John Doe', type: 'string' },
       { key: 'NEW_PASSWORD', value: 'NewSecure123!', type: 'string' },
       { key: 'UPDATED_NAME', value: 'Updated Name', type: 'string' },
+
+      // Date/Time
+      { key: 'START_TIME', value: new Date(Date.now() + 86400000).toISOString(), type: 'string' },
+      { key: 'END_TIME', value: new Date(Date.now() + 90000000).toISOString(), type: 'string' },
+      { key: 'DATE', value: new Date(Date.now() + 86400000).toISOString().split('T')[0], type: 'string' },
     ];
 
     if (existingCollection && existingCollection.variable) {

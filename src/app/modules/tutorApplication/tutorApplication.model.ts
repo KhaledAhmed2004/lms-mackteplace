@@ -1,15 +1,12 @@
 import { model, Schema } from 'mongoose';
-import { APPLICATION_STATUS, ITutorApplication, TutorApplicationModel } from './tutorApplication.interface';
+import {
+  APPLICATION_STATUS,
+  ITutorApplication,
+  TutorApplicationModel,
+} from './tutorApplication.interface';
 
 const tutorApplicationSchema = new Schema<ITutorApplication>(
   {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'User ID is required'],
-      unique: true, // One application per user
-    },
-
     // Subjects to teach
     subjects: {
       type: [String],
@@ -67,11 +64,6 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       enum: Object.values(APPLICATION_STATUS),
       default: APPLICATION_STATUS.SUBMITTED,
     },
-    phase: {
-      type: Number,
-      enum: [1, 2, 3],
-      default: 1,
-    },
     rejectionReason: {
       type: String,
       trim: true,
@@ -106,21 +98,6 @@ tutorApplicationSchema.index({ userId: 1 });
 tutorApplicationSchema.index({ status: 1, phase: 1 });
 tutorApplicationSchema.index({ submittedAt: -1 });
 tutorApplicationSchema.index({ email: 1 });
-
-// Pre-save hook to update phase based on status
-tutorApplicationSchema.pre('save', function (next) {
-  if (this.status === APPLICATION_STATUS.APPROVED) {
-    this.phase = 3;
-  } else if (
-    this.status === APPLICATION_STATUS.INTERVIEW_SCHEDULED ||
-    this.status === APPLICATION_STATUS.INTERVIEW_DONE
-  ) {
-    this.phase = 2;
-  } else {
-    this.phase = 1;
-  }
-  next();
-});
 
 export const TutorApplication = model<ITutorApplication, TutorApplicationModel>(
   'TutorApplication',

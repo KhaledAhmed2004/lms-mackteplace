@@ -10,8 +10,8 @@ export enum APPLICATION_STATUS {
 }
 
 export type ITutorApplication = {
-  userId: Types.ObjectId; // ref to User
-
+  _id: Types.ObjectId;
+ 
   // Application Data
   subjects: string[]; // Which subjects they want to teach
   name: string;
@@ -27,7 +27,6 @@ export type ITutorApplication = {
 
   // Status Tracking
   status: APPLICATION_STATUS;
-  phase: 1 | 2 | 3; // 1=Applied, 2=Interview scheduled, 3=Approved
   rejectionReason?: string;
 
   // Admin Notes
