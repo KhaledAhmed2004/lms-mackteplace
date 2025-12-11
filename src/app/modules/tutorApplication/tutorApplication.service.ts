@@ -4,14 +4,13 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import ApiError from '../../../errors/ApiError';
 import { USER_ROLES } from '../../../enums/user';
 import { User } from '../user/user.model';
-import { APPLICATION_STATUS, ITutorApplication } from './tutorApplication.interface';
+import {
+  APPLICATION_STATUS,
+  ITutorApplication,
+} from './tutorApplication.interface';
 import { TutorApplication } from './tutorApplication.model';
 // import { sendEmail } from '../../../helpers/emailHelper'; // Will implement later
 
-/**
- * Submit tutor application
- * User must be APPLICANT role
- */
 const submitApplication = async (
   userId: string,
   payload: Partial<ITutorApplication>
@@ -34,9 +33,7 @@ const submitApplication = async (
   // Create application
   const applicationData = {
     ...payload,
-    userId: new Types.ObjectId(userId),
     status: APPLICATION_STATUS.SUBMITTED,
-    phase: 1,
     submittedAt: new Date(),
   };
 
@@ -67,7 +64,9 @@ const submitApplication = async (
 /**
  * Get my application (applicant)
  */
-const getMyApplication = async (userId: string): Promise<ITutorApplication | null> => {
+const getMyApplication = async (
+  userId: string
+): Promise<ITutorApplication | null> => {
   const application = await TutorApplication.findOne({ userId }).populate(
     'userId',
     'name email profilePicture'
@@ -86,7 +85,10 @@ const getMyApplication = async (userId: string): Promise<ITutorApplication | nul
  */
 const getAllApplications = async (query: Record<string, unknown>) => {
   const applicationQuery = new QueryBuilder(
-    TutorApplication.find().populate('userId', 'name email profilePicture phone'),
+    TutorApplication.find().populate(
+      'userId',
+      'name email profilePicture phone'
+    ),
     query
   )
     .search(['name', 'email', 'phone']) // Search by name, email, phone
@@ -107,7 +109,9 @@ const getAllApplications = async (query: Record<string, unknown>) => {
 /**
  * Get single application by ID (admin)
  */
-const getSingleApplication = async (id: string): Promise<ITutorApplication | null> => {
+const getSingleApplication = async (
+  id: string
+): Promise<ITutorApplication | null> => {
   const application = await TutorApplication.findById(id).populate(
     'userId',
     'name email profilePicture phone status'
@@ -269,7 +273,9 @@ const updateApplicationStatus = async (
  * Delete application (admin only)
  * Hard delete
  */
-const deleteApplication = async (id: string): Promise<ITutorApplication | null> => {
+const deleteApplication = async (
+  id: string
+): Promise<ITutorApplication | null> => {
   const application = await TutorApplication.findById(id);
 
   if (!application) {

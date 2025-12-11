@@ -7,16 +7,11 @@ import {
 
 const tutorApplicationSchema = new Schema<ITutorApplication>(
   {
-    // Subjects to teach
     subjects: {
       type: [String],
       required: [true, 'At least one subject is required'],
-      validate: {
-        validator: (v: string[]) => v && v.length > 0,
-        message: 'At least one subject must be selected',
-      },
+      minlength: [1, 'At least one subject must be selected'],
     },
-
     // Personal Information
     name: {
       type: String,
@@ -44,21 +39,21 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       required: [true, 'Birth date is required'],
     },
 
-    // Documents (URLs from Cloudinary/S3)
-    cvUrl: {
+    // Documents (must match your interface exactly)
+    cv: {
       type: String,
       required: [true, 'CV is required'],
     },
-    abiturCertificateUrl: {
+    abiturCertificate: {
       type: String,
-      required: [true, 'Abitur certificate is required'], // MANDATORY
+      required: [true, 'Abitur certificate is required'],
     },
-    educationProofUrls: {
-      type: [String],
-      default: [],
+    officalIdDocument: {
+      type: String,
+      required: [true, 'Official ID document is required'],
     },
 
-    // Status
+    // Status Tracking
     status: {
       type: String,
       enum: Object.values(APPLICATION_STATUS),
@@ -80,9 +75,6 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: Date,
       default: Date.now,
     },
-    reviewedAt: {
-      type: Date,
-    },
     approvedAt: {
       type: Date,
     },
@@ -94,10 +86,9 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
 );
 
 // Indexes for performance
-tutorApplicationSchema.index({ userId: 1 });
-tutorApplicationSchema.index({ status: 1, phase: 1 });
-tutorApplicationSchema.index({ submittedAt: -1 });
 tutorApplicationSchema.index({ email: 1 });
+tutorApplicationSchema.index({ status: 1 });
+tutorApplicationSchema.index({ submittedAt: -1 });
 
 export const TutorApplication = model<ITutorApplication, TutorApplicationModel>(
   'TutorApplication',

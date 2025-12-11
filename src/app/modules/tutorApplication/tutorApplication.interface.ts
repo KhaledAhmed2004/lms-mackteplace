@@ -11,9 +11,9 @@ export enum APPLICATION_STATUS {
 
 export type ITutorApplication = {
   _id: Types.ObjectId;
- 
+
   // Application Data
-  subjects: string[]; // Which subjects they want to teach
+  subjects: string[];
   name: string;
   email: string;
   phone: string;
@@ -21,9 +21,9 @@ export type ITutorApplication = {
   birthDate: Date;
 
   // Documents (uploaded files)
-  cvUrl: string; // PDF file
-  abiturCertificateUrl: string; // MANDATORY - German certificate
-  educationProofUrls?: string[]; // Optional additional proofs
+  cv: string;
+  abiturCertificate: string;
+  officalIdDocument: string;
 
   // Status Tracking
   status: APPLICATION_STATUS;
@@ -34,7 +34,6 @@ export type ITutorApplication = {
 
   // Timestamps
   submittedAt: Date;
-  reviewedAt?: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
 };
