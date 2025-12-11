@@ -84,6 +84,10 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: String,
       trim: true,
     },
+    revisionNote: {
+      type: String,
+      trim: true,
+    },
 
     // Admin Notes
     adminNotes: {
@@ -100,6 +104,9 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: Date,
     },
     rejectedAt: {
+      type: Date,
+    },
+    revisionRequestedAt: {
       type: Date,
     },
   },

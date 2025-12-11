@@ -106,8 +106,9 @@ const createApplicationZodSchema = z.object({
 // Update application status (admin only) - simplified
 const updateApplicationStatusZodSchema = z.object({
   body: z.object({
-    status: z.enum(['SUBMITTED', 'APPROVED', 'REJECTED']).optional(),
+    status: z.enum(['SUBMITTED', 'REVISION', 'APPROVED', 'REJECTED']).optional(),
     rejectionReason: z.string().trim().optional(),
+    revisionNote: z.string().trim().optional(),
     adminNotes: z.string().trim().optional(),
   }),
 });
@@ -131,9 +132,22 @@ const rejectApplicationZodSchema = z.object({
   }),
 });
 
+// Send for revision (admin only)
+const sendForRevisionZodSchema = z.object({
+  body: z.object({
+    revisionNote: z
+      .string({
+        required_error: 'Revision note is required',
+      })
+      .trim()
+      .min(10, 'Revision note must be at least 10 characters'),
+  }),
+});
+
 export const TutorApplicationValidation = {
   createApplicationZodSchema,
   updateApplicationStatusZodSchema,
   approveApplicationZodSchema,
   rejectApplicationZodSchema,
+  sendForRevisionZodSchema,
 };

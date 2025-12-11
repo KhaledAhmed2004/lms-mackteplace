@@ -89,10 +89,23 @@ router.patch(
 );
 
 /**
+ * @route   PATCH /api/v1/applications/:id/revision
+ * @desc    Send application for revision (ask applicant to fix something)
+ * @access  Admin only
+ * @body    { revisionNote: string }
+ */
+router.patch(
+  '/:id/revision',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(TutorApplicationValidation.sendForRevisionZodSchema),
+  TutorApplicationController.sendForRevision
+);
+
+/**
  * @route   PATCH /api/v1/applications/:id
  * @desc    Update application status (generic update)
  * @access  Admin only
- * @body    { status?, rejectionReason?, adminNotes? }
+ * @body    { status?, rejectionReason?, revisionNote?, adminNotes? }
  */
 router.patch(
   '/:id',

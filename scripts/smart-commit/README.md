@@ -1,12 +1,34 @@
-# Smart Commit Message Generator
+# Smart Commit Message Generator v3.0
+
+## 🆕 What's New in v3.0
+
+**এখন আর generic commit messages নয়!** v3.0 তে detailed bullet-pointed commit messages পাবে যেখানে প্রতিটা change স্পষ্টভাবে দেখানো হয়।
+
+**আগে (v2.0):**
+```
+refactor: refactor source files
+```
+
+**এখন (v3.0):**
+```
+feat: update builders and modules
+
+- Enhanced QueryBuilder with generateFuzzyPatterns, calculateScore methods
+- Enhanced AggregationBuilder with paginateWithFacet, getStats methods
+- Updated AuthService with Google OAuth integration
+- Added NotificationBuilder for multi-channel notifications
+- Updated message module with real-time sync
+```
+
+---
 
 ## সংক্ষিপ্ত বিবরণ
 
-এই টুলটি তোমার Git changes analyze করে এবং [Conventional Commits](https://www.conventionalcommits.org/) specification অনুযায়ী commit message suggest করে।
+এই টুলটি তোমার Git changes analyze করে এবং [Conventional Commits](https://www.conventionalcommits.org/) specification অনুযায়ী **detailed bullet-pointed** commit message suggest করে।
 
 ```
 📦 scripts/smart-commit/
-├── index.js           # মূল স্ক্রিপ্ট - commit message generator
+├── index.js           # মূল স্ক্রিপ্ট - commit message generator (v3.0)
 ├── explained.js       # Technical overview (কিভাবে কাজ করে)
 ├── tutorial.js        # Senior → Junior style tutorial (বাংলা)
 ├── code-walkthrough.js # Live code demonstration
@@ -55,7 +77,7 @@ npm run commit
 3. সবচেয়ে relevant commit messages suggest করে
 4. Interactive menu দেখায় - তুমি select করতে পারো
 
-**Output Example:**
+**Output Example (v3.0):**
 ```
 ╔══════════════════════════════════════════════════════════════════╗
 ║                 📊 CHANGE ANALYSIS RESULTS                        ║
@@ -67,20 +89,39 @@ npm run commit
 │ M  src/app/modules/auth/auth.service.ts                        │
 │ M  src/app/modules/auth/auth.controller.ts                     │
 │ A  src/app/modules/auth/auth.validation.ts                     │
+│ M  src/app/builder/QueryBuilder.ts                             │
+│ A  src/app/builder/NotificationBuilder.ts                      │
 └─────────────────────────────────────────────────────────────────┘
 
 ╔══════════════════════════════════════════════════════════════════╗
 ║                 💡 SUGGESTED COMMIT MESSAGES                      ║
 ╚══════════════════════════════════════════════════════════════════╝
 
-  1. ✨ feat(auth): add new authentication feature
-     Confidence: ████████░░ 85%
+  1. ✨ feat: update auth module and builders
+     Confidence: ████████░░ 88%
 
-  2. 🔧 refactor(auth): improve authentication logic
-     Confidence: ██████░░░░ 65%
+     - Enhanced AuthService with validateToken, refreshSession methods
+     - Updated AuthController with OAuth endpoints
+     - Added auth validation schemas
+     - Enhanced QueryBuilder with fuzzySearch, scoring methods
+     - Added NotificationBuilder for push notifications
+
+  2. 🔧 refactor: improve authentication and query system
+     Confidence: ██████░░░░ 72%
+
+     - Updated auth module with improved validation
+     - Enhanced builder pattern implementation
 
 ❯ Select a message (1-2) or press 'c' for custom:
 ```
+
+### 🆕 v3.0 Features: Detailed Bullet Points
+
+প্রতিটা commit message এখন দেখাবে:
+- **কোন file change হয়েছে** - filename সহ
+- **কি functions/methods add হয়েছে** - diff analyze করে বের করে
+- **কি classes add হয়েছে** - নতুন class detect করে
+- **Category wise grouping** - builders, modules, scripts আলাদা করে দেখায়
 
 ---
 
@@ -264,7 +305,7 @@ Script automatically detect করে:
 
 ---
 
-## 🔧 কিভাবে কাজ করে (Behind the Scenes)
+## 🔧 কিভাবে কাজ করে (Behind the Scenes) - v3.0
 
 ### Step 1: Git Changes Collect
 
@@ -289,12 +330,64 @@ const files = [
 ];
 ```
 
-### Step 3: Type Detection
+### Step 3: 🆕 Detailed File Analysis (v3.0)
+
+```javascript
+// প্রতিটা file এর জন্য detailed information extract করে
+function extractFileDetails(filePath, fileInfo, stagedOnly) {
+  return {
+    path: filePath,
+    status: fileInfo.status,
+    module: 'auth',           // কোন module
+    fileType: 'service',      // service/controller/model/etc.
+    category: 'module',       // module/builder/script/logging/docs/config
+    builderName: null,        // builder হলে নাম
+    addedFunctions: ['login', 'logout', 'validateToken'],  // নতুন functions
+    addedClasses: ['AuthService'],                         // নতুন classes
+    description: 'Enhanced AuthService with login, logout methods'
+  };
+}
+```
+
+### Step 4: 🆕 Diff Content Analysis (v3.0)
+
+```javascript
+// Git diff analyze করে নতুন functions/classes বের করে
+function analyzeDiffContent(diff) {
+  return {
+    linesAdded: 45,
+    linesRemoved: 12,
+    addedFunctions: ['validateToken', 'refreshSession'],
+    addedClasses: ['TokenValidator'],
+    addedExports: ['validateToken']
+  };
+}
+
+// Patterns that detect new code:
+// - function functionName(
+// - const functionName = (
+// - async functionName(
+// - class ClassName
+// - export { ... }
+```
+
+### Step 5: 🆕 Human-Readable Description (v3.0)
+
+```javascript
+// প্রতিটা file এর জন্য readable description generate করে
+function generateFileDescription(detail) {
+  // Examples:
+  // "Enhanced QueryBuilder with fuzzySearch, calculateScore methods"
+  // "Added NotificationBuilder"
+  // "Updated AuthService"
+  // "Added README documentation"
+}
+```
+
+### Step 6: Type Detection
 
 ```javascript
 // File path এবং content analyze করে type detect করে
-// Pattern matching use করে
-
 if (file.includes('.test.') || file.includes('.spec.')) {
   return 'test';
 }
@@ -304,7 +397,7 @@ if (file.includes('README') || file.endsWith('.md')) {
 // ... more patterns
 ```
 
-### Step 4: Scope Detection
+### Step 7: Scope Detection
 
 ```javascript
 // File path থেকে scope extract করে
@@ -312,21 +405,27 @@ if (file.includes('README') || file.endsWith('.md')) {
 // src/app/builder/QueryBuilder.ts → scope: 'builder'
 ```
 
-### Step 5: Confidence Calculation
+### Step 8: 🆕 Detailed Message Generation (v3.0)
 
 ```javascript
-// বিভিন্ন factor consider করে confidence score বের করে
-// - কতগুলো file same type
-// - কতগুলো file same scope
-// - Pattern match strength
-// - File importance (service > util)
-```
+// Type + Analyzed details → Detailed message with bullet points
+function generateDetailedMessage(analysis, type) {
+  return {
+    subject: 'feat: update auth module and builders',
+    bulletPoints: [
+      'Enhanced AuthService with validateToken, refreshSession methods',
+      'Updated AuthController with OAuth endpoints',
+      'Added NotificationBuilder for push notifications'
+    ]
+  };
+}
 
-### Step 6: Message Generation
-
-```javascript
-// Type + Scope + Analyzed content → Message
-// feat + auth + "add new function" → "feat(auth): add authentication feature"
+// Final output format:
+// feat: update auth module and builders
+//
+// - Enhanced AuthService with validateToken, refreshSession methods
+// - Updated AuthController with OAuth endpoints
+// - Added NotificationBuilder for push notifications
 ```
 
 ---
@@ -336,14 +435,21 @@ if (file.includes('README') || file.endsWith('.md')) {
 ```
 scripts/smart-commit/
 │
-├── index.js (673 lines)
+├── index.js (v3.0 - ~800 lines)
+│   │
 │   ├── CONFIG object - types, patterns, scopes
 │   ├── getChangedFiles() - git diff execute
 │   ├── analyzeChanges() - orchestrator function
-│   ├── analyzeDiff() - content analysis
+│   │
+│   │ 🆕 v3.0 Functions:
+│   ├── extractFileDetails() - detailed file analysis
+│   ├── analyzeDiffContent() - find new functions/classes from diff
+│   ├── generateFileDescription() - human-readable descriptions
+│   ├── generateDetailedMessage() - bullet-pointed message generation
+│   ├── generateGroupSubject() - smart subject based on categories
+│   │
 │   ├── detectScope() - scope extraction
 │   ├── generateCommitSuggestions() - message creation
-│   ├── generateSubject() - subject line generation
 │   ├── groupFilesByPurpose() - file categorization
 │   └── main() - CLI interface
 │
@@ -355,7 +461,7 @@ scripts/smart-commit/
 │
 ├── scenarios.js - Output examples for scenarios
 │
-└── README.md - This documentation
+└── README.md - This documentation (v3.0 updated)
 ```
 
 ---
@@ -386,6 +492,65 @@ npm run commit -- --file src/auth/login.ts
 
 # JSON output
 npm run commit -- --json
+```
+
+---
+
+## 📝 v3.0 Description Generation Examples
+
+### File Type এর উপর ভিত্তি করে Description
+
+| File Type | Status | Added Functions | Generated Description |
+|-----------|--------|-----------------|----------------------|
+| `QueryBuilder.ts` | M | `fuzzySearch`, `score` | "Enhanced QueryBuilder with fuzzySearch, score methods" |
+| `NotificationBuilder.ts` | A | - | "Added NotificationBuilder" |
+| `auth.service.ts` | M | `validateToken` | "Enhanced AuthService with validateToken methods" |
+| `user.model.ts` | M | - | "Updated UserModel" |
+| `README.md` | A | - | "Added README documentation" |
+| `config.ts` | M | - | "Updated config configuration" |
+| `auth.test.ts` | A | - | "Added auth tests" |
+
+### Category Grouping
+
+Script automatically categories files:
+
+```
+📦 Builders:     QueryBuilder, AggregationBuilder, NotificationBuilder
+📦 Modules:      auth, user, payment, message
+📦 Scripts:      smart-commit, code-review, diagram-generator
+📦 Logging:      opentelemetry, requestLogger, mongooseMetrics
+📦 Config:       config.ts, .env, package.json
+📦 Docs:         README.md, CLAUDE.md, *.md files
+📦 Tests:        *.test.ts, *.spec.ts
+```
+
+### Real Output Example (v3.0)
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                 💡 SUGGESTED COMMIT MESSAGES                      ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  1. ⚡ perf: update builders and modules
+
+     - Enhanced AggregationBuilder with paginateWithFacet methods
+     - Enhanced ExportBuilder with generateExcel methods
+     - Enhanced QueryBuilder with fuzzySearch, scoring methods
+     - Updated AuthService with OAuth integration
+     - Updated MessageService with real-time sync
+     - Added NotificationBuilder for push notifications
+     - Updated logging configuration
+     - Added smart-commit documentation
+
+     Confidence: ████████░░ 85%
+
+  2. ♻️ refactor: improve codebase structure
+
+     - Updated multiple builders
+     - Enhanced module implementations
+     - Improved documentation
+
+     Confidence: ██████░░░░ 65%
 ```
 
 ---

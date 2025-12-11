@@ -222,6 +222,45 @@ const rejectApplication = async (
 };
 
 /**
+ * Send application for revision (admin only)
+ * Admin requests the applicant to fix/update something
+ */
+const sendForRevision = async (
+  id: string,
+  revisionNote: string
+): Promise<ITutorApplication | null> => {
+  const application = await TutorApplication.findById(id);
+
+  if (!application) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+  }
+
+  if (application.status === APPLICATION_STATUS.APPROVED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot request revision for an approved application'
+    );
+  }
+
+  if (application.status === APPLICATION_STATUS.REJECTED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot request revision for a rejected application'
+    );
+  }
+
+  // Update application
+  application.status = APPLICATION_STATUS.REVISION;
+  application.revisionNote = revisionNote;
+  application.revisionRequestedAt = new Date();
+  await application.save();
+
+  // TODO: Send email notification to applicant about revision request
+
+  return application;
+};
+
+/**
  * Update application status (admin only)
  * Generic update function
  */
@@ -266,6 +305,7 @@ export const TutorApplicationService = {
   getSingleApplication,
   approveApplication,
   rejectApplication,
+  sendForRevision,
   updateApplicationStatus,
   deleteApplication,
 };

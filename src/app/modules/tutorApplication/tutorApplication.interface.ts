@@ -3,6 +3,7 @@ import { Model, Types } from 'mongoose';
 // Simple status - NO phases
 export enum APPLICATION_STATUS {
   SUBMITTED = 'SUBMITTED',
+  REVISION = 'REVISION', // Admin requests changes
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
 }
@@ -32,6 +33,7 @@ export type ITutorApplication = {
   // Status Tracking (simple)
   status: APPLICATION_STATUS;
   rejectionReason?: string;
+  revisionNote?: string; // Admin's note for what needs to be fixed
 
   // Admin Notes
   adminNotes?: string;
@@ -40,6 +42,7 @@ export type ITutorApplication = {
   submittedAt: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
+  revisionRequestedAt?: Date;
 };
 
 export type TutorApplicationModel = Model<ITutorApplication>;
