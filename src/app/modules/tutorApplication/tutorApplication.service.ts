@@ -84,13 +84,13 @@ const submitApplication = async (payload: TApplicationPayload) => {
   return { application, user: { _id: newUser._id, email: newUser.email } };
 };
 
-/**
- * Get my application (for logged in applicant)
- */
+// Get my application (for logged in applicant)
 const getMyApplication = async (
   userEmail: string
 ): Promise<ITutorApplication | null> => {
-  const application = await TutorApplication.findOne({ email: userEmail });
+  const application = await TutorApplication.findOne({
+    email: userEmail,
+  }).populate({ path: 'subjects', select: 'name -_id' });
 
   if (!application) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'No application found');
@@ -111,6 +111,13 @@ const getAllApplications = async (query: Record<string, unknown>) => {
     .paginate()
     .fields();
 
+  // Add populate for subjects
+  applicationQuery.modelQuery = applicationQuery.modelQuery.populate({
+    path: 'subjects',
+    select: 'name -_id',
+  });
+
+  // Execute query
   const result = await applicationQuery.modelQuery;
   const meta = await applicationQuery.getPaginationInfo();
 
@@ -120,13 +127,14 @@ const getAllApplications = async (query: Record<string, unknown>) => {
   };
 };
 
-/**
- * Get single application by ID (admin)
- */
+// Get single application by ID (admin)
 const getSingleApplication = async (
   id: string
 ): Promise<ITutorApplication | null> => {
-  const application = await TutorApplication.findById(id);
+  const application = await TutorApplication.findById(id).populate({
+    path: 'subjects',
+    select: 'name -_id',
+  });
 
   if (!application) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');

@@ -11,7 +11,7 @@ export type ITutorApplication = {
   _id: Types.ObjectId;
 
   // Application Data
-  subjects: string[];
+  subjects: Types.ObjectId[];
   name: string;
   email: string;
   phone: string;

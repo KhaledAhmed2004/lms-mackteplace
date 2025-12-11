@@ -7,14 +7,13 @@ import {
 
 const tutorApplicationSchema = new Schema<ITutorApplication>(
   {
-    subjects: {
-      type: [String],
-      required: [true, 'At least one subject is required'],
-      validate: {
-        validator: (arr: string[]) => arr.length > 0,
-        message: 'At least one subject must be selected',
+    subjects: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Subject',
+        required: true,
       },
-    },
+    ],
 
     // Personal Information
     name: {
