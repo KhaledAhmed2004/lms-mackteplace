@@ -9,15 +9,19 @@ const router = express.Router();
 
 /**
  * @route   POST /api/v1/applications
- * @desc    Submit tutor application
- * @access  Any authenticated user
- * @body    { subjects[], name, email, phone, address, birthDate, cvUrl, abiturCertificateUrl, educationProofUrls[]? }
- * @note    Files must be uploaded first via file upload endpoint
- * @note    User role will be changed to APPLICANT after submission
+ * @desc    Submit tutor application (PUBLIC - creates user + application)
+ * @access  Public (no auth required)
+ * @body    {
+ *   email, password,
+ *   name, birthDate, phone,
+ *   street, houseNumber, zipCode, city,
+ *   subjects[],
+ *   cv, abiturCertificate, officialIdDocument
+ * }
+ * @note    First-time registration for tutors
  */
 router.post(
   '/',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.APPLICANT), // Any user can apply
   validateRequest(TutorApplicationValidation.createApplicationZodSchema),
   TutorApplicationController.submitApplication
 );
@@ -39,7 +43,7 @@ router.get(
  * @route   GET /api/v1/applications
  * @desc    Get all applications with filtering, searching, pagination
  * @access  Admin only
- * @query   ?page=1&limit=10&searchTerm=john&status=SUBMITTED&phase=1
+ * @query   ?page=1&limit=10&searchTerm=john&status=SUBMITTED
  */
 router.get(
   '/',
@@ -59,17 +63,16 @@ router.get(
 );
 
 /**
- * @route   PATCH /api/v1/applications/:id/approve-phase2
- * @desc    Approve application to Phase 2 (Interview scheduling)
+ * @route   PATCH /api/v1/applications/:id/approve
+ * @desc    Approve application (changes user role to TUTOR)
  * @access  Admin only
  * @body    { adminNotes?: string }
- * @note    Sends email to applicant with interview scheduling link
  */
 router.patch(
-  '/:id/approve-phase2',
+  '/:id/approve',
   auth(USER_ROLES.SUPER_ADMIN),
-  validateRequest(TutorApplicationValidation.approveToPhase2ZodSchema),
-  TutorApplicationController.approveToPhase2
+  validateRequest(TutorApplicationValidation.approveApplicationZodSchema),
+  TutorApplicationController.approveApplication
 );
 
 /**
@@ -77,26 +80,12 @@ router.patch(
  * @desc    Reject application
  * @access  Admin only
  * @body    { rejectionReason: string }
- * @note    Sends rejection email to applicant
  */
 router.patch(
   '/:id/reject',
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(TutorApplicationValidation.rejectApplicationZodSchema),
   TutorApplicationController.rejectApplication
-);
-
-/**
- * @route   PATCH /api/v1/applications/:id/mark-as-tutor
- * @desc    Mark applicant as tutor (Final approval - Phase 3)
- * @access  Admin only
- * @note    Changes user role from APPLICANT to TUTOR
- * @note    Sends welcome email to new tutor
- */
-router.patch(
-  '/:id/mark-as-tutor',
-  auth(USER_ROLES.SUPER_ADMIN),
-  TutorApplicationController.markAsTutor
 );
 
 /**

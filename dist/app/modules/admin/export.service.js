@@ -73,19 +73,17 @@ const exportUsers = (role) => __awaiter(void 0, void 0, void 0, function* () {
  */
 const exportApplications = (status) => __awaiter(void 0, void 0, void 0, function* () {
     const query = status ? { status } : {};
-    const applications = yield tutorApplication_model_1.TutorApplication.find(query)
-        .populate('userId', 'name email')
-        .select('userId status subjects motivation createdAt reviewedAt');
-    const data = applications.map(app => {
-        var _a, _b, _c, _d;
+    const applications = yield tutorApplication_model_1.TutorApplication.find(query).select('name email status subjects city submittedAt approvedAt rejectedAt');
+    const data = applications.map((app) => {
+        var _a, _b;
         return ({
-            applicantName: ((_a = app.userId) === null || _a === void 0 ? void 0 : _a.name) || 'N/A',
-            applicantEmail: ((_b = app.userId) === null || _b === void 0 ? void 0 : _b.email) || 'N/A',
+            applicantName: app.name || 'N/A',
+            applicantEmail: app.email || 'N/A',
             status: app.status,
             subjects: app.subjects.join('; '),
-            motivation: app.motivation,
-            appliedAt: (_c = app.createdAt) === null || _c === void 0 ? void 0 : _c.toISOString().split('T')[0],
-            reviewedAt: ((_d = app.reviewedAt) === null || _d === void 0 ? void 0 : _d.toISOString().split('T')[0]) || 'N/A',
+            city: app.city || 'N/A',
+            appliedAt: (_a = app.submittedAt) === null || _a === void 0 ? void 0 : _a.toISOString().split('T')[0],
+            approvedAt: ((_b = app.approvedAt) === null || _b === void 0 ? void 0 : _b.toISOString().split('T')[0]) || 'N/A',
         });
     });
     return jsonToCSV(data);

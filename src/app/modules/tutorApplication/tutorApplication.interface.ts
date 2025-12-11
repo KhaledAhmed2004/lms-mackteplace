@@ -1,10 +1,8 @@
 import { Model, Types } from 'mongoose';
 
+// Simple status - NO phases
 export enum APPLICATION_STATUS {
   SUBMITTED = 'SUBMITTED',
-  DOCUMENTS_REVIEWED = 'DOCUMENTS_REVIEWED',
-  INTERVIEW_SCHEDULED = 'INTERVIEW_SCHEDULED',
-  INTERVIEW_DONE = 'INTERVIEW_DONE',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
 }
@@ -17,15 +15,21 @@ export type ITutorApplication = {
   name: string;
   email: string;
   phone: string;
-  address: string;
+
+  // Address (structured)
+  street: string;
+  houseNumber: string;
+  zipCode: string;
+  city: string;
+
   birthDate: Date;
 
-  // Documents (uploaded files)
+  // Documents (all mandatory)
   cv: string;
   abiturCertificate: string;
-  officalIdDocument: string;
+  officialIdDocument: string;
 
-  // Status Tracking
+  // Status Tracking (simple)
   status: APPLICATION_STATUS;
   rejectionReason?: string;
 

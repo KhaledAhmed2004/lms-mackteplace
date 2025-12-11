@@ -34,7 +34,7 @@ const getAllSubjects = (query) => __awaiter(void 0, void 0, void 0, function* ()
         .sort()
         .paginate()
         .fields();
-    const data = yield subjectQuery.modelQuery.lean();
+    const data = yield subjectQuery.modelQuery;
     const pagination = yield subjectQuery.getPaginationInfo();
     return {
         data,

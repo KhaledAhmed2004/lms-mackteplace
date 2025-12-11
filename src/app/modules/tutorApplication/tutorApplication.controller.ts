@@ -4,6 +4,7 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { TutorApplicationService } from './tutorApplication.service';
 
+// Submit application (PUBLIC - creates user + application)
 const submitApplication = catchAsync(async (req: Request, res: Response) => {
   const result = await TutorApplicationService.submitApplication(req.body);
 
@@ -15,10 +16,10 @@ const submitApplication = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Get my application (applicant view)
+// Get my application (applicant view - requires auth)
 const getMyApplication = catchAsync(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-  const result = await TutorApplicationService.getMyApplication(userId);
+  const userEmail = req.user?.email as string;
+  const result = await TutorApplicationService.getMyApplication(userEmail);
 
   sendResponse(res, {
     success: true,
@@ -54,21 +55,24 @@ const getSingleApplication = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Approve application to Phase 2 (Interview) [Admin only]
-const approveToPhase2 = catchAsync(async (req: Request, res: Response) => {
+// Approve application (Admin only)
+const approveApplication = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { adminNotes } = req.body;
-  const result = await TutorApplicationService.approveToPhase2(id, adminNotes);
+  const result = await TutorApplicationService.approveApplication(
+    id,
+    adminNotes
+  );
 
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'Application approved for interview',
+    message: 'Application approved successfully',
     data: result,
   });
 });
 
-// Reject application [Admin only]
+// Reject application (Admin only)
 const rejectApplication = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { rejectionReason } = req.body;
@@ -85,23 +89,7 @@ const rejectApplication = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-/**
- * Mark as tutor (Final approval - Phase 3)
- * Admin only
- */
-const markAsTutor = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await TutorApplicationService.markAsTutor(id);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Applicant approved as tutor successfully',
-    data: result,
-  });
-});
-
-// Update application status [Admin only]
+// Update application status (Admin only)
 const updateApplicationStatus = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
@@ -119,7 +107,7 @@ const updateApplicationStatus = catchAsync(
   }
 );
 
-// Delete application [Admin only]
+// Delete application (Admin only)
 const deleteApplication = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await TutorApplicationService.deleteApplication(id);
@@ -137,9 +125,8 @@ export const TutorApplicationController = {
   getMyApplication,
   getAllApplications,
   getSingleApplication,
-  approveToPhase2,
+  approveApplication,
   rejectApplication,
-  markAsTutor,
   updateApplicationStatus,
   deleteApplication,
 };

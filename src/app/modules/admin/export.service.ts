@@ -68,18 +68,18 @@ const exportUsers = async (role?: string): Promise<string> => {
  */
 const exportApplications = async (status?: string): Promise<string> => {
   const query = status ? { status } : {};
-  const applications = await TutorApplication.find(query)
-    .populate('userId', 'name email')
-    .select('userId status subjects motivation createdAt reviewedAt');
+  const applications = await TutorApplication.find(query).select(
+    'name email status subjects city submittedAt approvedAt rejectedAt'
+  );
 
-  const data = applications.map(app => ({
-    applicantName: (app.userId as any)?.name || 'N/A',
-    applicantEmail: (app.userId as any)?.email || 'N/A',
+  const data = applications.map((app) => ({
+    applicantName: app.name || 'N/A',
+    applicantEmail: app.email || 'N/A',
     status: app.status,
     subjects: app.subjects.join('; '),
-    motivation: app.motivation,
-    appliedAt: app.createdAt?.toISOString().split('T')[0],
-    reviewedAt: app.reviewedAt?.toISOString().split('T')[0] || 'N/A',
+    city: app.city || 'N/A',
+    appliedAt: app.submittedAt?.toISOString().split('T')[0],
+    approvedAt: app.approvedAt?.toISOString().split('T')[0] || 'N/A',
   }));
 
   return jsonToCSV(data);

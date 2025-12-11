@@ -10,8 +10,12 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
     subjects: {
       type: [String],
       required: [true, 'At least one subject is required'],
-      minlength: [1, 'At least one subject must be selected'],
+      validate: {
+        validator: (arr: string[]) => arr.length > 0,
+        message: 'At least one subject must be selected',
+      },
     },
+
     // Personal Information
     name: {
       type: String,
@@ -23,15 +27,11 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       required: [true, 'Email is required'],
       lowercase: true,
       trim: true,
+      unique: true,
     },
     phone: {
       type: String,
       required: [true, 'Phone number is required'],
-      trim: true,
-    },
-    address: {
-      type: String,
-      required: [true, 'Address is required'],
       trim: true,
     },
     birthDate: {
@@ -39,7 +39,29 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       required: [true, 'Birth date is required'],
     },
 
-    // Documents (must match your interface exactly)
+    // Address (structured fields)
+    street: {
+      type: String,
+      required: [true, 'Street is required'],
+      trim: true,
+    },
+    houseNumber: {
+      type: String,
+      required: [true, 'House number is required'],
+      trim: true,
+    },
+    zipCode: {
+      type: String,
+      required: [true, 'ZIP code is required'],
+      trim: true,
+    },
+    city: {
+      type: String,
+      required: [true, 'City is required'],
+      trim: true,
+    },
+
+    // Documents (all mandatory)
     cv: {
       type: String,
       required: [true, 'CV is required'],
@@ -48,12 +70,12 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: String,
       required: [true, 'Abitur certificate is required'],
     },
-    officalIdDocument: {
+    officialIdDocument: {
       type: String,
       required: [true, 'Official ID document is required'],
     },
 
-    // Status Tracking
+    // Status Tracking (simple - no phases)
     status: {
       type: String,
       enum: Object.values(APPLICATION_STATUS),

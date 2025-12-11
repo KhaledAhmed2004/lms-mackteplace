@@ -90,12 +90,14 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     if (!application) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
     }
-    if (application.userId.toString() !== applicantId) {
+    // Get user to check email match
+    const user = yield user_model_1.User.findById(applicantId);
+    if (!user || application.email !== user.email) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'This application does not belong to you');
     }
-    // Check if application is in correct status
-    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.DOCUMENTS_REVIEWED) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be in DOCUMENTS_REVIEWED status to book interview');
+    // Check if application is in correct status (simplified - only SUBMITTED can book)
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be in SUBMITTED status to book interview');
     }
     // Check if applicant already has a booked slot
     const existingBooking = yield interviewSlot_model_1.InterviewSlot.findOne({

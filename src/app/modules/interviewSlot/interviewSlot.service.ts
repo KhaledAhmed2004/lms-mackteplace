@@ -115,18 +115,20 @@ const bookInterviewSlot = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
   }
 
-  if (application.userId.toString() !== applicantId) {
+  // Get user to check email match
+  const user = await User.findById(applicantId);
+  if (!user || application.email !== user.email) {
     throw new ApiError(
       StatusCodes.FORBIDDEN,
       'This application does not belong to you'
     );
   }
 
-  // Check if application is in correct status
-  if (application.status !== APPLICATION_STATUS.DOCUMENTS_REVIEWED) {
+  // Check if application is in correct status (simplified - only SUBMITTED can book)
+  if (application.status !== APPLICATION_STATUS.SUBMITTED) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      'Application must be in DOCUMENTS_REVIEWED status to book interview'
+      'Application must be in SUBMITTED status to book interview'
     );
   }
 
