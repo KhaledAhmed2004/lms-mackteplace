@@ -1,10 +1,8 @@
 import { StatusCodes } from 'http-status-codes';
-import bcrypt from 'bcrypt';
 import QueryBuilder from '../../builder/QueryBuilder';
 import ApiError from '../../../errors/ApiError';
 import { USER_ROLES } from '../../../enums/user';
 import { User } from '../user/user.model';
-import config from '../../../config';
 import {
   APPLICATION_STATUS,
   ITutorApplication,
@@ -49,17 +47,12 @@ const submitApplication = async (payload: TApplicationPayload) => {
     );
   }
 
-  // 2. Hash password
-  const hashedPassword = await bcrypt.hash(
-    payload.password,
-    Number(config.bcrypt_salt_rounds)
-  );
-
-  // 3. Create new User with APPLICANT role
+  // 2. Create new User with APPLICANT role
+  // Note: Password will be hashed by User model's pre-save hook
   const newUser = await User.create({
     name: payload.name,
     email: payload.email,
-    password: hashedPassword,
+    password: payload.password,
     phone: payload.phone,
     role: USER_ROLES.APPLICANT,
     dateOfBirth: new Date(payload.birthDate),

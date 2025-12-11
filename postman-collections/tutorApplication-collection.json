@@ -1,0 +1,441 @@
+{
+  "info": {
+    "name": "TutorApplication API Collection",
+    "description": "TutorApplication module endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "@note    First-time registration for tutors",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subjects\": [\n    \"Mathematics\",\n    \"Physics\"\n  ],\n  \"name\": \"{{TEST_NAME}}\",\n  \"email\": \"{{TEST_EMAIL}}\",\n  \"phone\": \"+49123456789\",\n  \"address\": \"123 Main Street, Berlin\",\n  \"birthDate\": \"1995-05-15\",\n  \"cvUrl\": \"https://example.com/cv.pdf\",\n  \"abiturCertificateUrl\": \"https://example.com/abitur.pdf\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@access  Applicant only",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/my-application",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            "my-application"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@query   ?page=1&limit=10&searchTerm=john&status=SUBMITTED",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@access  Admin only",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/:id",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            ":id"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@body    { adminNotes?: string }",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/:id/approve",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            ":id",
+            "approve"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"adminNotes\": \"Approved for next phase\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@body    { rejectionReason: string }",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/:id/reject",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            ":id",
+            "reject"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rejectionReason\": \"Application does not meet requirements\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@body    { status?, rejectionReason?, adminNotes? }",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/:id",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            ":id"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "@access  Admin only",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/applications/:id",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "applications",
+            ":id"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tutorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "studentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "chatId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "messageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "paymentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clientSecret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subjectId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "applicationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slotId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "trialRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sessionRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subscriptionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "billingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "earningsId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "TARGET_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "TEST_EMAIL",
+      "value": "test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "TEST_PASSWORD",
+      "value": "SecurePass123!",
+      "type": "string"
+    },
+    {
+      "key": "TEST_NAME",
+      "value": "John Doe",
+      "type": "string"
+    },
+    {
+      "key": "NEW_PASSWORD",
+      "value": "NewSecure123!",
+      "type": "string"
+    },
+    {
+      "key": "UPDATED_NAME",
+      "value": "Updated Name",
+      "type": "string"
+    },
+    {
+      "key": "START_TIME",
+      "value": "2025-12-12T21:23:06.126Z",
+      "type": "string"
+    },
+    {
+      "key": "END_TIME",
+      "value": "2025-12-12T22:23:06.126Z",
+      "type": "string"
+    },
+    {
+      "key": "DATE",
+      "value": "2025-12-12",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-inject Bearer token if available",
+          "const token = pm.collectionVariables.get(\"accessToken\");",
+          "",
+          "if (token) {",
+          "  pm.request.headers.add({",
+          "    key: \"Authorization\",",
+          "    value: \"Bearer \" + token",
+          "  });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generic response validation",
+          "pm.test(\"Status code is 2xx\", function () {",
+          "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "pm.test(\"Response has success field\", function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response).to.have.property(\"success\");",
+          "});"
+        ]
+      }
+    }
+  ]
+}

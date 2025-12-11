@@ -699,14 +699,24 @@ Available Modules (auto-detected from routes/index.ts):
       },
       tutorApplication: {
         '/': {
-          subjects: ['Mathematics', 'Physics'],
-          name: '{{TEST_NAME}}',
+          // Auth fields
           email: '{{TEST_EMAIL}}',
-          phone: '+49123456789',
-          address: '123 Main Street, Berlin',
+          password: '{{TEST_PASSWORD}}',
+          // Personal info
+          name: '{{TEST_NAME}}',
           birthDate: '1995-05-15',
-          cvUrl: 'https://example.com/cv.pdf',
-          abiturCertificateUrl: 'https://example.com/abitur.pdf',
+          phone: '+49123456789',
+          // Address (structured)
+          street: 'Hauptstraße',
+          houseNumber: '42',
+          zipCode: '10115',
+          city: 'Berlin',
+          // Subjects
+          subjects: ['{{subjectId}}'],
+          // Documents (all mandatory)
+          cv: 'https://example.com/cv.pdf',
+          abiturCertificate: 'https://example.com/abitur.pdf',
+          officialIdDocument: 'https://example.com/id.pdf',
         },
       },
       interviewSlot: {
