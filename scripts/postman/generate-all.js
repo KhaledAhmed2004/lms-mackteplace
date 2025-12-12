@@ -461,27 +461,22 @@ Available Modules (auto-detected from routes/index.ts):
       const beforeMatch = content.substring(0, match.index);
       const lineNumber = beforeMatch.split('\n').length - 1;
 
-      // Look for comment above route
+      // Look for JSDoc comment above route - prioritize @desc tag
       let customName = null;
-      for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 5); i--) {
+      for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 15); i--) {
         const line = lines[i].trim();
 
+        // Stop at another route definition or non-comment line
         if (line.startsWith('router.')) break;
-        if (
-          line &&
-          !line.startsWith('//') &&
-          !line.startsWith('/*') &&
-          !line.startsWith('*')
-        ) {
-          break;
-        }
+        if (line.startsWith('//') && line.includes('============')) break; // Section divider
 
-        if (line.startsWith('//')) {
-          customName = line.replace('//', '').trim();
-          break;
-        } else if (line.startsWith('/*') || line.startsWith('*')) {
-          customName = line.replace(/^\/\*|\*\/|\*/g, '').trim();
-          if (customName) break;
+        // Look for @desc tag (highest priority)
+        if (line.includes('@desc')) {
+          const descMatch = line.match(/@desc\s+(.+)/);
+          if (descMatch) {
+            customName = descMatch[1].trim();
+            break;
+          }
         }
       }
 
