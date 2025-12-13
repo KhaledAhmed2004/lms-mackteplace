@@ -85,6 +85,18 @@ const rejectApplication = (0, catchAsync_1.default)((req, res) => __awaiter(void
         data: result,
     });
 }));
+// Send for revision (Admin only)
+const sendForRevision = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { revisionNote } = req.body;
+    const result = yield tutorApplication_service_1.TutorApplicationService.sendForRevision(id, revisionNote);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Application sent for revision',
+        data: result,
+    });
+}));
 // Update application status (Admin only)
 const updateApplicationStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
@@ -114,6 +126,7 @@ exports.TutorApplicationController = {
     getSingleApplication,
     approveApplication,
     rejectApplication,
+    sendForRevision,
     updateApplicationStatus,
     deleteApplication,
 };

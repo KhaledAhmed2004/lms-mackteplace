@@ -54,7 +54,7 @@ const getAllInterviewSlots = (query, userId, userRole) => __awaiter(void 0, void
         .paginate()
         .fields();
     const result = yield slotQuery.modelQuery;
-    const meta = yield slotQuery.countTotal();
+    const meta = yield slotQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -95,9 +95,10 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     if (!user || application.email !== user.email) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'This application does not belong to you');
     }
-    // Check if application is in correct status (simplified - only SUBMITTED can book)
-    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be in SUBMITTED status to book interview');
+    // Check if application is in correct status (SUBMITTED or REVISION can book)
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED &&
+        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be in SUBMITTED or REVISION status to book interview');
     }
     // Check if applicant already has a booked slot
     const existingBooking = yield interviewSlot_model_1.InterviewSlot.findOne({
@@ -105,7 +106,7 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
         status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED,
     });
     if (existingBooking) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You already have a booked interview slot');
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You already have a booked interview slot. Cancel it first to book a new one.');
     }
     // Update slot
     slot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED;
@@ -121,22 +122,23 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     //   attendees: [application.email, admin.email]
     // });
     yield slot.save();
-    // Update application status to INTERVIEW_SCHEDULED
-    yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(applicationId, {
-        status: tutorApplication_interface_1.APPLICATION_STATUS.INTERVIEW_SCHEDULED,
-    });
-    // TODO: Send email notification to applicant and admin
+    // TODO: Send email notification to applicant with meeting details
     // await sendEmail({
     //   to: application.email,
-    //   subject: 'Interview Scheduled',
+    //   subject: 'Interview Scheduled - Tutor Application',
     //   template: 'interview-scheduled',
-    //   data: { name: application.name, meetLink: slot.googleMeetLink, startTime: slot.startTime }
+    //   data: {
+    //     name: application.name,
+    //     meetLink: slot.googleMeetLink,
+    //     startTime: slot.startTime,
+    //     endTime: slot.endTime
+    //   }
     // });
     return slot;
 });
 /**
  * Cancel interview slot
- * Admin or Applicant can cancel
+ * Admin or Applicant can cancel (must be at least 1 hour before interview)
  */
 const cancelInterviewSlot = (slotId, userId, cancellationReason) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -148,32 +150,42 @@ const cancelInterviewSlot = (slotId, userId, cancellationReason) => __awaiter(vo
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only booked slots can be cancelled');
     }
     // Verify user is either admin or applicant of this slot
-    if (slot.adminId.toString() !== userId &&
-        ((_a = slot.applicantId) === null || _a === void 0 ? void 0 : _a.toString()) !== userId) {
+    const user = yield user_model_1.User.findById(userId);
+    const isAdmin = (user === null || user === void 0 ? void 0 : user.role) === 'SUPER_ADMIN';
+    const isSlotOwner = ((_a = slot.applicantId) === null || _a === void 0 ? void 0 : _a.toString()) === userId;
+    if (!isAdmin && !isSlotOwner) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to cancel this slot');
     }
-    // Update slot
+    // Check if cancellation is at least 1 hour before interview (for applicants only)
+    if (!isAdmin) {
+        const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+        if (slot.startTime <= oneHourFromNow) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot cancel interview less than 1 hour before the scheduled time');
+        }
+    }
+    // Update slot - make it available again for others to book
     slot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.CANCELLED;
     slot.cancellationReason = cancellationReason;
     slot.cancelledAt = new Date();
     yield slot.save();
-    // Update application status back to DOCUMENTS_REVIEWED
+    // Update application status back to SUBMITTED (so they can book again)
     if (slot.applicationId) {
         yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(slot.applicationId, {
-            status: tutorApplication_interface_1.APPLICATION_STATUS.DOCUMENTS_REVIEWED,
+            status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED,
         });
     }
     // TODO: Send cancellation email
     // await sendEmail({
-    //   to: [applicant.email, admin.email],
+    //   to: application.email,
     //   subject: 'Interview Cancelled',
     //   template: 'interview-cancelled',
-    //   data: { reason: cancellationReason }
+    //   data: { reason: cancellationReason, startTime: slot.startTime }
     // });
     return slot;
 });
 /**
  * Mark interview as completed (Admin only)
+ * After completion, admin can approve/reject the application separately
  */
 const markAsCompleted = (slotId) => __awaiter(void 0, void 0, void 0, function* () {
     const slot = yield interviewSlot_model_1.InterviewSlot.findById(slotId);
@@ -187,13 +199,67 @@ const markAsCompleted = (slotId) => __awaiter(void 0, void 0, void 0, function* 
     slot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.COMPLETED;
     slot.completedAt = new Date();
     yield slot.save();
-    // Update application status to INTERVIEW_DONE
-    if (slot.applicationId) {
-        yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(slot.applicationId, {
-            status: tutorApplication_interface_1.APPLICATION_STATUS.INTERVIEW_DONE,
-        });
-    }
+    // Application status remains SUBMITTED - admin will approve/reject separately
     return slot;
+});
+/**
+ * Reschedule interview slot (Applicant)
+ * Cancel current booking and book a new slot in one action
+ */
+const rescheduleInterviewSlot = (currentSlotId, newSlotId, applicantId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    // Get current slot
+    const currentSlot = yield interviewSlot_model_1.InterviewSlot.findById(currentSlotId);
+    if (!currentSlot) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Current interview slot not found');
+    }
+    // Verify applicant owns this slot
+    if (((_a = currentSlot.applicantId) === null || _a === void 0 ? void 0 : _a.toString()) !== applicantId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to reschedule this slot');
+    }
+    if (currentSlot.status !== interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only booked slots can be rescheduled');
+    }
+    // Check if reschedule is at least 1 hour before current interview
+    const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
+    if (currentSlot.startTime <= oneHourFromNow) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot reschedule interview less than 1 hour before the scheduled time');
+    }
+    // Get new slot
+    const newSlot = yield interviewSlot_model_1.InterviewSlot.findById(newSlotId);
+    if (!newSlot) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'New interview slot not found');
+    }
+    if (newSlot.status !== interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'New slot is not available');
+    }
+    // Save applicant and application IDs before clearing
+    const savedApplicantId = currentSlot.applicantId;
+    const savedApplicationId = currentSlot.applicationId;
+    // Cancel current slot (make it available again)
+    currentSlot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE;
+    currentSlot.applicantId = undefined;
+    currentSlot.applicationId = undefined;
+    currentSlot.bookedAt = undefined;
+    yield currentSlot.save();
+    // Book new slot
+    newSlot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED;
+    newSlot.applicantId = savedApplicantId;
+    newSlot.applicationId = savedApplicationId;
+    newSlot.bookedAt = new Date();
+    yield newSlot.save();
+    // TODO: Send reschedule email notification
+    // await sendEmail({
+    //   to: applicant.email,
+    //   subject: 'Interview Rescheduled',
+    //   template: 'interview-rescheduled',
+    //   data: {
+    //     oldTime: currentSlot.startTime,
+    //     newTime: newSlot.startTime,
+    //     meetLink: newSlot.googleMeetLink
+    //   }
+    // });
+    return newSlot;
 });
 /**
  * Update interview slot (Admin only)
@@ -234,6 +300,7 @@ exports.InterviewSlotService = {
     getSingleInterviewSlot,
     bookInterviewSlot,
     cancelInterviewSlot,
+    rescheduleInterviewSlot,
     markAsCompleted,
     updateInterviewSlot,
     deleteInterviewSlot,

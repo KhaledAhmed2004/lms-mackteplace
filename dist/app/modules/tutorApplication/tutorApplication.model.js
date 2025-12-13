@@ -4,14 +4,13 @@ exports.TutorApplication = void 0;
 const mongoose_1 = require("mongoose");
 const tutorApplication_interface_1 = require("./tutorApplication.interface");
 const tutorApplicationSchema = new mongoose_1.Schema({
-    subjects: {
-        type: [String],
-        required: [true, 'At least one subject is required'],
-        validate: {
-            validator: (arr) => arr.length > 0,
-            message: 'At least one subject must be selected',
+    subjects: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: 'Subject',
+            required: true,
         },
-    },
+    ],
     // Personal Information
     name: {
         type: String,
@@ -78,6 +77,10 @@ const tutorApplicationSchema = new mongoose_1.Schema({
         type: String,
         trim: true,
     },
+    revisionNote: {
+        type: String,
+        trim: true,
+    },
     // Admin Notes
     adminNotes: {
         type: String,
@@ -92,6 +95,9 @@ const tutorApplicationSchema = new mongoose_1.Schema({
         type: Date,
     },
     rejectedAt: {
+        type: Date,
+    },
+    revisionRequestedAt: {
         type: Date,
     },
 }, { timestamps: true });

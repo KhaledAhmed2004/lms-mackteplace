@@ -95,6 +95,22 @@ const cancelInterviewSlot = (0, catchAsync_1.default)((req, res) => __awaiter(vo
     });
 }));
 /**
+ * Reschedule interview slot (Applicant)
+ */
+const rescheduleInterviewSlot = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const applicantId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const { newSlotId } = req.body;
+    const result = yield interviewSlot_service_1.InterviewSlotService.rescheduleInterviewSlot(id, newSlotId, applicantId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Interview rescheduled successfully',
+        data: result,
+    });
+}));
+/**
  * Mark interview as completed (Admin only)
  */
 const markAsCompleted = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -139,6 +155,7 @@ exports.InterviewSlotController = {
     getSingleInterviewSlot,
     bookInterviewSlot,
     cancelInterviewSlot,
+    rescheduleInterviewSlot,
     markAsCompleted,
     updateInterviewSlot,
     deleteInterviewSlot,

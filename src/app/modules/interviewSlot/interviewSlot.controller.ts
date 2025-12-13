@@ -8,7 +8,7 @@ import { InterviewSlotService } from './interviewSlot.service';
  * Create interview slot (Admin only)
  */
 const createInterviewSlot = catchAsync(async (req: Request, res: Response) => {
-  const adminId = req.user?.id;
+  const adminId = req.user?.id as string;
   const result = await InterviewSlotService.createInterviewSlot(adminId, req.body);
 
   sendResponse(res, {
@@ -25,8 +25,8 @@ const createInterviewSlot = catchAsync(async (req: Request, res: Response) => {
  * Applicant: See only available slots
  */
 const getAllInterviewSlots = catchAsync(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-  const userRole = req.user?.role;
+  const userId = req.user?.id as string | undefined;
+  const userRole = req.user?.role as string | undefined;
   const result = await InterviewSlotService.getAllInterviewSlots(req.query, userId, userRole);
 
   sendResponse(res, {
@@ -58,7 +58,7 @@ const getSingleInterviewSlot = catchAsync(async (req: Request, res: Response) =>
  */
 const bookInterviewSlot = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const applicantId = req.user?.id;
+  const applicantId = req.user?.id as string;
   const { applicationId } = req.body;
 
   const result = await InterviewSlotService.bookInterviewSlot(
@@ -80,7 +80,7 @@ const bookInterviewSlot = catchAsync(async (req: Request, res: Response) => {
  */
 const cancelInterviewSlot = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const userId = req.user?.id;
+  const userId = req.user?.id as string;
   const { cancellationReason } = req.body;
 
   const result = await InterviewSlotService.cancelInterviewSlot(
@@ -93,6 +93,28 @@ const cancelInterviewSlot = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Interview slot cancelled successfully',
+    data: result,
+  });
+});
+
+/**
+ * Reschedule interview slot (Applicant)
+ */
+const rescheduleInterviewSlot = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const applicantId = req.user?.id as string;
+  const { newSlotId } = req.body;
+
+  const result = await InterviewSlotService.rescheduleInterviewSlot(
+    id,
+    newSlotId,
+    applicantId
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Interview rescheduled successfully',
     data: result,
   });
 });
@@ -148,6 +170,7 @@ export const InterviewSlotController = {
   getSingleInterviewSlot,
   bookInterviewSlot,
   cancelInterviewSlot,
+  rescheduleInterviewSlot,
   markAsCompleted,
   updateInterviewSlot,
   deleteInterviewSlot,

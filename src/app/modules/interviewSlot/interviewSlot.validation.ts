@@ -58,6 +58,17 @@ const cancelInterviewSlotZodSchema = z.object({
   }),
 });
 
+// Reschedule interview slot validation (Applicant)
+const rescheduleInterviewSlotZodSchema = z.object({
+  body: z.object({
+    newSlotId: z
+      .string({
+        required_error: 'New slot ID is required',
+      })
+      .regex(/^[0-9a-fA-F]{24}$/, 'Invalid new slot ID format'),
+  }),
+});
+
 // Update interview slot validation (Admin)
 const updateInterviewSlotZodSchema = z.object({
   body: z.object({
@@ -87,5 +98,6 @@ export const InterviewSlotValidation = {
   createInterviewSlotZodSchema,
   bookInterviewSlotZodSchema,
   cancelInterviewSlotZodSchema,
+  rescheduleInterviewSlotZodSchema,
   updateInterviewSlotZodSchema,
 };

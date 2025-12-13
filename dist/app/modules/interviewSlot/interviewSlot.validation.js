@@ -49,6 +49,16 @@ const cancelInterviewSlotZodSchema = zod_1.z.object({
             .min(10, 'Cancellation reason must be at least 10 characters'),
     }),
 });
+// Reschedule interview slot validation (Applicant)
+const rescheduleInterviewSlotZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        newSlotId: zod_1.z
+            .string({
+            required_error: 'New slot ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid new slot ID format'),
+    }),
+});
 // Update interview slot validation (Admin)
 const updateInterviewSlotZodSchema = zod_1.z.object({
     body: zod_1.z.object({
@@ -74,5 +84,6 @@ exports.InterviewSlotValidation = {
     createInterviewSlotZodSchema,
     bookInterviewSlotZodSchema,
     cancelInterviewSlotZodSchema,
+    rescheduleInterviewSlotZodSchema,
     updateInterviewSlotZodSchema,
 };

@@ -90,8 +90,9 @@ const createApplicationZodSchema = zod_1.z.object({
 // Update application status (admin only) - simplified
 const updateApplicationStatusZodSchema = zod_1.z.object({
     body: zod_1.z.object({
-        status: zod_1.z.enum(['SUBMITTED', 'APPROVED', 'REJECTED']).optional(),
+        status: zod_1.z.enum(['SUBMITTED', 'REVISION', 'APPROVED', 'REJECTED']).optional(),
         rejectionReason: zod_1.z.string().trim().optional(),
+        revisionNote: zod_1.z.string().trim().optional(),
         adminNotes: zod_1.z.string().trim().optional(),
     }),
 });
@@ -112,9 +113,21 @@ const rejectApplicationZodSchema = zod_1.z.object({
             .min(10, 'Rejection reason must be at least 10 characters'),
     }),
 });
+// Send for revision (admin only)
+const sendForRevisionZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        revisionNote: zod_1.z
+            .string({
+            required_error: 'Revision note is required',
+        })
+            .trim()
+            .min(10, 'Revision note must be at least 10 characters'),
+    }),
+});
 exports.TutorApplicationValidation = {
     createApplicationZodSchema,
     updateApplicationStatusZodSchema,
     approveApplicationZodSchema,
     rejectApplicationZodSchema,
+    sendForRevisionZodSchema,
 };

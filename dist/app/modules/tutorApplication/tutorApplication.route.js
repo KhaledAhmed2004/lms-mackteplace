@@ -60,10 +60,17 @@ router.patch('/:id/approve', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN),
  */
 router.patch('/:id/reject', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.rejectApplicationZodSchema), tutorApplication_controller_1.TutorApplicationController.rejectApplication);
 /**
+ * @route   PATCH /api/v1/applications/:id/revision
+ * @desc    Send application for revision (ask applicant to fix something)
+ * @access  Admin only
+ * @body    { revisionNote: string }
+ */
+router.patch('/:id/revision', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.sendForRevisionZodSchema), tutorApplication_controller_1.TutorApplicationController.sendForRevision);
+/**
  * @route   PATCH /api/v1/applications/:id
  * @desc    Update application status (generic update)
  * @access  Admin only
- * @body    { status?, rejectionReason?, adminNotes? }
+ * @body    { status?, rejectionReason?, revisionNote?, adminNotes? }
  */
 router.patch('/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.updateApplicationStatusZodSchema), tutorApplication_controller_1.TutorApplicationController.updateApplicationStatus);
 /**

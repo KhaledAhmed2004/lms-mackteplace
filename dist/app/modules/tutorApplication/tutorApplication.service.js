@@ -14,12 +14,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TutorApplicationService = void 0;
 const http_status_codes_1 = require("http-status-codes");
-const bcrypt_1 = __importDefault(require("bcrypt"));
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_1 = require("../../../enums/user");
 const user_model_1 = require("../user/user.model");
-const config_1 = __importDefault(require("../../../config"));
 const tutorApplication_interface_1 = require("./tutorApplication.interface");
 const tutorApplication_model_1 = require("./tutorApplication.model");
 /**
@@ -39,13 +37,12 @@ const submitApplication = (payload) => __awaiter(void 0, void 0, void 0, functio
     if (existingApplication) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.CONFLICT, 'An application with this email already exists');
     }
-    // 2. Hash password
-    const hashedPassword = yield bcrypt_1.default.hash(payload.password, Number(config_1.default.bcrypt_salt_rounds));
-    // 3. Create new User with APPLICANT role
+    // 2. Create new User with APPLICANT role
+    // Note: Password will be hashed by User model's pre-save hook
     const newUser = yield user_model_1.User.create({
         name: payload.name,
         email: payload.email,
-        password: hashedPassword,
+        password: payload.password,
         phone: payload.phone,
         role: user_1.USER_ROLES.APPLICANT,
         dateOfBirth: new Date(payload.birthDate),
@@ -74,11 +71,11 @@ const submitApplication = (payload) => __awaiter(void 0, void 0, void 0, functio
     });
     return { application, user: { _id: newUser._id, email: newUser.email } };
 });
-/**
- * Get my application (for logged in applicant)
- */
+// Get my application (for logged in applicant)
 const getMyApplication = (userEmail) => __awaiter(void 0, void 0, void 0, function* () {
-    const application = yield tutorApplication_model_1.TutorApplication.findOne({ email: userEmail });
+    const application = yield tutorApplication_model_1.TutorApplication.findOne({
+        email: userEmail,
+    }).populate({ path: 'subjects', select: 'name -_id' });
     if (!application) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'No application found');
     }
@@ -95,6 +92,12 @@ const getAllApplications = (query) => __awaiter(void 0, void 0, void 0, function
         .sort()
         .paginate()
         .fields();
+    // Add populate for subjects
+    applicationQuery.modelQuery = applicationQuery.modelQuery.populate({
+        path: 'subjects',
+        select: 'name -_id',
+    });
+    // Execute query
     const result = yield applicationQuery.modelQuery;
     const meta = yield applicationQuery.getPaginationInfo();
     return {
@@ -102,11 +105,12 @@ const getAllApplications = (query) => __awaiter(void 0, void 0, void 0, function
         data: result,
     };
 });
-/**
- * Get single application by ID (admin)
- */
+// Get single application by ID (admin)
 const getSingleApplication = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const application = yield tutorApplication_model_1.TutorApplication.findById(id);
+    const application = yield tutorApplication_model_1.TutorApplication.findById(id).populate({
+        path: 'subjects',
+        select: 'name -_id',
+    });
     if (!application) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
     }
@@ -161,6 +165,29 @@ const rejectApplication = (id, rejectionReason) => __awaiter(void 0, void 0, voi
     return application;
 });
 /**
+ * Send application for revision (admin only)
+ * Admin requests the applicant to fix/update something
+ */
+const sendForRevision = (id, revisionNote) => __awaiter(void 0, void 0, void 0, function* () {
+    const application = yield tutorApplication_model_1.TutorApplication.findById(id);
+    if (!application) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
+    }
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.APPROVED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot request revision for an approved application');
+    }
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.REJECTED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot request revision for a rejected application');
+    }
+    // Update application
+    application.status = tutorApplication_interface_1.APPLICATION_STATUS.REVISION;
+    application.revisionNote = revisionNote;
+    application.revisionRequestedAt = new Date();
+    yield application.save();
+    // TODO: Send email notification to applicant about revision request
+    return application;
+});
+/**
  * Update application status (admin only)
  * Generic update function
  */
@@ -193,6 +220,7 @@ exports.TutorApplicationService = {
     getSingleApplication,
     approveApplication,
     rejectApplication,
+    sendForRevision,
     updateApplicationStatus,
     deleteApplication,
 };
