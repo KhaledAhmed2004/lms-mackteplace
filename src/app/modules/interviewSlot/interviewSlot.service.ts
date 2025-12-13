@@ -49,13 +49,13 @@ const getAllInterviewSlots = async (
 ) => {
   let filter = {};
 
-  // If applicant, only show available slots
-  if (userRole === 'APPLICANT') {
+  // If applicant or tutor, only show available slots
+  if (userRole === 'APPLICANT' || userRole === 'TUTOR') {
     filter = { status: INTERVIEW_SLOT_STATUS.AVAILABLE };
   }
 
   const slotQuery = new QueryBuilder(
-    InterviewSlot.find(filter).populate('adminId', 'name email').populate('applicantId', 'name email'),
+    InterviewSlot.find(filter),
     query
   )
     .filter()
@@ -226,15 +226,19 @@ const cancelInterviewSlot = async (
     }
   }
 
+  // Save applicationId before clearing
+  const savedApplicationId = slot.applicationId;
+
   // Update slot - make it available again for others to book
-  slot.status = INTERVIEW_SLOT_STATUS.CANCELLED;
-  slot.cancellationReason = cancellationReason;
-  slot.cancelledAt = new Date();
+  slot.status = INTERVIEW_SLOT_STATUS.AVAILABLE;
+  slot.applicantId = undefined;
+  slot.applicationId = undefined;
+  slot.bookedAt = undefined;
   await slot.save();
 
   // Update application status back to SUBMITTED (so they can book again)
-  if (slot.applicationId) {
-    await TutorApplication.findByIdAndUpdate(slot.applicationId, {
+  if (savedApplicationId) {
+    await TutorApplication.findByIdAndUpdate(savedApplicationId, {
       status: APPLICATION_STATUS.SUBMITTED,
     });
   }

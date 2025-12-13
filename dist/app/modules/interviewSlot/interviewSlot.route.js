@@ -14,44 +14,44 @@ const router = express_1.default.Router();
 // ============ APPLICANT ROUTES ============
 /**
  * @route   GET /api/v1/interview-slots
- * @desc    Get available interview slots (Applicants see only AVAILABLE)
- * @access  Applicant
+ * @desc    Get available interview slots (Applicants/Tutors see only AVAILABLE)
+ * @access  Applicant, Tutor, or Admin
  * @query   ?page=1&limit=10&sort=-startTime
  */
-router.get('/', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getAllInterviewSlots);
+router.get('/', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getAllInterviewSlots);
 /**
  * @route   GET /api/v1/interview-slots/:id
  * @desc    Get single interview slot details
- * @access  Applicant or Admin
+ * @access  Applicant, Tutor, or Admin
  */
-router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getSingleInterviewSlot);
+router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getSingleInterviewSlot);
 /**
  * @route   PATCH /api/v1/interview-slots/:id/book
  * @desc    Book an available interview slot
- * @access  Applicant only
+ * @access  Applicant or Tutor
  * @body    { applicationId: string }
  * @note    Application must be in SUBMITTED or REVISION status
  * @note    Applicant can only have one booked slot at a time
  */
-router.patch('/:id/book', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.bookInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.bookInterviewSlot);
+router.patch('/:id/book', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.bookInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.bookInterviewSlot);
 /**
  * @route   PATCH /api/v1/interview-slots/:id/cancel
  * @desc    Cancel a booked interview slot
- * @access  Applicant or Admin
+ * @access  Applicant, Tutor, or Admin
  * @body    { cancellationReason: string }
- * @note    Must be at least 1 hour before interview (for applicants)
+ * @note    Must be at least 1 hour before interview (for applicants/tutors)
  * @note    Reverts application status to SUBMITTED
  */
-router.patch('/:id/cancel', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.cancelInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.cancelInterviewSlot);
+router.patch('/:id/cancel', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.cancelInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.cancelInterviewSlot);
 /**
  * @route   PATCH /api/v1/interview-slots/:id/reschedule
  * @desc    Reschedule a booked interview to a different slot
- * @access  Applicant only
+ * @access  Applicant or Tutor
  * @body    { newSlotId: string }
  * @note    Must be at least 1 hour before current interview
  * @note    Current slot becomes available, new slot gets booked
  */
-router.patch('/:id/reschedule', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.rescheduleInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.rescheduleInterviewSlot);
+router.patch('/:id/reschedule', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(interviewSlot_validation_1.InterviewSlotValidation.rescheduleInterviewSlotZodSchema), interviewSlot_controller_1.InterviewSlotController.rescheduleInterviewSlot);
 // ============ ADMIN ROUTES ============
 /**
  * @route   POST /api/v1/interview-slots

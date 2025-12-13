@@ -44,11 +44,11 @@ const createInterviewSlot = (adminId, payload) => __awaiter(void 0, void 0, void
  */
 const getAllInterviewSlots = (query, userId, userRole) => __awaiter(void 0, void 0, void 0, function* () {
     let filter = {};
-    // If applicant, only show available slots
-    if (userRole === 'APPLICANT') {
+    // If applicant or tutor, only show available slots
+    if (userRole === 'APPLICANT' || userRole === 'TUTOR') {
         filter = { status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE };
     }
-    const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find(filter).populate('adminId', 'name email').populate('applicantId', 'name email'), query)
+    const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find(filter), query)
         .filter()
         .sort()
         .paginate()
@@ -163,14 +163,17 @@ const cancelInterviewSlot = (slotId, userId, cancellationReason) => __awaiter(vo
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot cancel interview less than 1 hour before the scheduled time');
         }
     }
+    // Save applicationId before clearing
+    const savedApplicationId = slot.applicationId;
     // Update slot - make it available again for others to book
-    slot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.CANCELLED;
-    slot.cancellationReason = cancellationReason;
-    slot.cancelledAt = new Date();
+    slot.status = interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE;
+    slot.applicantId = undefined;
+    slot.applicationId = undefined;
+    slot.bookedAt = undefined;
     yield slot.save();
     // Update application status back to SUBMITTED (so they can book again)
-    if (slot.applicationId) {
-        yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(slot.applicationId, {
+    if (savedApplicationId) {
+        yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(savedApplicationId, {
             status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED,
         });
     }

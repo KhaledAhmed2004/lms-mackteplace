@@ -11,38 +11,38 @@ const router = express.Router();
 
 /**
  * @route   GET /api/v1/interview-slots
- * @desc    Get available interview slots (Applicants see only AVAILABLE)
- * @access  Applicant
+ * @desc    Get available interview slots (Applicants/Tutors see only AVAILABLE)
+ * @access  Applicant, Tutor, or Admin
  * @query   ?page=1&limit=10&sort=-startTime
  */
 router.get(
   '/',
-  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.APPLICANT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   InterviewSlotController.getAllInterviewSlots
 );
 
 /**
  * @route   GET /api/v1/interview-slots/:id
  * @desc    Get single interview slot details
- * @access  Applicant or Admin
+ * @access  Applicant, Tutor, or Admin
  */
 router.get(
   '/:id',
-  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.APPLICANT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   InterviewSlotController.getSingleInterviewSlot
 );
 
 /**
  * @route   PATCH /api/v1/interview-slots/:id/book
  * @desc    Book an available interview slot
- * @access  Applicant only
+ * @access  Applicant or Tutor
  * @body    { applicationId: string }
  * @note    Application must be in SUBMITTED or REVISION status
  * @note    Applicant can only have one booked slot at a time
  */
 router.patch(
   '/:id/book',
-  auth(USER_ROLES.APPLICANT),
+  auth(USER_ROLES.APPLICANT, USER_ROLES.TUTOR),
   validateRequest(InterviewSlotValidation.bookInterviewSlotZodSchema),
   InterviewSlotController.bookInterviewSlot
 );
@@ -50,14 +50,14 @@ router.patch(
 /**
  * @route   PATCH /api/v1/interview-slots/:id/cancel
  * @desc    Cancel a booked interview slot
- * @access  Applicant or Admin
+ * @access  Applicant, Tutor, or Admin
  * @body    { cancellationReason: string }
- * @note    Must be at least 1 hour before interview (for applicants)
+ * @note    Must be at least 1 hour before interview (for applicants/tutors)
  * @note    Reverts application status to SUBMITTED
  */
 router.patch(
   '/:id/cancel',
-  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.APPLICANT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   validateRequest(InterviewSlotValidation.cancelInterviewSlotZodSchema),
   InterviewSlotController.cancelInterviewSlot
 );
@@ -65,14 +65,14 @@ router.patch(
 /**
  * @route   PATCH /api/v1/interview-slots/:id/reschedule
  * @desc    Reschedule a booked interview to a different slot
- * @access  Applicant only
+ * @access  Applicant or Tutor
  * @body    { newSlotId: string }
  * @note    Must be at least 1 hour before current interview
  * @note    Current slot becomes available, new slot gets booked
  */
 router.patch(
   '/:id/reschedule',
-  auth(USER_ROLES.APPLICANT),
+  auth(USER_ROLES.APPLICANT, USER_ROLES.TUTOR),
   validateRequest(InterviewSlotValidation.rescheduleInterviewSlotZodSchema),
   InterviewSlotController.rescheduleInterviewSlot
 );
