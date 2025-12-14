@@ -1946,7 +1946,7 @@
       "name": "InterviewSlot Module",
       "item": [
         {
-          "name": "Get available interview slots (Applicants see only AVAILABLE)",
+          "name": "Get available interview slots (Applicants/Tutors see only AVAILABLE)",
           "request": {
             "method": "GET",
             "header": [
@@ -4883,12 +4883,12 @@
     },
     {
       "key": "START_TIME",
-      "value": "2025-12-14T18:39:12.949Z",
+      "value": "2025-12-14T22:44:46.029Z",
       "type": "string"
     },
     {
       "key": "END_TIME",
-      "value": "2025-12-14T19:39:12.950Z",
+      "value": "2025-12-14T23:44:46.030Z",
       "type": "string"
     },
     {

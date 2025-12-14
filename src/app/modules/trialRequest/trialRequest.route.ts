@@ -33,7 +33,6 @@ const router = express.Router();
  */
 router.post(
   '/',
-  optionalAuth, // Allow both authenticated and guest users
   validateRequest(TrialRequestValidation.createTrialRequestZodSchema),
   TrialRequestController.createTrialRequest
 );
