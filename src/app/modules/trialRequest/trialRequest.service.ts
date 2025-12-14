@@ -1,6 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
 import { Types } from 'mongoose';
-import QueryBuilder from '../../builder/QueryBuilder';
 import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
@@ -11,9 +10,13 @@ import { TrialRequest } from './trialRequest.model';
 import { SessionRequest } from '../sessionRequest/sessionRequest.model';
 import { SESSION_REQUEST_STATUS } from '../sessionRequest/sessionRequest.interface';
 
+// NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
+// Use /session-requests endpoints instead (unified view with requestType filter)
+
 /**
  * Create trial request (First-time Student or Guest ONLY)
  * For returning students, use SessionRequest module instead
+ * Automatically creates User account when trial request is created
  */
 const createTrialRequest = async (
   studentId: string | null,
@@ -104,6 +107,15 @@ const createTrialRequest = async (
       : payload.studentInfo?.email;
 
     if (emailToCheck) {
+      // Check if user already exists with this email
+      const existingUser = await User.findOne({ email: emailToCheck.toLowerCase() });
+      if (existingUser) {
+        throw new ApiError(
+          StatusCodes.BAD_REQUEST,
+          'An account with this email already exists. Please log in to create a trial request.'
+        );
+      }
+
       // Check if guest has already completed a trial
       const previousAcceptedTrial = await TrialRequest.findOne({
         $or: [
@@ -138,14 +150,53 @@ const createTrialRequest = async (
     }
   }
 
+  // Auto-create User account for guest users when trial request is created
+  let createdStudentId = studentId;
+  if (!studentId && payload.studentInfo) {
+    // Determine email and password based on age
+    // For under 18: use guardian's email/password (guardian becomes the account holder)
+    // For 18+: use student's email/password
+    const isUnder18 = payload.studentInfo.isUnder18;
+    const email = isUnder18
+      ? payload.studentInfo.guardianInfo?.email
+      : payload.studentInfo.email;
+    const password = isUnder18
+      ? payload.studentInfo.guardianInfo?.password
+      : payload.studentInfo.password;
+    const name = isUnder18
+      ? payload.studentInfo.guardianInfo?.name || payload.studentInfo.name
+      : payload.studentInfo.name;
+    const phone = isUnder18
+      ? payload.studentInfo.guardianInfo?.phone
+      : undefined;
+
+    if (email && password) {
+      // Create new User account
+      const newUser = await User.create({
+        name: name,
+        email: email.toLowerCase(),
+        password: password,
+        phone: phone,
+        role: USER_ROLES.STUDENT,
+        studentProfile: {
+          hasCompletedTrial: false,
+          trialRequestsCount: 1,
+          sessionRequestsCount: 0,
+        },
+      });
+
+      createdStudentId = newUser._id.toString();
+    }
+  }
+
   // Create trial request
   const trialRequest = await TrialRequest.create({
     ...payload,
-    studentId: studentId ? new Types.ObjectId(studentId) : undefined,
+    studentId: createdStudentId ? new Types.ObjectId(createdStudentId) : undefined,
     status: TRIAL_REQUEST_STATUS.PENDING,
   });
 
-  // Increment student trial request count if logged in
+  // Increment student trial request count if logged in (existing user)
   if (studentId) {
     await User.findByIdAndUpdate(studentId, {
       $inc: { 'studentProfile.trialRequestsCount': 1 },
@@ -157,106 +208,6 @@ const createTrialRequest = async (
   // TODO: Send confirmation email to student
 
   return trialRequest;
-};
-
-/**
- * Get matching trial requests for tutor
- * Shows PENDING requests in tutor's subjects
- */
-const getMatchingTrialRequests = async (
-  tutorId: string,
-  query: Record<string, unknown>
-) => {
-  // Get tutor's subjects
-  const tutor = await User.findById(tutorId);
-  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can view matching requests');
-  }
-
-  if (!tutor.tutorProfile?.isVerified) {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Only verified tutors can view trial requests');
-  }
-
-  const tutorSubjects = tutor.tutorProfile?.subjects || [];
-
-  // Find matching requests
-  const requestQuery = new QueryBuilder(
-    TrialRequest.find({
-      subject: { $in: tutorSubjects },
-      status: TRIAL_REQUEST_STATUS.PENDING,
-      expiresAt: { $gt: new Date() }, // Not expired
-    })
-      .populate('studentId', 'name profilePicture')
-      .populate('subject', 'name icon'),
-    query
-  )
-    .filter()
-    .sort()
-    .paginate()
-    .fields();
-
-  const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.getPaginationInfo();
-
-  return {
-    meta,
-    data: result,
-  };
-};
-
-/**
- * Get student's own trial requests
- */
-const getMyTrialRequests = async (
-  studentId: string,
-  query: Record<string, unknown>
-) => {
-  const requestQuery = new QueryBuilder(
-    TrialRequest.find({ studentId: new Types.ObjectId(studentId) })
-      .populate('acceptedTutorId', 'name profilePicture')
-      .populate('subject', 'name icon')
-      .populate('chatId'),
-    query
-  )
-    .filter()
-    .sort()
-    .paginate()
-    .fields();
-
-  const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.getPaginationInfo();
-
-  return {
-    meta,
-    data: result,
-  };
-};
-
-/**
- * Get all trial requests (Admin)
- */
-const getAllTrialRequests = async (query: Record<string, unknown>) => {
-  const requestQuery = new QueryBuilder(
-    TrialRequest.find()
-      .populate('studentId', 'name email profilePicture')
-      .populate('acceptedTutorId', 'name email profilePicture')
-      .populate('subject', 'name icon')
-      .populate('chatId'),
-    query
-  )
-    .search(['description', 'studentInfo.name', 'studentInfo.email'])
-    .filter()
-    .sort()
-    .paginate()
-    .fields();
-
-  const result = await requestQuery.modelQuery;
-  const meta = await requestQuery.getPaginationInfo();
-
-  return {
-    meta,
-    data: result,
-  };
 };
 
 /**
@@ -402,14 +353,138 @@ const cancelTrialRequest = async (
 };
 
 /**
- * Auto-expire trial requests (Cron job)
- * Should be called periodically to expire old requests
+ * Extend trial request (Student)
+ * Adds 7 more days to expiration (max 1 extension)
+ */
+const extendTrialRequest = async (
+  requestId: string,
+  studentIdOrEmail: string
+): Promise<ITrialRequest | null> => {
+  const request = await TrialRequest.findById(requestId);
+
+  if (!request) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Trial request not found');
+  }
+
+  // Verify ownership
+  const isOwnerByStudentId =
+    request.studentId && request.studentId.toString() === studentIdOrEmail;
+  const isOwnerByEmail =
+    request.studentInfo?.email?.toLowerCase() === studentIdOrEmail.toLowerCase();
+  const isOwnerByGuardianEmail =
+    request.studentInfo?.guardianInfo?.email?.toLowerCase() === studentIdOrEmail.toLowerCase();
+
+  if (!isOwnerByStudentId && !isOwnerByEmail && !isOwnerByGuardianEmail) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You can only extend your own trial requests'
+    );
+  }
+
+  // Can only extend PENDING requests
+  if (request.status !== TRIAL_REQUEST_STATUS.PENDING) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Only pending trial requests can be extended'
+    );
+  }
+
+  // Check extension limit (max 1)
+  if (request.extensionCount && request.extensionCount >= 1) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Trial request can only be extended once'
+    );
+  }
+
+  // Extend by 7 days
+  const newExpiresAt = new Date();
+  newExpiresAt.setDate(newExpiresAt.getDate() + 7);
+
+  request.expiresAt = newExpiresAt;
+  request.isExtended = true;
+  request.extensionCount = (request.extensionCount || 0) + 1;
+  request.finalExpiresAt = undefined; // Reset final deadline
+  request.reminderSentAt = undefined; // Reset reminder
+  await request.save();
+
+  // TODO: Send confirmation email
+
+  return request;
+};
+
+/**
+ * Send reminders for expiring requests (Cron job)
+ * Finds requests where expiresAt has passed but no reminder sent yet
+ * Sets finalExpiresAt to 3 days from now
+ */
+const sendExpirationReminders = async (): Promise<number> => {
+  const now = new Date();
+
+  // Find expired requests that haven't received reminder
+  const expiredRequests = await TrialRequest.find({
+    status: TRIAL_REQUEST_STATUS.PENDING,
+    expiresAt: { $lt: now },
+    reminderSentAt: { $exists: false },
+  });
+
+  let reminderCount = 0;
+
+  for (const request of expiredRequests) {
+    // Set reminder sent and final deadline (3 days)
+    const finalDeadline = new Date();
+    finalDeadline.setDate(finalDeadline.getDate() + 3);
+
+    request.reminderSentAt = now;
+    request.finalExpiresAt = finalDeadline;
+    await request.save();
+
+    // TODO: Send email notification
+    // const email = request.studentInfo?.isUnder18
+    //   ? request.studentInfo?.guardianInfo?.email
+    //   : request.studentInfo?.email;
+    // await sendEmail({
+    //   to: email,
+    //   subject: 'Your Trial Request is Expiring',
+    //   template: 'trial-request-expiring',
+    //   data: {
+    //     name: request.studentInfo?.name,
+    //     expiresAt: finalDeadline,
+    //     extendUrl: `${FRONTEND_URL}/trial-requests/${request._id}/extend`,
+    //     cancelUrl: `${FRONTEND_URL}/trial-requests/${request._id}/cancel`,
+    //   }
+    // });
+
+    reminderCount++;
+  }
+
+  return reminderCount;
+};
+
+/**
+ * Auto-delete requests after final deadline (Cron job)
+ * Deletes requests where finalExpiresAt has passed with no response
+ */
+const autoDeleteExpiredRequests = async (): Promise<number> => {
+  const now = new Date();
+
+  const result = await TrialRequest.deleteMany({
+    status: TRIAL_REQUEST_STATUS.PENDING,
+    finalExpiresAt: { $lt: now },
+  });
+
+  return result.deletedCount;
+};
+
+/**
+ * Auto-expire trial requests (Cron job - legacy)
+ * Marks as EXPIRED instead of delete (for records)
  */
 const expireOldRequests = async (): Promise<number> => {
   const result = await TrialRequest.updateMany(
     {
       status: TRIAL_REQUEST_STATUS.PENDING,
-      expiresAt: { $lt: new Date() },
+      finalExpiresAt: { $lt: new Date() },
     },
     {
       $set: { status: TRIAL_REQUEST_STATUS.EXPIRED },
@@ -421,11 +496,11 @@ const expireOldRequests = async (): Promise<number> => {
 
 export const TrialRequestService = {
   createTrialRequest,
-  getMatchingTrialRequests,
-  getMyTrialRequests,
-  getAllTrialRequests,
   getSingleTrialRequest,
   acceptTrialRequest,
   cancelTrialRequest,
+  extendTrialRequest,
+  sendExpirationReminders,
+  autoDeleteExpiredRequests,
   expireOldRequests,
 };

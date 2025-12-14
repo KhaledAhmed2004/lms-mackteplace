@@ -33,24 +33,13 @@ const router = express.Router();
  */
 router.post(
   '/',
-  optionalAuth, // Allow both authenticated and guest users
   validateRequest(TrialRequestValidation.createTrialRequestZodSchema),
   TrialRequestController.createTrialRequest
 );
 
 // ============ STUDENT ROUTES ============
 
-/**
- * @route   GET /api/v1/trial-requests/my-requests
- * @desc    Get student's own trial requests
- * @access  Student only
- * @query   ?status=PENDING&page=1&limit=10
- */
-router.get(
-  '/my-requests',
-  auth(USER_ROLES.STUDENT),
-  TrialRequestController.getMyTrialRequests
-);
+// NOTE: GET /my-requests removed - use /session-requests/my-requests instead (unified view)
 
 /**
  * @route   PATCH /api/v1/trial-requests/:id/cancel
@@ -66,21 +55,23 @@ router.patch(
   TrialRequestController.cancelTrialRequest
 );
 
+/**
+ * @route   PATCH /api/v1/trial-requests/:id/extend
+ * @desc    Extend trial request by 7 more days
+ * @access  Student (logged-in) or Guest (via email in body)
+ * @body    { email?: string } (Required for guest users)
+ * @note    Only PENDING requests can be extended
+ * @note    Max 1 extension allowed
+ */
+router.patch(
+  '/:id/extend',
+  optionalAuth,
+  TrialRequestController.extendTrialRequest
+);
+
 // ============ TUTOR ROUTES ============
 
-/**
- * @route   GET /api/v1/trial-requests/matching
- * @desc    Get trial requests matching tutor's subjects
- * @access  Tutor only (verified tutors only)
- * @query   ?subject=Math&page=1&limit=10
- * @note    Only shows PENDING requests in tutor's teaching subjects
- * @note    Excludes expired requests
- */
-router.get(
-  '/matching',
-  auth(USER_ROLES.TUTOR),
-  TrialRequestController.getMatchingTrialRequests
-);
+// NOTE: GET /matching removed - use /session-requests/matching instead (unified view)
 
 /**
  * @route   PATCH /api/v1/trial-requests/:id/accept
@@ -112,29 +103,45 @@ router.get(
 
 // ============ ADMIN ROUTES ============
 
-/**
- * @route   GET /api/v1/trial-requests
- * @desc    Get all trial requests
- * @access  Admin only
- * @query   ?status=PENDING&subject=Math&searchTerm=help&page=1&limit=10
- */
-router.get(
-  '/',
-  auth(USER_ROLES.SUPER_ADMIN),
-  TrialRequestController.getAllTrialRequests
-);
+// NOTE: GET / (all trial requests) removed - use /session-requests instead (unified view)
 
 /**
  * @route   POST /api/v1/trial-requests/expire-old
  * @desc    Expire old trial requests (Cron job endpoint)
  * @access  Admin only
- * @note    Updates PENDING requests past expiresAt to EXPIRED
- * @note    Should be called periodically (e.g., every hour)
+ * @note    Updates PENDING requests past finalExpiresAt to EXPIRED
  */
 router.post(
   '/expire-old',
   auth(USER_ROLES.SUPER_ADMIN),
   TrialRequestController.expireOldRequests
+);
+
+/**
+ * @route   POST /api/v1/trial-requests/send-reminders
+ * @desc    Send expiration reminder emails (Cron job endpoint)
+ * @access  Admin only
+ * @note    Sends email to students whose requests expired (7 days)
+ * @note    Sets finalExpiresAt to 3 days from now
+ * @note    Should be called daily
+ */
+router.post(
+  '/send-reminders',
+  auth(USER_ROLES.SUPER_ADMIN),
+  TrialRequestController.sendExpirationReminders
+);
+
+/**
+ * @route   POST /api/v1/trial-requests/auto-delete
+ * @desc    Auto-delete expired requests (Cron job endpoint)
+ * @access  Admin only
+ * @note    Deletes requests where finalExpiresAt has passed (no response after reminder)
+ * @note    Should be called daily
+ */
+router.post(
+  '/auto-delete',
+  auth(USER_ROLES.SUPER_ADMIN),
+  TrialRequestController.autoDeleteExpiredRequests
 );
 
 export const TrialRequestRoutes = router;

@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TrialRequestService = void 0;
 const http_status_codes_1 = require("http-status-codes");
 const mongoose_1 = require("mongoose");
-const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
@@ -25,12 +24,15 @@ const trialRequest_interface_1 = require("./trialRequest.interface");
 const trialRequest_model_1 = require("./trialRequest.model");
 const sessionRequest_model_1 = require("../sessionRequest/sessionRequest.model");
 const sessionRequest_interface_1 = require("../sessionRequest/sessionRequest.interface");
+// NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
+// Use /session-requests endpoints instead (unified view with requestType filter)
 /**
  * Create trial request (First-time Student or Guest ONLY)
  * For returning students, use SessionRequest module instead
+ * Automatically creates User account when trial request is created
  */
 const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
     // Validate subject exists
     const subjectExists = yield subject_model_1.Subject.findById(payload.subject);
     if (!subjectExists) {
@@ -88,6 +90,11 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
             ? (_h = (_g = payload.studentInfo) === null || _g === void 0 ? void 0 : _g.guardianInfo) === null || _h === void 0 ? void 0 : _h.email
             : (_j = payload.studentInfo) === null || _j === void 0 ? void 0 : _j.email;
         if (emailToCheck) {
+            // Check if user already exists with this email
+            const existingUser = yield user_model_1.User.findOne({ email: emailToCheck.toLowerCase() });
+            if (existingUser) {
+                throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'An account with this email already exists. Please log in to create a trial request.');
+            }
             // Check if guest has already completed a trial
             const previousAcceptedTrial = yield trialRequest_model_1.TrialRequest.findOne({
                 $or: [
@@ -112,9 +119,45 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
             }
         }
     }
+    // Auto-create User account for guest users when trial request is created
+    let createdStudentId = studentId;
+    if (!studentId && payload.studentInfo) {
+        // Determine email and password based on age
+        // For under 18: use guardian's email/password (guardian becomes the account holder)
+        // For 18+: use student's email/password
+        const isUnder18 = payload.studentInfo.isUnder18;
+        const email = isUnder18
+            ? (_k = payload.studentInfo.guardianInfo) === null || _k === void 0 ? void 0 : _k.email
+            : payload.studentInfo.email;
+        const password = isUnder18
+            ? (_l = payload.studentInfo.guardianInfo) === null || _l === void 0 ? void 0 : _l.password
+            : payload.studentInfo.password;
+        const name = isUnder18
+            ? ((_m = payload.studentInfo.guardianInfo) === null || _m === void 0 ? void 0 : _m.name) || payload.studentInfo.firstName + ' ' + payload.studentInfo.lastName
+            : payload.studentInfo.firstName + ' ' + payload.studentInfo.lastName;
+        const phone = isUnder18
+            ? (_o = payload.studentInfo.guardianInfo) === null || _o === void 0 ? void 0 : _o.phone
+            : undefined;
+        if (email && password) {
+            // Create new User account
+            const newUser = yield user_model_1.User.create({
+                name: name,
+                email: email.toLowerCase(),
+                password: password,
+                phone: phone,
+                role: user_1.USER_ROLES.STUDENT,
+                studentProfile: {
+                    hasCompletedTrial: false,
+                    trialRequestsCount: 1,
+                    sessionRequestsCount: 0,
+                },
+            });
+            createdStudentId = newUser._id.toString();
+        }
+    }
     // Create trial request
-    const trialRequest = yield trialRequest_model_1.TrialRequest.create(Object.assign(Object.assign({}, payload), { studentId: studentId ? new mongoose_1.Types.ObjectId(studentId) : undefined, status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING }));
-    // Increment student trial request count if logged in
+    const trialRequest = yield trialRequest_model_1.TrialRequest.create(Object.assign(Object.assign({}, payload), { studentId: createdStudentId ? new mongoose_1.Types.ObjectId(createdStudentId) : undefined, status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING }));
+    // Increment student trial request count if logged in (existing user)
     if (studentId) {
         yield user_model_1.User.findByIdAndUpdate(studentId, {
             $inc: { 'studentProfile.trialRequestsCount': 1 },
@@ -124,80 +167,6 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
     // TODO: Send email notification to admin
     // TODO: Send confirmation email to student
     return trialRequest;
-});
-/**
- * Get matching trial requests for tutor
- * Shows PENDING requests in tutor's subjects
- */
-const getMatchingTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    // Get tutor's subjects
-    const tutor = yield user_model_1.User.findById(tutorId);
-    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can view matching requests');
-    }
-    if (!((_a = tutor.tutorProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only verified tutors can view trial requests');
-    }
-    const tutorSubjects = ((_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) || [];
-    // Find matching requests
-    const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find({
-        subject: { $in: tutorSubjects },
-        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
-        expiresAt: { $gt: new Date() }, // Not expired
-    })
-        .populate('studentId', 'name profilePicture')
-        .populate('subject', 'name icon'), query)
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
-    return {
-        meta,
-        data: result,
-    };
-});
-/**
- * Get student's own trial requests
- */
-const getMyTrialRequests = (studentId, query) => __awaiter(void 0, void 0, void 0, function* () {
-    const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find({ studentId: new mongoose_1.Types.ObjectId(studentId) })
-        .populate('acceptedTutorId', 'name profilePicture')
-        .populate('subject', 'name icon')
-        .populate('chatId'), query)
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
-    return {
-        meta,
-        data: result,
-    };
-});
-/**
- * Get all trial requests (Admin)
- */
-const getAllTrialRequests = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find()
-        .populate('studentId', 'name email profilePicture')
-        .populate('acceptedTutorId', 'name email profilePicture')
-        .populate('subject', 'name icon')
-        .populate('chatId'), query)
-        .search(['description', 'studentInfo.name', 'studentInfo.email'])
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
-    return {
-        meta,
-        data: result,
-    };
 });
 /**
  * Get single trial request
@@ -301,13 +270,102 @@ const cancelTrialRequest = (requestId, studentIdOrEmail, cancellationReason) => 
     return request;
 });
 /**
- * Auto-expire trial requests (Cron job)
- * Should be called periodically to expire old requests
+ * Extend trial request (Student)
+ * Adds 7 more days to expiration (max 1 extension)
+ */
+const extendTrialRequest = (requestId, studentIdOrEmail) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e;
+    const request = yield trialRequest_model_1.TrialRequest.findById(requestId);
+    if (!request) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Trial request not found');
+    }
+    // Verify ownership
+    const isOwnerByStudentId = request.studentId && request.studentId.toString() === studentIdOrEmail;
+    const isOwnerByEmail = ((_b = (_a = request.studentInfo) === null || _a === void 0 ? void 0 : _a.email) === null || _b === void 0 ? void 0 : _b.toLowerCase()) === studentIdOrEmail.toLowerCase();
+    const isOwnerByGuardianEmail = ((_e = (_d = (_c = request.studentInfo) === null || _c === void 0 ? void 0 : _c.guardianInfo) === null || _d === void 0 ? void 0 : _d.email) === null || _e === void 0 ? void 0 : _e.toLowerCase()) === studentIdOrEmail.toLowerCase();
+    if (!isOwnerByStudentId && !isOwnerByEmail && !isOwnerByGuardianEmail) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You can only extend your own trial requests');
+    }
+    // Can only extend PENDING requests
+    if (request.status !== trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only pending trial requests can be extended');
+    }
+    // Check extension limit (max 1)
+    if (request.extensionCount && request.extensionCount >= 1) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Trial request can only be extended once');
+    }
+    // Extend by 7 days
+    const newExpiresAt = new Date();
+    newExpiresAt.setDate(newExpiresAt.getDate() + 7);
+    request.expiresAt = newExpiresAt;
+    request.isExtended = true;
+    request.extensionCount = (request.extensionCount || 0) + 1;
+    request.finalExpiresAt = undefined; // Reset final deadline
+    request.reminderSentAt = undefined; // Reset reminder
+    yield request.save();
+    // TODO: Send confirmation email
+    return request;
+});
+/**
+ * Send reminders for expiring requests (Cron job)
+ * Finds requests where expiresAt has passed but no reminder sent yet
+ * Sets finalExpiresAt to 3 days from now
+ */
+const sendExpirationReminders = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    // Find expired requests that haven't received reminder
+    const expiredRequests = yield trialRequest_model_1.TrialRequest.find({
+        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        expiresAt: { $lt: now },
+        reminderSentAt: { $exists: false },
+    });
+    let reminderCount = 0;
+    for (const request of expiredRequests) {
+        // Set reminder sent and final deadline (3 days)
+        const finalDeadline = new Date();
+        finalDeadline.setDate(finalDeadline.getDate() + 3);
+        request.reminderSentAt = now;
+        request.finalExpiresAt = finalDeadline;
+        yield request.save();
+        // TODO: Send email notification
+        // const email = request.studentInfo?.isUnder18
+        //   ? request.studentInfo?.guardianInfo?.email
+        //   : request.studentInfo?.email;
+        // await sendEmail({
+        //   to: email,
+        //   subject: 'Your Trial Request is Expiring',
+        //   template: 'trial-request-expiring',
+        //   data: {
+        //     name: request.studentInfo?.name,
+        //     expiresAt: finalDeadline,
+        //     extendUrl: `${FRONTEND_URL}/trial-requests/${request._id}/extend`,
+        //     cancelUrl: `${FRONTEND_URL}/trial-requests/${request._id}/cancel`,
+        //   }
+        // });
+        reminderCount++;
+    }
+    return reminderCount;
+});
+/**
+ * Auto-delete requests after final deadline (Cron job)
+ * Deletes requests where finalExpiresAt has passed with no response
+ */
+const autoDeleteExpiredRequests = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const result = yield trialRequest_model_1.TrialRequest.deleteMany({
+        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        finalExpiresAt: { $lt: now },
+    });
+    return result.deletedCount;
+});
+/**
+ * Auto-expire trial requests (Cron job - legacy)
+ * Marks as EXPIRED instead of delete (for records)
  */
 const expireOldRequests = () => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield trialRequest_model_1.TrialRequest.updateMany({
         status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
-        expiresAt: { $lt: new Date() },
+        finalExpiresAt: { $lt: new Date() },
     }, {
         $set: { status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.EXPIRED },
     });
@@ -315,11 +373,11 @@ const expireOldRequests = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.TrialRequestService = {
     createTrialRequest,
-    getMatchingTrialRequests,
-    getMyTrialRequests,
-    getAllTrialRequests,
     getSingleTrialRequest,
     acceptTrialRequest,
     cancelTrialRequest,
+    extendTrialRequest,
+    sendExpirationReminders,
+    autoDeleteExpiredRequests,
     expireOldRequests,
 };

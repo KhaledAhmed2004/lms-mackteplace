@@ -25,11 +25,6 @@ const guardianInfoSchema = new mongoose_1.Schema({
         required: [true, 'Guardian phone number is required'],
         trim: true,
     },
-    relationship: {
-        type: String,
-        enum: ['PARENT', 'LEGAL_GUARDIAN', 'OTHER'],
-        default: 'PARENT',
-    },
 }, { _id: false });
 // Student info sub-schema (with nested guardianInfo)
 // If under 18: only name required, email/password comes from guardian
@@ -64,6 +59,12 @@ const studentInfoSchema = new mongoose_1.Schema({
     },
 }, { _id: false });
 const trialRequestSchema = new mongoose_1.Schema({
+    // Request type (for unified view)
+    requestType: {
+        type: String,
+        enum: Object.values(trialRequest_interface_1.REQUEST_TYPE),
+        default: trialRequest_interface_1.REQUEST_TYPE.TRIAL,
+    },
     // Student reference (optional - for registered users)
     studentId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -133,16 +134,35 @@ const trialRequestSchema = new mongoose_1.Schema({
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Chat',
     },
-    // Timestamps
+    // Timestamps & Expiration
     expiresAt: {
         type: Date,
-        required: [true, 'Expiration date is required'],
+        default: function () {
+            const date = new Date();
+            date.setDate(date.getDate() + 7); // 7 days from now
+            return date;
+        },
     },
     acceptedAt: {
         type: Date,
     },
     cancelledAt: {
         type: Date,
+    },
+    // Extension tracking
+    isExtended: {
+        type: Boolean,
+        default: false,
+    },
+    extensionCount: {
+        type: Number,
+        default: 0,
+    },
+    reminderSentAt: {
+        type: Date, // When reminder email was sent (after 7 days)
+    },
+    finalExpiresAt: {
+        type: Date, // 2-3 days after reminder if no response, auto-delete
     },
     // Metadata
     cancellationReason: {
@@ -162,15 +182,6 @@ trialRequestSchema.index({ acceptedTutorId: 1 });
 trialRequestSchema.index({ createdAt: -1 }); // Latest first
 // Compound index for tutor matching queries
 trialRequestSchema.index({ status: 1, subject: 1, expiresAt: 1 });
-// Pre-save: Set expiration date (24 hours from creation)
-trialRequestSchema.pre('save', function (next) {
-    if (this.isNew && !this.expiresAt) {
-        const expirationDate = new Date();
-        expirationDate.setHours(expirationDate.getHours() + 24); // 24 hours from now
-        this.expiresAt = expirationDate;
-    }
-    next();
-});
 // Pre-save: Validate based on age
 // Under 18: guardian info required, student email/password not needed
 // 18+: student email/password required, guardian info not needed

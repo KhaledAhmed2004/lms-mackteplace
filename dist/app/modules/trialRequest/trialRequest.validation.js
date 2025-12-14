@@ -30,12 +30,6 @@ const guardianInfoSchema = zod_1.z.object({
         .trim()
         .min(8, 'Phone number must be at least 8 characters')
         .max(20, 'Phone number cannot exceed 20 characters'),
-    relationship: zod_1.z
-        .enum(['PARENT', 'LEGAL_GUARDIAN', 'OTHER'], {
-        invalid_type_error: 'Invalid relationship type',
-    })
-        .optional()
-        .default('PARENT'),
 });
 // Student info schema (with nested guardianInfo)
 // Under 18: only name required, email/password comes from guardian

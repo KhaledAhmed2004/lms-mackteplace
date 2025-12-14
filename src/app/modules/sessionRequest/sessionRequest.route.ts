@@ -28,6 +28,12 @@ router.patch(
   SessionRequestController.cancelSessionRequest
 );
 
+router.patch(
+  '/:id/extend',
+  auth(USER_ROLES.STUDENT),
+  SessionRequestController.extendSessionRequest
+);
+
 // Tutor routes
 router.get(
   '/matching',
@@ -52,6 +58,18 @@ router.post(
   '/expire-old',
   auth(USER_ROLES.SUPER_ADMIN),
   SessionRequestController.expireOldRequests
+);
+
+router.post(
+  '/send-reminders',
+  auth(USER_ROLES.SUPER_ADMIN),
+  SessionRequestController.sendExpirationReminders
+);
+
+router.post(
+  '/auto-delete',
+  auth(USER_ROLES.SUPER_ADMIN),
+  SessionRequestController.autoDeleteExpiredRequests
 );
 
 // Shared routes (authenticated users)

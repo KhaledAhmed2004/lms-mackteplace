@@ -4,6 +4,12 @@ exports.SessionRequest = void 0;
 const mongoose_1 = require("mongoose");
 const sessionRequest_interface_1 = require("./sessionRequest.interface");
 const sessionRequestSchema = new mongoose_1.Schema({
+    // Request type (for unified view)
+    requestType: {
+        type: String,
+        enum: Object.values(sessionRequest_interface_1.REQUEST_TYPE),
+        default: sessionRequest_interface_1.REQUEST_TYPE.SESSION,
+    },
     // Student reference (Required - must be logged in)
     studentId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -64,15 +70,34 @@ const sessionRequestSchema = new mongoose_1.Schema({
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Chat',
     },
-    // Timestamps
+    // Timestamps & Expiration
     expiresAt: {
         type: Date,
-        required: [true, 'Expiration date is required'],
+        default: function () {
+            const date = new Date();
+            date.setDate(date.getDate() + 7); // 7 days from now
+            return date;
+        },
     },
     acceptedAt: {
         type: Date,
     },
     cancelledAt: {
+        type: Date,
+    },
+    // Extension tracking
+    isExtended: {
+        type: Boolean,
+        default: false,
+    },
+    extensionCount: {
+        type: Number,
+        default: 0,
+    },
+    reminderSentAt: {
+        type: Date,
+    },
+    finalExpiresAt: {
         type: Date,
     },
     // Metadata
@@ -92,13 +117,4 @@ sessionRequestSchema.index({ acceptedTutorId: 1 });
 sessionRequestSchema.index({ createdAt: -1 }); // Latest first
 // Compound index for tutor matching queries
 sessionRequestSchema.index({ status: 1, subject: 1, expiresAt: 1 });
-// Pre-save: Set expiration date (24 hours from creation)
-sessionRequestSchema.pre('save', function (next) {
-    if (this.isNew && !this.expiresAt) {
-        const expirationDate = new Date();
-        expirationDate.setHours(expirationDate.getHours() + 24); // 24 hours from now
-        this.expiresAt = expirationDate;
-    }
-    next();
-});
 exports.SessionRequest = (0, mongoose_1.model)('SessionRequest', sessionRequestSchema);

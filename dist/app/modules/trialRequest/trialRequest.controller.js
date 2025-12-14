@@ -35,47 +35,8 @@ const createTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         data: result,
     });
 }));
-/**
- * Get matching trial requests for tutor
- */
-const getMatchingTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const tutorId = req.user.id;
-    const result = yield trialRequest_service_1.TrialRequestService.getMatchingTrialRequests(tutorId, req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Matching trial requests retrieved successfully',
-        data: result.data,
-        pagination: result.meta,
-    });
-}));
-/**
- * Get student's own trial requests
- */
-const getMyTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const studentId = req.user.id;
-    const result = yield trialRequest_service_1.TrialRequestService.getMyTrialRequests(studentId, req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Your trial requests retrieved successfully',
-        data: result.data,
-        pagination: result.meta,
-    });
-}));
-/**
- * Get all trial requests (Admin)
- */
-const getAllTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield trialRequest_service_1.TrialRequestService.getAllTrialRequests(req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Trial requests retrieved successfully',
-        data: result.data,
-        pagination: result.meta,
-    });
-}));
+// NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
+// Use /session-requests endpoints instead (unified view with requestType filter)
 /**
  * Get single trial request
  */
@@ -119,7 +80,48 @@ const cancelTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
     });
 }));
 /**
- * Expire old trial requests (Cron job endpoint)
+ * Extend trial request (Student)
+ * Can be called by logged-in student or via email link (guest)
+ */
+const extendTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    // Support both logged-in users and email-based extension
+    const studentIdOrEmail = ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || req.body.email || '';
+    const result = yield trialRequest_service_1.TrialRequestService.extendTrialRequest(id, studentIdOrEmail);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Trial request extended by 7 days successfully',
+        data: result,
+    });
+}));
+/**
+ * Send expiration reminders (Cron job endpoint)
+ */
+const sendExpirationReminders = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const count = yield trialRequest_service_1.TrialRequestService.sendExpirationReminders();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: `${count} reminder emails sent successfully`,
+        data: { reminderCount: count },
+    });
+}));
+/**
+ * Auto-delete expired requests (Cron job endpoint)
+ */
+const autoDeleteExpiredRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const count = yield trialRequest_service_1.TrialRequestService.autoDeleteExpiredRequests();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: `${count} expired trial requests deleted successfully`,
+        data: { deletedCount: count },
+    });
+}));
+/**
+ * Expire old trial requests (Cron job endpoint - marks as EXPIRED)
  */
 const expireOldRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const count = yield trialRequest_service_1.TrialRequestService.expireOldRequests();
@@ -132,11 +134,11 @@ const expireOldRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void
 }));
 exports.TrialRequestController = {
     createTrialRequest,
-    getMatchingTrialRequests,
-    getMyTrialRequests,
-    getAllTrialRequests,
     getSingleTrialRequest,
     acceptTrialRequest,
     cancelTrialRequest,
+    extendTrialRequest,
+    sendExpirationReminders,
+    autoDeleteExpiredRequests,
     expireOldRequests,
 };

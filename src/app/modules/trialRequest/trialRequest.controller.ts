@@ -23,52 +23,8 @@ const createTrialRequest = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-/**
- * Get matching trial requests for tutor
- */
-const getMatchingTrialRequests = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user!.id as string;
-  const result = await TrialRequestService.getMatchingTrialRequests(tutorId, req.query);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Matching trial requests retrieved successfully',
-    data: result.data,
-    pagination: result.meta,
-  });
-});
-
-/**
- * Get student's own trial requests
- */
-const getMyTrialRequests = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user!.id as string;
-  const result = await TrialRequestService.getMyTrialRequests(studentId, req.query);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Your trial requests retrieved successfully',
-    data: result.data,
-    pagination: result.meta,
-  });
-});
-
-/**
- * Get all trial requests (Admin)
- */
-const getAllTrialRequests = catchAsync(async (req: Request, res: Response) => {
-  const result = await TrialRequestService.getAllTrialRequests(req.query);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Trial requests retrieved successfully',
-    data: result.data,
-    pagination: result.meta,
-  });
-});
+// NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
+// Use /session-requests endpoints instead (unified view with requestType filter)
 
 /**
  * Get single trial request
@@ -124,7 +80,54 @@ const cancelTrialRequest = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
- * Expire old trial requests (Cron job endpoint)
+ * Extend trial request (Student)
+ * Can be called by logged-in student or via email link (guest)
+ */
+const extendTrialRequest = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  // Support both logged-in users and email-based extension
+  const studentIdOrEmail = req.user?.id || req.body.email || '';
+
+  const result = await TrialRequestService.extendTrialRequest(id, studentIdOrEmail);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Trial request extended by 7 days successfully',
+    data: result,
+  });
+});
+
+/**
+ * Send expiration reminders (Cron job endpoint)
+ */
+const sendExpirationReminders = catchAsync(async (req: Request, res: Response) => {
+  const count = await TrialRequestService.sendExpirationReminders();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: `${count} reminder emails sent successfully`,
+    data: { reminderCount: count },
+  });
+});
+
+/**
+ * Auto-delete expired requests (Cron job endpoint)
+ */
+const autoDeleteExpiredRequests = catchAsync(async (req: Request, res: Response) => {
+  const count = await TrialRequestService.autoDeleteExpiredRequests();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: `${count} expired trial requests deleted successfully`,
+    data: { deletedCount: count },
+  });
+});
+
+/**
+ * Expire old trial requests (Cron job endpoint - marks as EXPIRED)
  */
 const expireOldRequests = catchAsync(async (req: Request, res: Response) => {
   const count = await TrialRequestService.expireOldRequests();
@@ -139,11 +142,11 @@ const expireOldRequests = catchAsync(async (req: Request, res: Response) => {
 
 export const TrialRequestController = {
   createTrialRequest,
-  getMatchingTrialRequests,
-  getMyTrialRequests,
-  getAllTrialRequests,
   getSingleTrialRequest,
   acceptTrialRequest,
   cancelTrialRequest,
+  extendTrialRequest,
+  sendExpirationReminders,
+  autoDeleteExpiredRequests,
   expireOldRequests,
 };

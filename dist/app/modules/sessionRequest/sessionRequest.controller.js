@@ -139,6 +139,46 @@ const cancelSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
         data: result,
     });
 }));
+// Extend session request (Student)
+const extendSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    if (!studentId) {
+        return (0, sendResponse_1.default)(res, {
+            success: false,
+            statusCode: http_status_codes_1.StatusCodes.UNAUTHORIZED,
+            message: 'You must be logged in to extend a session request',
+        });
+    }
+    const result = yield sessionRequest_service_1.SessionRequestService.extendSessionRequest(id, studentId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Session request extended by 7 days successfully',
+        data: result,
+    });
+}));
+// Send expiration reminders (Admin/Cron)
+const sendExpirationReminders = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const count = yield sessionRequest_service_1.SessionRequestService.sendExpirationReminders();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: `${count} reminder emails sent successfully`,
+        data: { reminderCount: count },
+    });
+}));
+// Auto-delete expired requests (Admin/Cron)
+const autoDeleteExpiredRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const count = yield sessionRequest_service_1.SessionRequestService.autoDeleteExpiredRequests();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: `${count} expired session requests deleted successfully`,
+        data: { deletedCount: count },
+    });
+}));
 // Expire old session requests (Admin/Cron)
 const expireOldRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const expiredCount = yield sessionRequest_service_1.SessionRequestService.expireOldRequests();
@@ -157,5 +197,8 @@ exports.SessionRequestController = {
     getSingleSessionRequest,
     acceptSessionRequest,
     cancelSessionRequest,
+    extendSessionRequest,
+    sendExpirationReminders,
+    autoDeleteExpiredRequests,
     expireOldRequests,
 };

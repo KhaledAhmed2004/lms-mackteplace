@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionRequestService = void 0;
 const http_status_codes_1 = require("http-status-codes");
 const mongoose_1 = require("mongoose");
-const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
@@ -75,8 +74,8 @@ const createSessionRequest = (studentId, payload) => __awaiter(void 0, void 0, v
     return sessionRequest;
 });
 /**
- * Get matching session requests for tutor
- * Shows PENDING requests in tutor's subjects
+ * Get matching requests for tutor (UNIFIED: Trial + Session)
+ * Shows PENDING requests in tutor's subjects from both collections
  */
 const getMatchingSessionRequests = (tutorId, query) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -89,62 +88,424 @@ const getMatchingSessionRequests = (tutorId, query) => __awaiter(void 0, void 0,
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only verified tutors can view session requests');
     }
     const tutorSubjects = ((_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) || [];
-    // Find matching requests
-    const requestQuery = new QueryBuilder_1.default(sessionRequest_model_1.SessionRequest.find({
-        subject: { $in: tutorSubjects },
+    const now = new Date();
+    // Pagination params
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    // Filter by requestType if provided
+    const requestTypeFilter = query.requestType;
+    // Base match conditions for session requests
+    const sessionMatchConditions = {
+        subject: { $in: tutorSubjects.map(s => new mongoose_1.Types.ObjectId(String(s))) },
         status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING,
-        expiresAt: { $gt: new Date() }, // Not expired
-    })
-        .populate('studentId', 'name profilePicture studentProfile')
-        .populate('subject', 'name icon'), query)
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
+        expiresAt: { $gt: now },
+    };
+    // Base match conditions for trial requests
+    const trialMatchConditions = {
+        subject: { $in: tutorSubjects.map(s => new mongoose_1.Types.ObjectId(String(s))) },
+        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        expiresAt: { $gt: now },
+    };
+    // Build aggregation pipeline
+    const pipeline = [];
+    // If filtering by specific type, skip the $unionWith
+    if (requestTypeFilter === 'SESSION') {
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } });
+    }
+    else if (requestTypeFilter === 'TRIAL') {
+        // Query only trial requests
+        const trialResults = yield trialRequest_model_1.TrialRequest.aggregate([
+            { $match: trialMatchConditions },
+            { $addFields: { requestType: 'TRIAL' } },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'studentId',
+                    foreignField: '_id',
+                    as: 'studentId',
+                    pipeline: [{ $project: { name: 1, profilePicture: 1, studentProfile: 1 } }],
+                },
+            },
+            { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'subjects',
+                    localField: 'subject',
+                    foreignField: '_id',
+                    as: 'subject',
+                    pipeline: [{ $project: { name: 1, icon: 1 } }],
+                },
+            },
+            { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+        ]);
+        const totalTrialCount = yield trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions);
+        return {
+            meta: {
+                total: totalTrialCount,
+                limit,
+                page,
+                totalPage: Math.ceil(totalTrialCount / limit),
+            },
+            data: trialResults,
+        };
+    }
+    else {
+        // Unified query: both session and trial requests
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } }, {
+            $unionWith: {
+                coll: 'trialrequests',
+                pipeline: [
+                    { $match: trialMatchConditions },
+                    { $addFields: { requestType: 'TRIAL' } },
+                ],
+            },
+        });
+    }
+    // Add sorting, pagination, and lookups for non-TRIAL-only queries
+    if (requestTypeFilter !== 'TRIAL') {
+        pipeline.push({ $sort: { createdAt: -1 } }, { $skip: skip }, { $limit: limit }, {
+            $lookup: {
+                from: 'users',
+                localField: 'studentId',
+                foreignField: '_id',
+                as: 'studentId',
+                pipeline: [{ $project: { name: 1, profilePicture: 1, studentProfile: 1 } }],
+            },
+        }, { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'subjects',
+                localField: 'subject',
+                foreignField: '_id',
+                as: 'subject',
+                pipeline: [{ $project: { name: 1, icon: 1 } }],
+            },
+        }, { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } });
+    }
+    const result = yield sessionRequest_model_1.SessionRequest.aggregate(pipeline);
+    // Get total count for pagination
+    let totalCount = 0;
+    if (requestTypeFilter === 'SESSION') {
+        totalCount = yield sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions);
+    }
+    else {
+        const [sessionCount, trialCount] = yield Promise.all([
+            sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions),
+            trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions),
+        ]);
+        totalCount = sessionCount + trialCount;
+    }
     return {
-        meta,
+        meta: {
+            total: totalCount,
+            limit,
+            page,
+            totalPage: Math.ceil(totalCount / limit),
+        },
         data: result,
     };
 });
 /**
- * Get student's own session requests
+ * Get student's own requests (UNIFIED: Trial + Session)
+ * Returns both trial and session requests for the student
  */
 const getMySessionRequests = (studentId, query) => __awaiter(void 0, void 0, void 0, function* () {
-    const requestQuery = new QueryBuilder_1.default(sessionRequest_model_1.SessionRequest.find({ studentId: new mongoose_1.Types.ObjectId(studentId) })
-        .populate('acceptedTutorId', 'name profilePicture')
-        .populate('subject', 'name icon')
-        .populate('chatId'), query)
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
+    const studentObjectId = new mongoose_1.Types.ObjectId(studentId);
+    // Pagination params
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    // Filter by requestType if provided
+    const requestTypeFilter = query.requestType;
+    // Filter by status if provided
+    const statusFilter = query.status;
+    // Base match conditions
+    const sessionMatchConditions = { studentId: studentObjectId };
+    const trialMatchConditions = { studentId: studentObjectId };
+    if (statusFilter) {
+        sessionMatchConditions.status = statusFilter;
+        trialMatchConditions.status = statusFilter;
+    }
+    // Build aggregation pipeline
+    const pipeline = [];
+    if (requestTypeFilter === 'SESSION') {
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } });
+    }
+    else if (requestTypeFilter === 'TRIAL') {
+        // Query only trial requests
+        const trialResults = yield trialRequest_model_1.TrialRequest.aggregate([
+            { $match: trialMatchConditions },
+            { $addFields: { requestType: 'TRIAL' } },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'acceptedTutorId',
+                    foreignField: '_id',
+                    as: 'acceptedTutorId',
+                    pipeline: [{ $project: { name: 1, profilePicture: 1 } }],
+                },
+            },
+            { $unwind: { path: '$acceptedTutorId', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'subjects',
+                    localField: 'subject',
+                    foreignField: '_id',
+                    as: 'subject',
+                    pipeline: [{ $project: { name: 1, icon: 1 } }],
+                },
+            },
+            { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'chats',
+                    localField: 'chatId',
+                    foreignField: '_id',
+                    as: 'chatId',
+                },
+            },
+            { $unwind: { path: '$chatId', preserveNullAndEmptyArrays: true } },
+        ]);
+        const totalTrialCount = yield trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions);
+        return {
+            meta: {
+                total: totalTrialCount,
+                limit,
+                page,
+                totalPage: Math.ceil(totalTrialCount / limit),
+            },
+            data: trialResults,
+        };
+    }
+    else {
+        // Unified query: both session and trial requests
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } }, {
+            $unionWith: {
+                coll: 'trialrequests',
+                pipeline: [
+                    { $match: trialMatchConditions },
+                    { $addFields: { requestType: 'TRIAL' } },
+                ],
+            },
+        });
+    }
+    // Add sorting, pagination, and lookups for non-TRIAL-only queries
+    if (requestTypeFilter !== 'TRIAL') {
+        pipeline.push({ $sort: { createdAt: -1 } }, { $skip: skip }, { $limit: limit }, {
+            $lookup: {
+                from: 'users',
+                localField: 'acceptedTutorId',
+                foreignField: '_id',
+                as: 'acceptedTutorId',
+                pipeline: [{ $project: { name: 1, profilePicture: 1 } }],
+            },
+        }, { $unwind: { path: '$acceptedTutorId', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'subjects',
+                localField: 'subject',
+                foreignField: '_id',
+                as: 'subject',
+                pipeline: [{ $project: { name: 1, icon: 1 } }],
+            },
+        }, { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'chats',
+                localField: 'chatId',
+                foreignField: '_id',
+                as: 'chatId',
+            },
+        }, { $unwind: { path: '$chatId', preserveNullAndEmptyArrays: true } });
+    }
+    const result = yield sessionRequest_model_1.SessionRequest.aggregate(pipeline);
+    // Get total count for pagination
+    let totalCount = 0;
+    if (requestTypeFilter === 'SESSION') {
+        totalCount = yield sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions);
+    }
+    else {
+        const [sessionCount, trialCount] = yield Promise.all([
+            sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions),
+            trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions),
+        ]);
+        totalCount = sessionCount + trialCount;
+    }
     return {
-        meta,
+        meta: {
+            total: totalCount,
+            limit,
+            page,
+            totalPage: Math.ceil(totalCount / limit),
+        },
         data: result,
     };
 });
 /**
- * Get all session requests (Admin)
+ * Get all requests (Admin) - UNIFIED: Trial + Session
+ * Returns all trial and session requests for admin dashboard
  */
 const getAllSessionRequests = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const requestQuery = new QueryBuilder_1.default(sessionRequest_model_1.SessionRequest.find()
-        .populate('studentId', 'name email profilePicture studentProfile')
-        .populate('acceptedTutorId', 'name email profilePicture')
-        .populate('subject', 'name icon')
-        .populate('chatId'), query)
-        .search(['description'])
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    const result = yield requestQuery.modelQuery;
-    const meta = yield requestQuery.getPaginationInfo();
+    // Pagination params
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    // Filter by requestType if provided
+    const requestTypeFilter = query.requestType;
+    // Filter by status if provided
+    const statusFilter = query.status;
+    // Search term
+    const searchTerm = query.searchTerm;
+    // Base match conditions
+    const sessionMatchConditions = {};
+    const trialMatchConditions = {};
+    if (statusFilter) {
+        sessionMatchConditions.status = statusFilter;
+        trialMatchConditions.status = statusFilter;
+    }
+    if (searchTerm) {
+        sessionMatchConditions.description = { $regex: searchTerm, $options: 'i' };
+        trialMatchConditions.$or = [
+            { description: { $regex: searchTerm, $options: 'i' } },
+            { 'studentInfo.name': { $regex: searchTerm, $options: 'i' } },
+            { 'studentInfo.email': { $regex: searchTerm, $options: 'i' } },
+        ];
+    }
+    // Build aggregation pipeline
+    const pipeline = [];
+    if (requestTypeFilter === 'SESSION') {
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } });
+    }
+    else if (requestTypeFilter === 'TRIAL') {
+        // Query only trial requests
+        const trialResults = yield trialRequest_model_1.TrialRequest.aggregate([
+            { $match: trialMatchConditions },
+            { $addFields: { requestType: 'TRIAL' } },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'studentId',
+                    foreignField: '_id',
+                    as: 'studentId',
+                    pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1, studentProfile: 1 } }],
+                },
+            },
+            { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'acceptedTutorId',
+                    foreignField: '_id',
+                    as: 'acceptedTutorId',
+                    pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1 } }],
+                },
+            },
+            { $unwind: { path: '$acceptedTutorId', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'subjects',
+                    localField: 'subject',
+                    foreignField: '_id',
+                    as: 'subject',
+                    pipeline: [{ $project: { name: 1, icon: 1 } }],
+                },
+            },
+            { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'chats',
+                    localField: 'chatId',
+                    foreignField: '_id',
+                    as: 'chatId',
+                },
+            },
+            { $unwind: { path: '$chatId', preserveNullAndEmptyArrays: true } },
+        ]);
+        const totalTrialCount = yield trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions);
+        return {
+            meta: {
+                total: totalTrialCount,
+                limit,
+                page,
+                totalPage: Math.ceil(totalTrialCount / limit),
+            },
+            data: trialResults,
+        };
+    }
+    else {
+        // Unified query: both session and trial requests
+        pipeline.push({ $match: sessionMatchConditions }, { $addFields: { requestType: 'SESSION' } }, {
+            $unionWith: {
+                coll: 'trialrequests',
+                pipeline: [
+                    { $match: trialMatchConditions },
+                    { $addFields: { requestType: 'TRIAL' } },
+                ],
+            },
+        });
+    }
+    // Add sorting, pagination, and lookups for non-TRIAL-only queries
+    if (requestTypeFilter !== 'TRIAL') {
+        pipeline.push({ $sort: { createdAt: -1 } }, { $skip: skip }, { $limit: limit }, {
+            $lookup: {
+                from: 'users',
+                localField: 'studentId',
+                foreignField: '_id',
+                as: 'studentId',
+                pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1, studentProfile: 1 } }],
+            },
+        }, { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'users',
+                localField: 'acceptedTutorId',
+                foreignField: '_id',
+                as: 'acceptedTutorId',
+                pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1 } }],
+            },
+        }, { $unwind: { path: '$acceptedTutorId', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'subjects',
+                localField: 'subject',
+                foreignField: '_id',
+                as: 'subject',
+                pipeline: [{ $project: { name: 1, icon: 1 } }],
+            },
+        }, { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } }, {
+            $lookup: {
+                from: 'chats',
+                localField: 'chatId',
+                foreignField: '_id',
+                as: 'chatId',
+            },
+        }, { $unwind: { path: '$chatId', preserveNullAndEmptyArrays: true } });
+    }
+    const result = yield sessionRequest_model_1.SessionRequest.aggregate(pipeline);
+    // Get total count for pagination
+    let totalCount = 0;
+    if (requestTypeFilter === 'SESSION') {
+        totalCount = yield sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions);
+    }
+    else {
+        const [sessionCount, trialCount] = yield Promise.all([
+            sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions),
+            trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions),
+        ]);
+        totalCount = sessionCount + trialCount;
+    }
     return {
-        meta,
+        meta: {
+            total: totalCount,
+            limit,
+            page,
+            totalPage: Math.ceil(totalCount / limit),
+        },
         data: result,
     };
 });
@@ -234,13 +595,76 @@ const cancelSessionRequest = (requestId, studentId, cancellationReason) => __awa
     return request;
 });
 /**
+ * Extend session request (Student)
+ * Adds 7 more days to expiration (max 1 extension)
+ */
+const extendSessionRequest = (requestId, studentId) => __awaiter(void 0, void 0, void 0, function* () {
+    const request = yield sessionRequest_model_1.SessionRequest.findById(requestId);
+    if (!request) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session request not found');
+    }
+    // Verify ownership
+    if (request.studentId.toString() !== studentId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You can only extend your own session requests');
+    }
+    // Can only extend PENDING requests
+    if (request.status !== sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only pending session requests can be extended');
+    }
+    // Check extension limit (max 1)
+    if (request.extensionCount && request.extensionCount >= 1) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session request can only be extended once');
+    }
+    // Extend by 7 days
+    const newExpiresAt = new Date();
+    newExpiresAt.setDate(newExpiresAt.getDate() + 7);
+    request.expiresAt = newExpiresAt;
+    request.isExtended = true;
+    request.extensionCount = (request.extensionCount || 0) + 1;
+    request.finalExpiresAt = undefined;
+    request.reminderSentAt = undefined;
+    yield request.save();
+    return request;
+});
+/**
+ * Send reminders for expiring requests (Cron job)
+ */
+const sendExpirationReminders = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const expiredRequests = yield sessionRequest_model_1.SessionRequest.find({
+        status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING,
+        expiresAt: { $lt: now },
+        reminderSentAt: { $exists: false },
+    }).populate('studentId', 'email name');
+    let reminderCount = 0;
+    for (const request of expiredRequests) {
+        const finalDeadline = new Date();
+        finalDeadline.setDate(finalDeadline.getDate() + 3);
+        request.reminderSentAt = now;
+        request.finalExpiresAt = finalDeadline;
+        yield request.save();
+        // TODO: Send email notification to student
+        reminderCount++;
+    }
+    return reminderCount;
+});
+/**
+ * Auto-delete requests after final deadline (Cron job)
+ */
+const autoDeleteExpiredRequests = () => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield sessionRequest_model_1.SessionRequest.deleteMany({
+        status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING,
+        finalExpiresAt: { $lt: new Date() },
+    });
+    return result.deletedCount;
+});
+/**
  * Auto-expire session requests (Cron job)
- * Should be called periodically to expire old requests
  */
 const expireOldRequests = () => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield sessionRequest_model_1.SessionRequest.updateMany({
         status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING,
-        expiresAt: { $lt: new Date() },
+        finalExpiresAt: { $lt: new Date() },
     }, {
         $set: { status: sessionRequest_interface_1.SESSION_REQUEST_STATUS.EXPIRED },
     });
@@ -254,5 +678,8 @@ exports.SessionRequestService = {
     getSingleSessionRequest,
     acceptSessionRequest,
     cancelSessionRequest,
+    extendSessionRequest,
+    sendExpirationReminders,
+    autoDeleteExpiredRequests,
     expireOldRequests,
 };

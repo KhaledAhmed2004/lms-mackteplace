@@ -8,9 +8,12 @@ export enum SESSION_REQUEST_STATUS {
 }
 
 // Reuse enums from trialRequest for consistency
-export { SCHOOL_TYPE, GRADE_LEVEL } from '../trialRequest/trialRequest.interface';
+export { SCHOOL_TYPE, GRADE_LEVEL, REQUEST_TYPE } from '../trialRequest/trialRequest.interface';
 
 export type ISessionRequest = {
+  // Request type (for unified view)
+  requestType: 'TRIAL' | 'SESSION';
+
   // Student reference (Required - must be logged in)
   studentId: Types.ObjectId;
 
@@ -34,10 +37,16 @@ export type ISessionRequest = {
   acceptedTutorId?: Types.ObjectId; // Tutor who accepted
   chatId?: Types.ObjectId; // Created chat when accepted
 
-  // Timestamps
-  expiresAt: Date; // Auto-expire after 24 hours
+  // Timestamps & Expiration
+  expiresAt: Date; // Auto-expire after 7 days
   acceptedAt?: Date;
   cancelledAt?: Date;
+
+  // Extension tracking
+  isExtended?: boolean;
+  extensionCount?: number;
+  reminderSentAt?: Date;
+  finalExpiresAt?: Date;
 
   // Metadata
   cancellationReason?: string;

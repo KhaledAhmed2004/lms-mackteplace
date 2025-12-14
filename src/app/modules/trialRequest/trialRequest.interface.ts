@@ -1,10 +1,16 @@
 import { Model, Types } from 'mongoose';
 
 export enum TRIAL_REQUEST_STATUS {
-  PENDING = 'PENDING', 
+  PENDING = 'PENDING',
   ACCEPTED = 'ACCEPTED', // Tutor accepted, chat opened
   EXPIRED = 'EXPIRED', // No tutor accepted within time limit
   CANCELLED = 'CANCELLED', // Student cancelled before acceptance
+}
+
+// Request type to distinguish between trial and session requests in unified view
+export enum REQUEST_TYPE {
+  TRIAL = 'TRIAL',
+  SESSION = 'SESSION',
 }
 
 // School types in Germany
@@ -47,7 +53,6 @@ export type IGuardianInfo = {
   email: string;
   password: string;
   phone: string;
-  relationship?: 'PARENT' | 'LEGAL_GUARDIAN' | 'OTHER';
 };
 
 // Student info collected during trial request
@@ -64,6 +69,9 @@ export type IStudentInfo = {
 };
 
 export type ITrialRequest = {
+  // Request type (for unified view)
+  requestType: REQUEST_TYPE;
+
   // Student reference (if already registered user)
   studentId?: Types.ObjectId;
 
@@ -91,10 +99,16 @@ export type ITrialRequest = {
   acceptedTutorId?: Types.ObjectId; // Tutor who accepted
   chatId?: Types.ObjectId; // Created chat when accepted
 
-  // Timestamps
-  expiresAt: Date; // Auto-expire after 24 hours
+  // Timestamps & Expiration
+  expiresAt: Date; // Auto-expire after 7 days
   acceptedAt?: Date;
   cancelledAt?: Date;
+
+  // Extension tracking
+  isExtended?: boolean; // Whether student requested extension
+  extensionCount?: number; // How many times extended (max 1)
+  reminderSentAt?: Date; // When 7-day reminder was sent
+  finalExpiresAt?: Date; // 2-3 days after reminder, auto-delete if no response
 
   // Metadata
   cancellationReason?: string;

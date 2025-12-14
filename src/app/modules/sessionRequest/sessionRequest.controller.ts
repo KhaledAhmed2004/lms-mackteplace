@@ -149,6 +149,53 @@ const cancelSessionRequest = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Extend session request (Student)
+const extendSessionRequest = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const studentId = req.user?.id;
+
+  if (!studentId) {
+    return sendResponse(res, {
+      success: false,
+      statusCode: StatusCodes.UNAUTHORIZED,
+      message: 'You must be logged in to extend a session request',
+    });
+  }
+
+  const result = await SessionRequestService.extendSessionRequest(id, studentId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Session request extended by 7 days successfully',
+    data: result,
+  });
+});
+
+// Send expiration reminders (Admin/Cron)
+const sendExpirationReminders = catchAsync(async (req: Request, res: Response) => {
+  const count = await SessionRequestService.sendExpirationReminders();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: `${count} reminder emails sent successfully`,
+    data: { reminderCount: count },
+  });
+});
+
+// Auto-delete expired requests (Admin/Cron)
+const autoDeleteExpiredRequests = catchAsync(async (req: Request, res: Response) => {
+  const count = await SessionRequestService.autoDeleteExpiredRequests();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: `${count} expired session requests deleted successfully`,
+    data: { deletedCount: count },
+  });
+});
+
 // Expire old session requests (Admin/Cron)
 const expireOldRequests = catchAsync(async (req: Request, res: Response) => {
   const expiredCount = await SessionRequestService.expireOldRequests();
@@ -169,5 +216,8 @@ export const SessionRequestController = {
   getSingleSessionRequest,
   acceptSessionRequest,
   cancelSessionRequest,
+  extendSessionRequest,
+  sendExpirationReminders,
+  autoDeleteExpiredRequests,
   expireOldRequests,
 };
