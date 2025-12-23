@@ -8,7 +8,7 @@ import { SessionService } from './session.service';
  * Propose session (Tutor sends in chat)
  */
 const proposeSession = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user?.id;
+  const tutorId = req.user!.id as string;
   const result = await SessionService.proposeSession(tutorId, req.body);
 
   sendResponse(res, {
@@ -24,7 +24,7 @@ const proposeSession = catchAsync(async (req: Request, res: Response) => {
  */
 const acceptSessionProposal = catchAsync(async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await SessionService.acceptSessionProposal(messageId, studentId);
 
   sendResponse(res, {
@@ -40,7 +40,7 @@ const acceptSessionProposal = catchAsync(async (req: Request, res: Response) => 
  */
 const rejectSessionProposal = catchAsync(async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const { rejectionReason } = req.body;
 
   const result = await SessionService.rejectSessionProposal(
@@ -64,7 +64,7 @@ const rejectSessionProposal = catchAsync(async (req: Request, res: Response) => 
  * Admin: All sessions
  */
 const getAllSessions = catchAsync(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
+  const userId = req.user?.id as string | undefined;
   const userRole = req.user?.role;
   const result = await SessionService.getAllSessions(req.query, userId, userRole);
 
@@ -97,7 +97,7 @@ const getSingleSession = catchAsync(async (req: Request, res: Response) => {
  */
 const cancelSession = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const userId = req.user?.id;
+  const userId = req.user!.id as string;
   const { cancellationReason } = req.body;
 
   const result = await SessionService.cancelSession(id, userId, cancellationReason);
@@ -139,6 +139,102 @@ const autoCompleteSessions = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get upcoming sessions for logged-in user
+ */
+const getUpcomingSessions = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id as string;
+  const userRole = req.user!.role as string;
+  const result = await SessionService.getUpcomingSessions(userId, userRole, req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Upcoming sessions retrieved successfully',
+    data: result.data,
+    pagination: result.meta,
+  });
+});
+
+/**
+ * Get completed sessions for logged-in user
+ */
+const getCompletedSessions = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id as string;
+  const userRole = req.user!.role as string;
+  const result = await SessionService.getCompletedSessions(userId, userRole, req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Completed sessions retrieved successfully',
+    data: result.data,
+    pagination: result.meta,
+  });
+});
+
+/**
+ * Request session reschedule
+ */
+const requestReschedule = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id as string;
+  const result = await SessionService.requestReschedule(id, userId, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Reschedule request sent successfully',
+    data: result,
+  });
+});
+
+/**
+ * Approve reschedule request
+ */
+const approveReschedule = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id as string;
+  const result = await SessionService.approveReschedule(id, userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Reschedule approved successfully',
+    data: result,
+  });
+});
+
+/**
+ * Reject reschedule request
+ */
+const rejectReschedule = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id as string;
+  const result = await SessionService.rejectReschedule(id, userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Reschedule rejected',
+    data: result,
+  });
+});
+
+/**
+ * Auto-transition session statuses (Cron job endpoint)
+ */
+const autoTransitionStatuses = catchAsync(async (req: Request, res: Response) => {
+  const result = await SessionService.autoTransitionSessionStatuses();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Session statuses transitioned successfully',
+    data: result,
+  });
+});
+
 export const SessionController = {
   proposeSession,
   acceptSessionProposal,
@@ -148,4 +244,10 @@ export const SessionController = {
   cancelSession,
   markAsCompleted,
   autoCompleteSessions,
+  getUpcomingSessions,
+  getCompletedSessions,
+  requestReschedule,
+  approveReschedule,
+  rejectReschedule,
+  autoTransitionStatuses,
 };

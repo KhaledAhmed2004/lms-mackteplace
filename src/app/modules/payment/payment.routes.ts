@@ -17,46 +17,46 @@ router.post(
 // Stripe Connect account management
 router.post(
   '/stripe/account',
-  auth(USER_ROLES.TASKER),
+  auth(USER_ROLES.TUTOR),
   StripeConnectController.createStripeAccountController
 );
 
 router.get(
   '/stripe/onboarding',
-  auth(USER_ROLES.TASKER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   StripeConnectController.getOnboardingLinkController
 );
 
 router.get(
   '/stripe/onboarding-status',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   StripeConnectController.checkOnboardingStatusController
 );
 
 // Payment history route for poster, tasker, super admin
 router.get(
   '/history',
-  auth(USER_ROLES.POSTER, USER_ROLES.TASKER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   PaymentController.getPaymentHistoryController
 );
 
 // Retrieve current intent and client_secret by bidId
 router.get(
   '/by-bid/:bidId/current-intent',
-  auth(USER_ROLES.POSTER, USER_ROLES.TASKER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   PaymentController.getCurrentIntentByBidController
 );
 
 router.post(
   '/refund/:paymentId',
-  auth(USER_ROLES.POSTER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.SUPER_ADMIN),
   PaymentController.refundPaymentController
 );
 
 // Payment information retrieval
 router.get(
   '/:paymentId',
-  auth(USER_ROLES.POSTER, USER_ROLES.TASKER, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   PaymentController.getPaymentByIdController
 );
 

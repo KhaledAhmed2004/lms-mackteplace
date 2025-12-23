@@ -24,8 +24,8 @@ const trialRequest_interface_1 = require("./trialRequest.interface");
 const trialRequest_model_1 = require("./trialRequest.model");
 const sessionRequest_model_1 = require("../sessionRequest/sessionRequest.model");
 const sessionRequest_interface_1 = require("../sessionRequest/sessionRequest.interface");
-// NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
-// Use /session-requests endpoints instead (unified view with requestType filter)
+const message_model_1 = require("../message/message.model");
+const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 /**
  * Create trial request (First-time Student or Guest ONLY)
  * For returning students, use SessionRequest module instead
@@ -133,8 +133,8 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
             ? (_l = payload.studentInfo.guardianInfo) === null || _l === void 0 ? void 0 : _l.password
             : payload.studentInfo.password;
         const name = isUnder18
-            ? ((_m = payload.studentInfo.guardianInfo) === null || _m === void 0 ? void 0 : _m.name) || payload.studentInfo.firstName + ' ' + payload.studentInfo.lastName
-            : payload.studentInfo.firstName + ' ' + payload.studentInfo.lastName;
+            ? ((_m = payload.studentInfo.guardianInfo) === null || _m === void 0 ? void 0 : _m.name) || payload.studentInfo.name
+            : payload.studentInfo.name;
         const phone = isUnder18
             ? (_o = payload.studentInfo.guardianInfo) === null || _o === void 0 ? void 0 : _o.phone
             : undefined;
@@ -183,11 +183,95 @@ const getSingleTrialRequest = (id) => __awaiter(void 0, void 0, void 0, function
     return request;
 });
 /**
+ * Get available trial requests matching tutor's subjects (Tutor)
+ * Returns PENDING requests where:
+ * - Tutor teaches the requested subject
+ * - Request is not expired
+ * - Request was not created by the tutor's own students (future consideration)
+ */
+const getAvailableTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    // Verify tutor exists and is verified
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can access this endpoint');
+    }
+    if (!((_a = tutor.tutorProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only verified tutors can view available requests');
+    }
+    // Get tutor's subjects
+    const tutorSubjectIds = ((_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) || [];
+    if (tutorSubjectIds.length === 0) {
+        return {
+            pagination: { page: 1, limit: 10, total: 0, totalPage: 0 },
+            data: [],
+        };
+    }
+    const now = new Date();
+    // Build query for pending requests matching tutor's subjects
+    const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find({
+        status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING,
+        subject: { $in: tutorSubjectIds },
+        expiresAt: { $gt: now }, // Not expired
+    })
+        .populate('subject', 'name icon description')
+        .select('-studentInfo.password -studentInfo.guardianInfo.password'), query)
+        .filter()
+        .sort()
+        .paginate();
+    const requests = yield requestQuery.modelQuery;
+    const paginationInfo = yield requestQuery.getPaginationInfo();
+    // Calculate student age from DOB for each request
+    const requestsWithAge = requests.map(request => {
+        var _a;
+        const reqObj = request.toObject();
+        if ((_a = reqObj.studentInfo) === null || _a === void 0 ? void 0 : _a.dateOfBirth) {
+            const dob = new Date(reqObj.studentInfo.dateOfBirth);
+            const age = Math.floor((now.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            return Object.assign(Object.assign({}, reqObj), { studentAge: age });
+        }
+        return reqObj;
+    });
+    return {
+        pagination: paginationInfo,
+        data: requestsWithAge,
+    };
+});
+/**
+ * Get tutor's accepted trial requests (Tutor)
+ * Returns requests the tutor has accepted with their status
+ */
+const getMyAcceptedTrialRequests = (tutorId, query) => __awaiter(void 0, void 0, void 0, function* () {
+    // Verify tutor exists
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can access this endpoint');
+    }
+    // Build query for accepted requests by this tutor
+    const requestQuery = new QueryBuilder_1.default(trialRequest_model_1.TrialRequest.find({
+        acceptedTutorId: new mongoose_1.Types.ObjectId(tutorId),
+    })
+        .populate('studentId', 'name email profilePicture phone')
+        .populate('subject', 'name icon description')
+        .populate('chatId')
+        .select('-studentInfo.password -studentInfo.guardianInfo.password'), query)
+        .filter()
+        .sort()
+        .paginate();
+    const requests = yield requestQuery.modelQuery;
+    const paginationInfo = yield requestQuery.getPaginationInfo();
+    return {
+        pagination: paginationInfo,
+        data: requests,
+    };
+});
+/**
  * Accept trial request (Tutor)
  * Creates chat and connects student with tutor
+ * Sends introductory message to chat
  * Marks student as having completed trial
  */
-const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, void 0, function* () {
+const acceptTrialRequest = (requestId, tutorId, introductoryMessage) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     // Verify request exists and is pending
     const request = yield trialRequest_model_1.TrialRequest.findById(requestId).populate('subject', 'name');
@@ -226,6 +310,15 @@ const acceptTrialRequest = (requestId, tutorId) => __awaiter(void 0, void 0, voi
         participants: chatParticipants,
         trialRequestId: request._id, // Link chat to trial request
     });
+    // Send introductory message if provided
+    if (introductoryMessage && introductoryMessage.trim()) {
+        yield message_model_1.Message.create({
+            chatId: chat._id,
+            sender: new mongoose_1.Types.ObjectId(tutorId),
+            text: introductoryMessage.trim(),
+            type: 'text',
+        });
+    }
     // Update trial request
     request.status = trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED;
     request.acceptedTutorId = new mongoose_1.Types.ObjectId(tutorId);
@@ -374,6 +467,8 @@ const expireOldRequests = () => __awaiter(void 0, void 0, void 0, function* () {
 exports.TrialRequestService = {
     createTrialRequest,
     getSingleTrialRequest,
+    getAvailableTrialRequests,
+    getMyAcceptedTrialRequests,
     acceptTrialRequest,
     cancelTrialRequest,
     extendTrialRequest,

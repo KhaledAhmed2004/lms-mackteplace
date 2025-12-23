@@ -71,13 +71,40 @@ router.patch(
 
 // ============ TUTOR ROUTES ============
 
-// NOTE: GET /matching removed - use /session-requests/matching instead (unified view)
+/**
+ * @route   GET /api/v1/trial-requests/available
+ * @desc    Get available trial requests matching tutor's subjects
+ * @access  Tutor only (verified tutors only)
+ * @query   ?page=1&limit=10&sort=-createdAt
+ * @returns Pending requests matching tutor's subjects with student info
+ * @note    Returns: subject, schoolType, gradeLevel, studentAge, studentName, learningGoal, documents
+ */
+router.get(
+  '/available',
+  auth(USER_ROLES.TUTOR),
+  TrialRequestController.getAvailableTrialRequests
+);
+
+/**
+ * @route   GET /api/v1/trial-requests/my-accepted
+ * @desc    Get trial requests the tutor has accepted
+ * @access  Tutor only
+ * @query   ?page=1&limit=10&sort=-acceptedAt
+ * @returns Accepted requests with student details and chat info
+ */
+router.get(
+  '/my-accepted',
+  auth(USER_ROLES.TUTOR),
+  TrialRequestController.getMyAcceptedTrialRequests
+);
 
 /**
  * @route   PATCH /api/v1/trial-requests/:id/accept
  * @desc    Accept trial request (Uber-style accept)
  * @access  Tutor only (verified tutors only)
+ * @body    { introductoryMessage?: string } (optional, min 10 chars, max 500 chars)
  * @note    Creates chat between student and tutor
+ * @note    Sends introductory message to chat if provided
  * @note    Changes request status to ACCEPTED
  * @note    Tutor must teach the requested subject
  * @note    Sends notification to student
@@ -85,6 +112,7 @@ router.patch(
 router.patch(
   '/:id/accept',
   auth(USER_ROLES.TUTOR),
+  validateRequest(TrialRequestValidation.acceptTrialRequestZodSchema),
   TrialRequestController.acceptTrialRequest
 );
 

@@ -21,8 +21,7 @@ const studentSubscription_service_1 = require("./studentSubscription.service");
  * Subscribe to a plan (Student)
  */
 const subscribeToPlan = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const { tier } = req.body;
     const result = yield studentSubscription_service_1.StudentSubscriptionService.subscribeToPlan(studentId, tier);
     (0, sendResponse_1.default)(res, {
@@ -36,8 +35,7 @@ const subscribeToPlan = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
  * Get student's active subscription
  */
 const getMySubscription = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield studentSubscription_service_1.StudentSubscriptionService.getMySubscription(studentId);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -76,9 +74,8 @@ const getSingleSubscription = (0, catchAsync_1.default)((req, res) => __awaiter(
  * Cancel subscription (Student)
  */
 const cancelSubscription = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const { cancellationReason } = req.body;
     const result = yield studentSubscription_service_1.StudentSubscriptionService.cancelSubscription(id, studentId, cancellationReason);
     (0, sendResponse_1.default)(res, {
@@ -100,6 +97,20 @@ const expireOldSubscriptions = (0, catchAsync_1.default)((req, res) => __awaiter
         data: { expiredCount: count },
     });
 }));
+/**
+ * Get plan usage details (Student)
+ * Includes: plan details, usage stats, spending, upcoming sessions
+ */
+const getMyPlanUsage = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const studentId = req.user.id;
+    const result = yield studentSubscription_service_1.StudentSubscriptionService.getMyPlanUsage(studentId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Plan usage retrieved successfully',
+        data: result,
+    });
+}));
 exports.StudentSubscriptionController = {
     subscribeToPlan,
     getMySubscription,
@@ -107,4 +118,5 @@ exports.StudentSubscriptionController = {
     getSingleSubscription,
     cancelSubscription,
     expireOldSubscriptions,
+    getMyPlanUsage,
 };

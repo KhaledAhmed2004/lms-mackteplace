@@ -8,8 +8,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminService = void 0;
+const mongoose_1 = require("mongoose");
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
 const tutorApplication_model_1 = require("../tutorApplication/tutorApplication.model");
@@ -21,6 +25,7 @@ const monthlyBilling_interface_1 = require("../monthlyBilling/monthlyBilling.int
 const tutorEarnings_model_1 = require("../tutorEarnings/tutorEarnings.model");
 const studentSubscription_model_1 = require("../studentSubscription/studentSubscription.model");
 const studentSubscription_interface_1 = require("../studentSubscription/studentSubscription.interface");
+const AggregationBuilder_1 = __importDefault(require("../../builder/AggregationBuilder"));
 /**
  * Get comprehensive dashboard statistics
  */
@@ -436,6 +441,148 @@ const getUserGrowth = (year, months) => __awaiter(void 0, void 0, void 0, functi
     }
     return stats;
 });
+/**
+ * Get overview stats with percentage changes
+ * Returns Total Revenue, Total Students, Total Tutors with growth metrics
+ */
+const getOverviewStats = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (period = 'month') {
+    const [revenue, students, tutors] = yield Promise.all([
+        // Revenue from MonthlyBilling (sum of 'total' field)
+        new AggregationBuilder_1.default(monthlyBilling_model_1.MonthlyBilling).calculateGrowth({
+            sumField: 'total',
+            filter: { status: monthlyBilling_interface_1.BILLING_STATUS.PAID },
+            period,
+        }),
+        // Students count
+        new AggregationBuilder_1.default(user_model_1.User).calculateGrowth({
+            filter: { role: user_1.USER_ROLES.STUDENT },
+            period,
+        }),
+        // Tutors count
+        new AggregationBuilder_1.default(user_model_1.User).calculateGrowth({
+            filter: { role: user_1.USER_ROLES.TUTOR },
+            period,
+        }),
+    ]);
+    return { revenue, students, tutors };
+});
+/**
+ * Get monthly revenue with advanced filters
+ */
+const getMonthlyRevenue = (year, months, filters) => __awaiter(void 0, void 0, void 0, function* () {
+    const targetMonths = months || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const stats = [];
+    for (const month of targetMonths) {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59);
+        // Build session filter
+        const sessionFilter = {
+            status: session_interface_1.SESSION_STATUS.COMPLETED,
+            completedAt: { $gte: startDate, $lte: endDate },
+        };
+        if (filters === null || filters === void 0 ? void 0 : filters.tutorId) {
+            sessionFilter.tutorId = new mongoose_1.Types.ObjectId(filters.tutorId);
+        }
+        if (filters === null || filters === void 0 ? void 0 : filters.studentId) {
+            sessionFilter.studentId = new mongoose_1.Types.ObjectId(filters.studentId);
+        }
+        if (filters === null || filters === void 0 ? void 0 : filters.subject) {
+            sessionFilter.subject = filters.subject;
+        }
+        // Get sessions with filters
+        const sessions = yield session_model_1.Session.find(sessionFilter);
+        // Calculate session stats
+        const sessionCount = sessions.length;
+        const totalHours = sessions.reduce((sum, s) => sum + s.duration / 60, 0);
+        const sessionRevenue = sessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+        const averageSessionPrice = sessionCount > 0 ? sessionRevenue / sessionCount : 0;
+        // Build billing filter
+        const billingFilter = {
+            billingYear: year,
+            billingMonth: month,
+            status: monthlyBilling_interface_1.BILLING_STATUS.PAID,
+        };
+        if (filters === null || filters === void 0 ? void 0 : filters.studentId) {
+            billingFilter.studentId = new mongoose_1.Types.ObjectId(filters.studentId);
+        }
+        // Get billings with tier filter if needed
+        let billings = yield monthlyBilling_model_1.MonthlyBilling.find(billingFilter).populate('studentId');
+        // Filter by subscription tier if provided
+        if (filters === null || filters === void 0 ? void 0 : filters.subscriptionTier) {
+            const studentsWithTier = yield studentSubscription_model_1.StudentSubscription.find({
+                tier: filters.subscriptionTier,
+                status: studentSubscription_interface_1.SUBSCRIPTION_STATUS.ACTIVE,
+            }).distinct('studentId');
+            billings = billings.filter(billing => studentsWithTier.some(studentId => { var _a; return studentId.toString() === ((_a = billing.studentId) === null || _a === void 0 ? void 0 : _a.toString()); }));
+        }
+        const totalRevenue = billings.reduce((sum, billing) => sum + billing.total, 0);
+        // Get earnings for commission/payout calculation
+        const earningsFilter = {
+            payoutYear: year,
+            payoutMonth: month,
+        };
+        if (filters === null || filters === void 0 ? void 0 : filters.tutorId) {
+            earningsFilter.tutorId = new mongoose_1.Types.ObjectId(filters.tutorId);
+        }
+        const earnings = yield tutorEarnings_model_1.TutorEarnings.find(earningsFilter);
+        const totalCommission = earnings.reduce((sum, earning) => sum + earning.platformCommission, 0);
+        const totalPayouts = earnings.reduce((sum, earning) => sum + earning.netEarnings, 0);
+        stats.push({
+            month,
+            year,
+            totalRevenue: Math.round(totalRevenue * 100) / 100,
+            totalCommission: Math.round(totalCommission * 100) / 100,
+            totalPayouts: Math.round(totalPayouts * 100) / 100,
+            netProfit: Math.round(totalCommission * 100) / 100,
+            sessionCount,
+            totalHours: Math.round(totalHours * 100) / 100,
+            averageSessionPrice: Math.round(averageSessionPrice * 100) / 100,
+        });
+    }
+    return stats;
+});
+/**
+ * Get user distribution by role and/or status
+ */
+const getUserDistribution = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (groupBy = 'role') {
+    const total = yield user_model_1.User.countDocuments();
+    const result = { total };
+    if (groupBy === 'role' || groupBy === 'both') {
+        const byRole = yield user_model_1.User.aggregate([
+            { $group: { _id: '$role', count: { $sum: 1 } } },
+            {
+                $project: {
+                    _id: 0,
+                    role: '$_id',
+                    count: 1,
+                    percentage: {
+                        $round: [{ $multiply: [{ $divide: ['$count', total] }, 100] }, 2],
+                    },
+                },
+            },
+            { $sort: { count: -1 } },
+        ]);
+        result.byRole = byRole;
+    }
+    if (groupBy === 'status' || groupBy === 'both') {
+        const byStatus = yield user_model_1.User.aggregate([
+            { $group: { _id: '$status', count: { $sum: 1 } } },
+            {
+                $project: {
+                    _id: 0,
+                    status: '$_id',
+                    count: 1,
+                    percentage: {
+                        $round: [{ $multiply: [{ $divide: ['$count', total] }, 100] }, 2],
+                    },
+                },
+            },
+            { $sort: { count: -1 } },
+        ]);
+        result.byStatus = byStatus;
+    }
+    return result;
+});
 exports.AdminService = {
     getDashboardStats,
     getRevenueByMonth,
@@ -443,4 +590,7 @@ exports.AdminService = {
     getTopTutors,
     getTopStudents,
     getUserGrowth,
+    getOverviewStats,
+    getMonthlyRevenue,
+    getUserDistribution,
 };

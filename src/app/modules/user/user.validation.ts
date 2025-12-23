@@ -18,24 +18,13 @@ const createUserZodSchema = z.object({
         .string()
         .regex(phoneRegex, 'Phone must be 7-15 digits, optional +')
         .optional(),
-      role: z.enum([USER_ROLES.POSTER, USER_ROLES.TASKER]).optional(),
-      password: z.string().optional(),
+      role: z.enum([USER_ROLES.STUDENT, USER_ROLES.TUTOR]).optional(),
+      password: z
+        .string({ required_error: 'Password is required' })
+        .regex(passwordRegex, 'Password must include upper, lower, number, special and be 8+ chars'),
       profilePicture: z.string().optional(),
-      googleId: z.string().optional(),
     })
-    .strict()
-    .superRefine((data, ctx) => {
-      if (!data.googleId) {
-        if (!data.password || data.password.length === 0) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Password is required' });
-        } else if (!passwordRegex.test(data.password)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Password must include upper, lower, number, special and be 8+ chars',
-          });
-        }
-      }
-    }),
+    .strict(),
 });
 
 // const updateUserZodSchema = z.object({
@@ -64,7 +53,17 @@ const updateUserZodSchema = z.object({
   }),
 });
 
+// Admin: Update tutor subjects
+const updateTutorSubjectsZodSchema = z.object({
+  body: z.object({
+    subjects: z
+      .array(z.string().min(1, 'Subject cannot be empty'))
+      .min(1, 'At least one subject is required'),
+  }),
+});
+
 export const UserValidation = {
   createUserZodSchema,
   updateUserZodSchema,
+  updateTutorSubjectsZodSchema,
 };

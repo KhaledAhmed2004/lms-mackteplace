@@ -17,6 +17,7 @@ import { MonthlyBillingRoutes } from '../app/modules/monthlyBilling/monthlyBilli
 import { TutorEarningsRoutes } from '../app/modules/tutorEarnings/tutorEarnings.route';
 import { AdminRoutes } from '../app/modules/admin/admin.route';
 import { SessionReviewRoutes } from '../app/modules/sessionReview/sessionReview.route';
+import { TutorSessionFeedbackRoutes } from '../app/modules/tutorSessionFeedback/tutorSessionFeedback.route';
 import { CallRoutes } from '../app/modules/call/call.route';
 import { WhiteboardRoutes } from '../app/modules/whiteboard/whiteboard.route';
 
@@ -94,6 +95,10 @@ const apiRoutes = [
   {
     path: '/reviews',
     route: SessionReviewRoutes,
+  },
+  {
+    path: '/tutor-feedback',
+    route: TutorSessionFeedbackRoutes,
   },
   {
     path: '/calls',

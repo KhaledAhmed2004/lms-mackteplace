@@ -38,6 +38,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/v1/subscriptions/my-plan-usage
+ * @desc    Get comprehensive plan usage details
+ * @access  Student only
+ * @returns Plan details, usage stats, spending, upcoming sessions
+ */
+router.get(
+  '/my-plan-usage',
+  auth(USER_ROLES.STUDENT),
+  StudentSubscriptionController.getMyPlanUsage
+);
+
+/**
  * @route   PATCH /api/v1/subscriptions/:id/cancel
  * @desc    Cancel subscription
  * @access  Student only (must own subscription)

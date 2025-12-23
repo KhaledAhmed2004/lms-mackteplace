@@ -1,12 +1,53 @@
 import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
+import validateRequest from '../../middlewares/validateRequest';
 import { AdminController } from './admin.controller';
 import { ExportController } from './export.controller';
+import { AdminValidation } from './admin.validation';
 
 const router = express.Router();
 
 // ============ DASHBOARD & STATISTICS ============
+
+/**
+ * @route   GET /api/v1/admin/overview-stats
+ * @desc    Get overview stats with percentage changes (Total Revenue, Students, Tutors)
+ * @access  Admin only
+ * @query   ?period=month (day|week|month|quarter|year)
+ */
+router.get(
+  '/overview-stats',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(AdminValidation.overviewStatsQuerySchema),
+  AdminController.getOverviewStats
+);
+
+/**
+ * @route   GET /api/v1/admin/monthly-revenue
+ * @desc    Get monthly revenue statistics with advanced filters
+ * @access  Admin only
+ * @query   ?year=2024&months=1,2,3&tutorId=xxx&studentId=xxx&subscriptionTier=FLEXIBLE&subject=Math
+ */
+router.get(
+  '/monthly-revenue',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(AdminValidation.monthlyRevenueQuerySchema),
+  AdminController.getMonthlyRevenue
+);
+
+/**
+ * @route   GET /api/v1/admin/user-distribution
+ * @desc    Get user distribution by role and/or status
+ * @access  Admin only
+ * @query   ?groupBy=role (role|status|both)
+ */
+router.get(
+  '/user-distribution',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(AdminValidation.userDistributionQuerySchema),
+  AdminController.getUserDistribution
+);
 
 /**
  * @route   GET /api/v1/admin/dashboard

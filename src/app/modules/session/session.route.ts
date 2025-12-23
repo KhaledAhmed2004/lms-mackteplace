@@ -59,6 +59,33 @@ router.post(
 // ============ SHARED ROUTES (STUDENT + TUTOR + ADMIN) ============
 
 /**
+ * @route   GET /api/v1/sessions/my-upcoming
+ * @desc    Get upcoming sessions for logged-in user
+ * @access  Student or Tutor
+ * @query   ?page=1&limit=10&sort=startTime
+ * @returns Sessions with status: SCHEDULED, STARTING_SOON, IN_PROGRESS, AWAITING_RESPONSE, RESCHEDULE_REQUESTED
+ */
+router.get(
+  '/my-upcoming',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  SessionController.getUpcomingSessions
+);
+
+/**
+ * @route   GET /api/v1/sessions/my-completed
+ * @desc    Get completed sessions for logged-in user
+ * @access  Student or Tutor
+ * @query   ?page=1&limit=10&sort=-completedAt
+ * @returns Sessions with status: COMPLETED, CANCELLED, EXPIRED, NO_SHOW
+ * @note    Includes review status (studentReviewStatus, tutorFeedbackStatus)
+ */
+router.get(
+  '/my-completed',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  SessionController.getCompletedSessions
+);
+
+/**
  * @route   GET /api/v1/sessions
  * @desc    Get sessions
  * @access  Student (own sessions), Tutor (own sessions), Admin (all sessions)
@@ -95,6 +122,45 @@ router.patch(
   SessionController.cancelSession
 );
 
+/**
+ * @route   PATCH /api/v1/sessions/:id/reschedule
+ * @desc    Request session reschedule
+ * @access  Student or Tutor (must be participant)
+ * @body    { newStartTime: Date, reason?: string }
+ * @note    Can only reschedule up to 10 minutes before session start
+ * @note    Other party must approve/reject the reschedule
+ */
+router.patch(
+  '/:id/reschedule',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  validateRequest(SessionValidation.rescheduleSessionZodSchema),
+  SessionController.requestReschedule
+);
+
+/**
+ * @route   PATCH /api/v1/sessions/:id/approve-reschedule
+ * @desc    Approve reschedule request
+ * @access  Student or Tutor (must be the OTHER party, not requester)
+ * @note    Updates session times and status back to SCHEDULED
+ */
+router.patch(
+  '/:id/approve-reschedule',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  SessionController.approveReschedule
+);
+
+/**
+ * @route   PATCH /api/v1/sessions/:id/reject-reschedule
+ * @desc    Reject reschedule request
+ * @access  Student or Tutor (must be the OTHER party, not requester)
+ * @note    Keeps original session times, status back to SCHEDULED
+ */
+router.patch(
+  '/:id/reject-reschedule',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  SessionController.rejectReschedule
+);
+
 // ============ ADMIN ROUTES ============
 
 /**
@@ -121,6 +187,20 @@ router.post(
   '/auto-complete',
   auth(USER_ROLES.SUPER_ADMIN),
   SessionController.autoCompleteSessions
+);
+
+/**
+ * @route   POST /api/v1/sessions/auto-transition
+ * @desc    Auto-transition session statuses (Cron job endpoint)
+ * @access  Admin only
+ * @note    SCHEDULED -> STARTING_SOON (10 min before)
+ * @note    STARTING_SOON -> IN_PROGRESS (at start)
+ * @note    IN_PROGRESS -> EXPIRED (at end if not completed)
+ */
+router.post(
+  '/auto-transition',
+  auth(USER_ROLES.SUPER_ADMIN),
+  SessionController.autoTransitionStatuses
 );
 
 export const SessionRoutes = router;

@@ -34,8 +34,7 @@ const generateMonthlyBillings = (0, catchAsync_1.default)((req, res) => __awaite
  * Get student's billing history
  */
 const getMyBillings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield monthlyBilling_service_1.MonthlyBillingService.getMyBillings(studentId, req.query);
     (0, sendResponse_1.default)(res, {
         success: true,

@@ -7,10 +7,33 @@ exports.AdminRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const user_1 = require("../../../enums/user");
 const auth_1 = __importDefault(require("../../middlewares/auth"));
+const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
 const admin_controller_1 = require("./admin.controller");
 const export_controller_1 = require("./export.controller");
+const admin_validation_1 = require("./admin.validation");
 const router = express_1.default.Router();
 // ============ DASHBOARD & STATISTICS ============
+/**
+ * @route   GET /api/v1/admin/overview-stats
+ * @desc    Get overview stats with percentage changes (Total Revenue, Students, Tutors)
+ * @access  Admin only
+ * @query   ?period=month (day|week|month|quarter|year)
+ */
+router.get('/overview-stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(admin_validation_1.AdminValidation.overviewStatsQuerySchema), admin_controller_1.AdminController.getOverviewStats);
+/**
+ * @route   GET /api/v1/admin/monthly-revenue
+ * @desc    Get monthly revenue statistics with advanced filters
+ * @access  Admin only
+ * @query   ?year=2024&months=1,2,3&tutorId=xxx&studentId=xxx&subscriptionTier=FLEXIBLE&subject=Math
+ */
+router.get('/monthly-revenue', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(admin_validation_1.AdminValidation.monthlyRevenueQuerySchema), admin_controller_1.AdminController.getMonthlyRevenue);
+/**
+ * @route   GET /api/v1/admin/user-distribution
+ * @desc    Get user distribution by role and/or status
+ * @access  Admin only
+ * @query   ?groupBy=role (role|status|both)
+ */
+router.get('/user-distribution', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(admin_validation_1.AdminValidation.userDistributionQuerySchema), admin_controller_1.AdminController.getUserDistribution);
 /**
  * @route   GET /api/v1/admin/dashboard
  * @desc    Get comprehensive dashboard statistics

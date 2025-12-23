@@ -42,6 +42,23 @@ router.post('/proposals/:messageId/accept', (0, auth_1.default)(user_1.USER_ROLE
 router.post('/proposals/:messageId/reject', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(session_validation_1.SessionValidation.rejectSessionProposalZodSchema), session_controller_1.SessionController.rejectSessionProposal);
 // ============ SHARED ROUTES (STUDENT + TUTOR + ADMIN) ============
 /**
+ * @route   GET /api/v1/sessions/my-upcoming
+ * @desc    Get upcoming sessions for logged-in user
+ * @access  Student or Tutor
+ * @query   ?page=1&limit=10&sort=startTime
+ * @returns Sessions with status: SCHEDULED, STARTING_SOON, IN_PROGRESS, AWAITING_RESPONSE, RESCHEDULE_REQUESTED
+ */
+router.get('/my-upcoming', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), session_controller_1.SessionController.getUpcomingSessions);
+/**
+ * @route   GET /api/v1/sessions/my-completed
+ * @desc    Get completed sessions for logged-in user
+ * @access  Student or Tutor
+ * @query   ?page=1&limit=10&sort=-completedAt
+ * @returns Sessions with status: COMPLETED, CANCELLED, EXPIRED, NO_SHOW
+ * @note    Includes review status (studentReviewStatus, tutorFeedbackStatus)
+ */
+router.get('/my-completed', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), session_controller_1.SessionController.getCompletedSessions);
+/**
  * @route   GET /api/v1/sessions
  * @desc    Get sessions
  * @access  Student (own sessions), Tutor (own sessions), Admin (all sessions)
@@ -62,6 +79,29 @@ router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_RO
  * @note    Only SCHEDULED sessions can be cancelled
  */
 router.patch('/:id/cancel', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(session_validation_1.SessionValidation.cancelSessionZodSchema), session_controller_1.SessionController.cancelSession);
+/**
+ * @route   PATCH /api/v1/sessions/:id/reschedule
+ * @desc    Request session reschedule
+ * @access  Student or Tutor (must be participant)
+ * @body    { newStartTime: Date, reason?: string }
+ * @note    Can only reschedule up to 10 minutes before session start
+ * @note    Other party must approve/reject the reschedule
+ */
+router.patch('/:id/reschedule', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(session_validation_1.SessionValidation.rescheduleSessionZodSchema), session_controller_1.SessionController.requestReschedule);
+/**
+ * @route   PATCH /api/v1/sessions/:id/approve-reschedule
+ * @desc    Approve reschedule request
+ * @access  Student or Tutor (must be the OTHER party, not requester)
+ * @note    Updates session times and status back to SCHEDULED
+ */
+router.patch('/:id/approve-reschedule', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), session_controller_1.SessionController.approveReschedule);
+/**
+ * @route   PATCH /api/v1/sessions/:id/reject-reschedule
+ * @desc    Reject reschedule request
+ * @access  Student or Tutor (must be the OTHER party, not requester)
+ * @note    Keeps original session times, status back to SCHEDULED
+ */
+router.patch('/:id/reject-reschedule', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), session_controller_1.SessionController.rejectReschedule);
 // ============ ADMIN ROUTES ============
 /**
  * @route   PATCH /api/v1/sessions/:id/complete
@@ -78,4 +118,13 @@ router.patch('/:id/complete', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN)
  * @note    Should be called periodically (e.g., every hour)
  */
 router.post('/auto-complete', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), session_controller_1.SessionController.autoCompleteSessions);
+/**
+ * @route   POST /api/v1/sessions/auto-transition
+ * @desc    Auto-transition session statuses (Cron job endpoint)
+ * @access  Admin only
+ * @note    SCHEDULED -> STARTING_SOON (10 min before)
+ * @note    STARTING_SOON -> IN_PROGRESS (at start)
+ * @note    IN_PROGRESS -> EXPIRED (at end if not completed)
+ */
+router.post('/auto-transition', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), session_controller_1.SessionController.autoTransitionStatuses);
 exports.SessionRoutes = router;

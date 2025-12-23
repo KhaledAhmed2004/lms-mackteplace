@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VERIFICATION_STATUS = exports.USER_STATUS = exports.USER_ROLES = void 0;
+exports.TUTOR_LEVEL = exports.VERIFICATION_STATUS = exports.USER_STATUS = exports.USER_ROLES = void 0;
 var USER_ROLES;
 (function (USER_ROLES) {
     USER_ROLES["SUPER_ADMIN"] = "SUPER_ADMIN";
@@ -23,3 +23,10 @@ var VERIFICATION_STATUS;
     VERIFICATION_STATUS["APPROVED"] = "APPROVED";
     VERIFICATION_STATUS["REJECTED"] = "REJECTED";
 })(VERIFICATION_STATUS || (exports.VERIFICATION_STATUS = VERIFICATION_STATUS = {}));
+// Tutor level system based on completed sessions
+var TUTOR_LEVEL;
+(function (TUTOR_LEVEL) {
+    TUTOR_LEVEL["STARTER"] = "STARTER";
+    TUTOR_LEVEL["INTERMEDIATE"] = "INTERMEDIATE";
+    TUTOR_LEVEL["EXPERT"] = "EXPERT";
+})(TUTOR_LEVEL || (exports.TUTOR_LEVEL = TUTOR_LEVEL = {}));

@@ -100,6 +100,9 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: Date,
       default: Date.now,
     },
+    selectedForInterviewAt: {
+      type: Date,
+    },
     approvedAt: {
       type: Date,
     },

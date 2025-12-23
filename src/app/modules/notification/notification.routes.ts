@@ -7,21 +7,21 @@ const router = express.Router();
 // Fetch notifications + unread count
 router.get(
   '/',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   NotificationController.getNotificationFromDB
 );
 
 // Mark a notification as read
 router.patch(
   '/:id/read',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   NotificationController.readNotification
 );
 
 // Mark all notifications as read
 router.patch(
   '/read-all',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   NotificationController.readAllNotifications
 );
 

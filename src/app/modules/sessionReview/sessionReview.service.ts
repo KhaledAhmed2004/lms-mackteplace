@@ -74,7 +74,7 @@ const getMyReviews = async (studentId: string, query: Record<string, unknown>) =
     .fields();
 
   const result = await reviewQuery.modelQuery;
-  const meta = await reviewQuery.countTotal();
+  const meta = await reviewQuery.getPaginationInfo();
 
   return { data: result, meta };
 };
@@ -103,7 +103,7 @@ const getTutorReviews = async (
     .fields();
 
   const result = await reviewQuery.modelQuery;
-  const meta = await reviewQuery.countTotal();
+  const meta = await reviewQuery.getPaginationInfo();
 
   return { data: result, meta };
 };

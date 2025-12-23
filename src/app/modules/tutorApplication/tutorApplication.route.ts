@@ -63,10 +63,24 @@ router.get(
 );
 
 /**
- * @route   PATCH /api/v1/applications/:id/approve
- * @desc    Approve application (changes user role to TUTOR)
+ * @route   PATCH /api/v1/applications/:id/select-for-interview
+ * @desc    Select application for interview (after initial review)
  * @access  Admin only
  * @body    { adminNotes?: string }
+ */
+router.patch(
+  '/:id/select-for-interview',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(TutorApplicationValidation.selectForInterviewZodSchema),
+  TutorApplicationController.selectForInterview
+);
+
+/**
+ * @route   PATCH /api/v1/applications/:id/approve
+ * @desc    Approve application after interview (changes user role to TUTOR)
+ * @access  Admin only
+ * @body    { adminNotes?: string }
+ * @note    Application must be SELECTED_FOR_INTERVIEW status first
  */
 router.patch(
   '/:id/approve',
@@ -99,19 +113,6 @@ router.patch(
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(TutorApplicationValidation.sendForRevisionZodSchema),
   TutorApplicationController.sendForRevision
-);
-
-/**
- * @route   PATCH /api/v1/applications/:id
- * @desc    Update application status (generic update)
- * @access  Admin only
- * @body    { status?, rejectionReason?, revisionNote?, adminNotes? }
- */
-router.patch(
-  '/:id',
-  auth(USER_ROLES.SUPER_ADMIN),
-  validateRequest(TutorApplicationValidation.updateApplicationStatusZodSchema),
-  TutorApplicationController.updateApplicationStatus
 );
 
 /**

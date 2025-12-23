@@ -140,26 +140,6 @@ const refreshToken = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result.tokens,
     });
 }));
-const googleCallback = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const user = req.user;
-        if (!user) {
-            console.error('❌ No user data received from passport');
-            const errorUrl = `${config_1.default.frontend_url}/error?message=${encodeURIComponent('Google authentication failed. No user data received.')}`;
-            return res.redirect(errorUrl);
-        }
-        const result = yield auth_service_1.AuthService.googleLoginToDB(user);
-        // Redirect to frontend with token as query parameter in frontend url
-        const successUrl = `${config_1.default.frontend_url}/success?token=${result.createToken}`;
-        return res.redirect(successUrl);
-    }
-    catch (error) {
-        console.error('💥 Google OAuth callback error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorUrl = `${config_1.default.frontend_url}/error?message=${encodeURIComponent(errorMessage)}`;
-        return res.redirect(errorUrl);
-    }
-}));
 exports.AuthController = {
     verifyEmail,
     logoutUser,
@@ -168,6 +148,5 @@ exports.AuthController = {
     resetPassword,
     changePassword,
     resendVerifyEmail,
-    googleCallback,
     refreshToken,
 };

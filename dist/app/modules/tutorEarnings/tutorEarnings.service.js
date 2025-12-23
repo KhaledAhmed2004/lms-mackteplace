@@ -85,7 +85,7 @@ const getMyEarnings = (tutorId, query) => __awaiter(void 0, void 0, void 0, func
         .paginate()
         .fields();
     const result = yield earningsQuery.modelQuery;
-    const meta = yield earningsQuery.countTotal();
+    const meta = yield earningsQuery.getPaginationInfo();
     return { data: result, meta };
 });
 /**
@@ -99,7 +99,7 @@ const getAllEarnings = (query) => __awaiter(void 0, void 0, void 0, function* ()
         .paginate()
         .fields();
     const result = yield earningsQuery.modelQuery;
-    const meta = yield earningsQuery.countTotal();
+    const meta = yield earningsQuery.getPaginationInfo();
     return { data: result, meta };
 });
 /**

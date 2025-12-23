@@ -9,6 +9,6 @@ const auth_1 = __importDefault(require("../../middlewares/auth"));
 const chat_controller_1 = require("./chat.controller");
 const user_1 = require("../../../enums/user");
 const router = express_1.default.Router();
-router.post('/:otherUserId', (0, auth_1.default)(user_1.USER_ROLES.TASKER, user_1.USER_ROLES.POSTER), chat_controller_1.ChatController.createChat);
-router.get('/', (0, auth_1.default)(user_1.USER_ROLES.TASKER, user_1.USER_ROLES.POSTER), chat_controller_1.ChatController.getChat);
+router.post('/:otherUserId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), chat_controller_1.ChatController.createChat);
+router.get('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), chat_controller_1.ChatController.getChat);
 exports.ChatRoutes = router;

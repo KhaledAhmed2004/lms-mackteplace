@@ -21,6 +21,8 @@ const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
 const studentSubscription_interface_1 = require("./studentSubscription.interface");
 const studentSubscription_model_1 = require("./studentSubscription.model");
+const session_model_1 = require("../session/session.model");
+const session_interface_1 = require("../session/session.interface");
 // import Stripe from 'stripe';
 // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 /**
@@ -86,7 +88,7 @@ const getAllSubscriptions = (query) => __awaiter(void 0, void 0, void 0, functio
         .paginate()
         .fields();
     const result = yield subscriptionQuery.modelQuery;
-    const meta = yield subscriptionQuery.countTotal();
+    const meta = yield subscriptionQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -169,6 +171,136 @@ const expireOldSubscriptions = () => __awaiter(void 0, void 0, void 0, function*
     }
     return result.modifiedCount;
 });
+const getMyPlanUsage = (studentId) => __awaiter(void 0, void 0, void 0, function* () {
+    // Get active subscription
+    const subscription = yield studentSubscription_model_1.StudentSubscription.findOne({
+        studentId: new mongoose_1.Types.ObjectId(studentId),
+        status: studentSubscription_interface_1.SUBSCRIPTION_STATUS.ACTIVE,
+    });
+    // Get current month dates
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Get completed sessions for current month
+    const currentMonthSessions = yield session_model_1.Session.find({
+        studentId: new mongoose_1.Types.ObjectId(studentId),
+        status: session_interface_1.SESSION_STATUS.COMPLETED,
+        completedAt: { $gte: startOfMonth, $lte: endOfMonth },
+    });
+    // Calculate current month spending
+    let currentMonthSpending = 0;
+    let bufferCharges = 0;
+    for (const session of currentMonthSessions) {
+        currentMonthSpending += session.totalPrice || 0;
+        bufferCharges += session.bufferPrice || 0;
+    }
+    // Get all completed sessions for total stats
+    const allCompletedSessions = yield session_model_1.Session.aggregate([
+        {
+            $match: {
+                studentId: new mongoose_1.Types.ObjectId(studentId),
+                status: session_interface_1.SESSION_STATUS.COMPLETED,
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                totalSessions: { $sum: 1 },
+                totalHours: { $sum: { $divide: ['$duration', 60] } },
+                totalSpending: { $sum: '$totalPrice' },
+                totalBufferCharges: { $sum: '$bufferPrice' },
+            },
+        },
+    ]);
+    const stats = allCompletedSessions[0] || {
+        totalSessions: 0,
+        totalHours: 0,
+        totalSpending: 0,
+        totalBufferCharges: 0,
+    };
+    // Get upcoming scheduled sessions
+    const upcomingSessions = yield session_model_1.Session.aggregate([
+        {
+            $match: {
+                studentId: new mongoose_1.Types.ObjectId(studentId),
+                status: { $in: [session_interface_1.SESSION_STATUS.SCHEDULED, session_interface_1.SESSION_STATUS.STARTING_SOON] },
+                startTime: { $gte: now },
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                count: { $sum: 1 },
+                totalHours: { $sum: { $divide: ['$duration', 60] } },
+            },
+        },
+    ]);
+    const upcomingStats = upcomingSessions[0] || { count: 0, totalHours: 0 };
+    // Build response based on subscription status
+    if (!subscription) {
+        // No active subscription
+        return {
+            plan: {
+                name: null,
+                pricePerHour: 30, // Default FLEXIBLE rate
+                commitmentMonths: 0,
+                minimumHours: 0,
+                status: null,
+                startDate: null,
+                endDate: null,
+            },
+            usage: {
+                hoursUsed: stats.totalHours,
+                sessionsCompleted: stats.totalSessions,
+                hoursRemaining: null,
+                sessionsRemaining: null,
+            },
+            spending: {
+                currentMonthSpending,
+                totalSpending: stats.totalSpending,
+                bufferCharges: stats.totalBufferCharges,
+            },
+            upcoming: {
+                scheduledSessions: upcomingStats.count,
+                upcomingHours: upcomingStats.totalHours,
+            },
+        };
+    }
+    // Calculate remaining hours (only for REGULAR and LONG_TERM)
+    let hoursRemaining = null;
+    let sessionsRemaining = null;
+    if (subscription.tier !== studentSubscription_interface_1.SUBSCRIPTION_TIER.FLEXIBLE) {
+        hoursRemaining = Math.max(0, subscription.minimumHours - subscription.totalHoursTaken);
+        // Assuming 1 hour per session
+        sessionsRemaining = Math.ceil(hoursRemaining);
+    }
+    return {
+        plan: {
+            name: subscription.tier,
+            pricePerHour: subscription.pricePerHour,
+            commitmentMonths: subscription.commitmentMonths,
+            minimumHours: subscription.minimumHours,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+        },
+        usage: {
+            hoursUsed: subscription.totalHoursTaken,
+            sessionsCompleted: stats.totalSessions,
+            hoursRemaining,
+            sessionsRemaining,
+        },
+        spending: {
+            currentMonthSpending,
+            totalSpending: stats.totalSpending,
+            bufferCharges: stats.totalBufferCharges,
+        },
+        upcoming: {
+            scheduledSessions: upcomingStats.count,
+            upcomingHours: upcomingStats.totalHours,
+        },
+    };
+});
 exports.StudentSubscriptionService = {
     subscribeToPlan,
     getMySubscription,
@@ -177,4 +309,5 @@ exports.StudentSubscriptionService = {
     cancelSubscription,
     incrementHoursTaken,
     expireOldSubscriptions,
+    getMyPlanUsage,
 };

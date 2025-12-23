@@ -21,8 +21,7 @@ const session_service_1 = require("./session.service");
  * Propose session (Tutor sends in chat)
  */
 const proposeSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const tutorId = req.user.id;
     const result = yield session_service_1.SessionService.proposeSession(tutorId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -35,9 +34,8 @@ const proposeSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
  * Accept session proposal (Student accepts)
  */
 const acceptSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { messageId } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield session_service_1.SessionService.acceptSessionProposal(messageId, studentId);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -50,9 +48,8 @@ const acceptSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(
  * Reject session proposal (Student rejects)
  */
 const rejectSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { messageId } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const { rejectionReason } = req.body;
     const result = yield session_service_1.SessionService.rejectSessionProposal(messageId, studentId, rejectionReason);
     (0, sendResponse_1.default)(res, {
@@ -98,9 +95,8 @@ const getSingleSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 
  * Cancel session (Student or Tutor)
  */
 const cancelSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const userId = req.user.id;
     const { cancellationReason } = req.body;
     const result = yield session_service_1.SessionService.cancelSession(id, userId, cancellationReason);
     (0, sendResponse_1.default)(res, {
@@ -135,6 +131,90 @@ const autoCompleteSessions = (0, catchAsync_1.default)((req, res) => __awaiter(v
         data: { completedCount: count },
     });
 }));
+/**
+ * Get upcoming sessions for logged-in user
+ */
+const getUpcomingSessions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = yield session_service_1.SessionService.getUpcomingSessions(userId, userRole, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Upcoming sessions retrieved successfully',
+        data: result.data,
+        pagination: result.meta,
+    });
+}));
+/**
+ * Get completed sessions for logged-in user
+ */
+const getCompletedSessions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const result = yield session_service_1.SessionService.getCompletedSessions(userId, userRole, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Completed sessions retrieved successfully',
+        data: result.data,
+        pagination: result.meta,
+    });
+}));
+/**
+ * Request session reschedule
+ */
+const requestReschedule = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const result = yield session_service_1.SessionService.requestReschedule(id, userId, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Reschedule request sent successfully',
+        data: result,
+    });
+}));
+/**
+ * Approve reschedule request
+ */
+const approveReschedule = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const result = yield session_service_1.SessionService.approveReschedule(id, userId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Reschedule approved successfully',
+        data: result,
+    });
+}));
+/**
+ * Reject reschedule request
+ */
+const rejectReschedule = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const result = yield session_service_1.SessionService.rejectReschedule(id, userId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Reschedule rejected',
+        data: result,
+    });
+}));
+/**
+ * Auto-transition session statuses (Cron job endpoint)
+ */
+const autoTransitionStatuses = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield session_service_1.SessionService.autoTransitionSessionStatuses();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Session statuses transitioned successfully',
+        data: result,
+    });
+}));
 exports.SessionController = {
     proposeSession,
     acceptSessionProposal,
@@ -144,4 +224,10 @@ exports.SessionController = {
     cancelSession,
     markAsCompleted,
     autoCompleteSessions,
+    getUpcomingSessions,
+    getCompletedSessions,
+    requestReschedule,
+    approveReschedule,
+    rejectReschedule,
+    autoTransitionStatuses,
 };

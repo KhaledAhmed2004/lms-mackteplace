@@ -90,9 +90,23 @@ const createApplicationZodSchema = zod_1.z.object({
 // Update application status (admin only) - simplified
 const updateApplicationStatusZodSchema = zod_1.z.object({
     body: zod_1.z.object({
-        status: zod_1.z.enum(['SUBMITTED', 'REVISION', 'APPROVED', 'REJECTED']).optional(),
+        status: zod_1.z
+            .enum([
+            'SUBMITTED',
+            'REVISION',
+            'SELECTED_FOR_INTERVIEW',
+            'APPROVED',
+            'REJECTED',
+        ])
+            .optional(),
         rejectionReason: zod_1.z.string().trim().optional(),
         revisionNote: zod_1.z.string().trim().optional(),
+        adminNotes: zod_1.z.string().trim().optional(),
+    }),
+});
+// Select for interview (admin only)
+const selectForInterviewZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
         adminNotes: zod_1.z.string().trim().optional(),
     }),
 });
@@ -127,6 +141,7 @@ const sendForRevisionZodSchema = zod_1.z.object({
 exports.TutorApplicationValidation = {
     createApplicationZodSchema,
     updateApplicationStatusZodSchema,
+    selectForInterviewZodSchema,
     approveApplicationZodSchema,
     rejectApplicationZodSchema,
     sendForRevisionZodSchema,

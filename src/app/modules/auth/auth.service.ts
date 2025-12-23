@@ -299,38 +299,6 @@ const resendVerifyEmailToDB = async (email: string) => {
   return { otp }; // optional: just for logging/debugging
 };
 
-// Google OAuth login
-const googleLoginToDB = async (user: any) => {
-  // Check if user exists and is active
-  if (!user) {
-    console.error('❌ No user provided to googleLoginToDB');
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Google authentication failed!'
-    );
-  }
-
-  // Check user status
-  if (user.status === USER_STATUS.DELETE) {
-    console.error('❌ User account is deleted');
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Your account has been deactivated. Contact support.'
-    );
-  }
-
-  // Create JWT token
-  const createToken = jwtHelper.createToken(
-    { id: user._id, role: user.role, email: user.email },
-    config.jwt.jwt_secret as Secret,
-    config.jwt.jwt_expire_in as string
-  );
-
-  console.log('✅ JWT token created successfully');
-
-  return { createToken };
-};
-
 // Refresh token: verify and issue new tokens
 const refreshTokenToDB = async (token: string) => {
   if (!token) {
@@ -381,6 +349,5 @@ export const AuthService = {
   changePasswordToDB,
   resendVerifyEmailToDB,
   logoutUserFromDB,
-  googleLoginToDB,
   refreshTokenToDB,
 };

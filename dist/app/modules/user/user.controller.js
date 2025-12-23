@@ -111,6 +111,90 @@ const getUserDetailsById = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         data: result,
     });
 }));
+// ============ ADMIN: STUDENT MANAGEMENT ============
+const getAllStudents = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield user_service_1.UserService.getAllStudents(req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Students retrieved successfully',
+        pagination: result.pagination,
+        data: result.data,
+    });
+}));
+const blockStudent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.blockStudent(id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Student blocked successfully',
+        data: result,
+    });
+}));
+const unblockStudent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.unblockStudent(id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Student unblocked successfully',
+        data: result,
+    });
+}));
+// ============ ADMIN: TUTOR MANAGEMENT ============
+const getAllTutors = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield user_service_1.UserService.getAllTutors(req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutors retrieved successfully',
+        pagination: result.pagination,
+        data: result.data,
+    });
+}));
+const blockTutor = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.blockTutor(id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor blocked successfully',
+        data: result,
+    });
+}));
+const unblockTutor = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.unblockTutor(id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor unblocked successfully',
+        data: result,
+    });
+}));
+const updateTutorSubjects = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { subjects } = req.body;
+    const result = yield user_service_1.UserService.updateTutorSubjects(id, subjects);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor subjects updated successfully',
+        data: result,
+    });
+}));
+// ============ TUTOR: STATISTICS ============
+const getTutorStatistics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const result = yield user_service_1.UserService.getTutorStatistics(user.id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor statistics retrieved successfully',
+        data: result,
+    });
+}));
 exports.UserController = {
     createUser,
     getUserProfile,
@@ -120,4 +204,15 @@ exports.UserController = {
     unblockUser,
     getUserById,
     getUserDetailsById,
+    // Admin: Student Management
+    getAllStudents,
+    blockStudent,
+    unblockStudent,
+    // Admin: Tutor Management
+    getAllTutors,
+    blockTutor,
+    unblockTutor,
+    updateTutorSubjects,
+    // Tutor: Statistics
+    getTutorStatistics,
 };

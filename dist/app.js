@@ -21,11 +21,9 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const globalErrorHandler_1 = __importDefault(require("./app/middlewares/globalErrorHandler"));
 const requestContext_1 = require("./app/logging/requestContext");
 const clientInfo_1 = require("./app/logging/clientInfo");
-// import './config/passport';
 const requestLogger_1 = require("./app/logging/requestLogger");
 const otelExpress_1 = require("./app/logging/otelExpress");
 const path_1 = __importDefault(require("path"));
-const passport_1 = __importDefault(require("passport"));
 const corsLogger_1 = require("./app/logging/corsLogger");
 // autoLabelBootstrap moved above router import to ensure controllers are wrapped before route binding
 const app = (0, express_1.default)();
@@ -107,8 +105,6 @@ app.use((req, res, next) => {
 app.use(express_1.default.urlencoded({ extended: true }));
 // Cookie parser (for reading refresh tokens from cookies)
 app.use((0, cookie_parser_1.default)());
-// Passport
-app.use(passport_1.default.initialize());
 // Request/Response logging
 // Initialize request-scoped context BEFORE logging
 app.use(requestContext_1.requestContextInit);

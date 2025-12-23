@@ -30,6 +30,13 @@ router.post('/subscribe', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, va
  */
 router.get('/my-subscription', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), studentSubscription_controller_1.StudentSubscriptionController.getMySubscription);
 /**
+ * @route   GET /api/v1/subscriptions/my-plan-usage
+ * @desc    Get comprehensive plan usage details
+ * @access  Student only
+ * @returns Plan details, usage stats, spending, upcoming sessions
+ */
+router.get('/my-plan-usage', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), studentSubscription_controller_1.StudentSubscriptionController.getMyPlanUsage);
+/**
  * @route   PATCH /api/v1/subscriptions/:id/cancel
  * @desc    Cancel subscription
  * @access  Student only (must own subscription)

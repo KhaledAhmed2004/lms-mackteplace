@@ -8,7 +8,7 @@ import { SessionReviewService } from './sessionReview.service';
  * Create a new review
  */
 const createReview = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await SessionReviewService.createReview(studentId, req.body);
 
   sendResponse(res, {
@@ -23,7 +23,7 @@ const createReview = catchAsync(async (req: Request, res: Response) => {
  * Get student's reviews
  */
 const getMyReviews = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await SessionReviewService.getMyReviews(studentId, req.query);
 
   sendResponse(res, {
@@ -76,7 +76,7 @@ const getSingleReview = catchAsync(async (req: Request, res: Response) => {
  */
 const updateReview = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await SessionReviewService.updateReview(id, studentId, req.body);
 
   sendResponse(res, {
@@ -92,7 +92,7 @@ const updateReview = catchAsync(async (req: Request, res: Response) => {
  */
 const deleteReview = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   await SessionReviewService.deleteReview(id, studentId);
 
   sendResponse(res, {

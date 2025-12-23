@@ -23,7 +23,7 @@ const generateMonthlyBillings = catchAsync(async (req: Request, res: Response) =
  * Get student's billing history
  */
 const getMyBillings = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await MonthlyBillingService.getMyBillings(studentId, req.query);
 
   sendResponse(res, {

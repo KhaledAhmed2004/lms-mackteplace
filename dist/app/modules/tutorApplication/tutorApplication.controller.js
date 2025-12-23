@@ -61,7 +61,19 @@ const getSingleApplication = (0, catchAsync_1.default)((req, res) => __awaiter(v
         data: result,
     });
 }));
-// Approve application (Admin only)
+// Select for interview (Admin only) - after initial review
+const selectForInterview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { adminNotes } = req.body;
+    const result = yield tutorApplication_service_1.TutorApplicationService.selectForInterview(id, adminNotes);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Application selected for interview',
+        data: result,
+    });
+}));
+// Approve application (Admin only) - after interview
 const approveApplication = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { adminNotes } = req.body;
@@ -69,7 +81,7 @@ const approveApplication = (0, catchAsync_1.default)((req, res) => __awaiter(voi
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Application approved successfully',
+        message: 'Application approved successfully. User is now a TUTOR.',
         data: result,
     });
 }));
@@ -97,17 +109,6 @@ const sendForRevision = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
         data: result,
     });
 }));
-// Update application status (Admin only)
-const updateApplicationStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield tutorApplication_service_1.TutorApplicationService.updateApplicationStatus(id, req.body);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Application status updated successfully',
-        data: result,
-    });
-}));
 // Delete application (Admin only)
 const deleteApplication = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
@@ -124,9 +125,9 @@ exports.TutorApplicationController = {
     getMyApplication,
     getAllApplications,
     getSingleApplication,
+    selectForInterview,
     approveApplication,
     rejectApplication,
     sendForRevision,
-    updateApplicationStatus,
     deleteApplication,
 };

@@ -16,11 +16,9 @@ import cookieParser from 'cookie-parser';
 import globalErrorHandler from './app/middlewares/globalErrorHandler';
 import { requestContextInit } from './app/logging/requestContext';
 import { clientInfo } from './app/logging/clientInfo';
-// import './config/passport';
 import { requestLogger } from './app/logging/requestLogger';
 import { otelExpressMiddleware } from './app/logging/otelExpress';
 import path from 'path';
-import passport from 'passport';
 import { logger, errorLogger } from './shared/logger';
 import { allowedOrigins, maybeLogCors } from './app/logging/corsLogger';
 // autoLabelBootstrap moved above router import to ensure controllers are wrapped before route binding
@@ -127,9 +125,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Cookie parser (for reading refresh tokens from cookies)
 app.use(cookieParser());
-
-// Passport
-app.use(passport.initialize());
 
 // Request/Response logging
 // Initialize request-scoped context BEFORE logging

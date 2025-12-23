@@ -27,6 +27,40 @@ const createTrialRequest = catchAsync(async (req: Request, res: Response) => {
 // Use /session-requests endpoints instead (unified view with requestType filter)
 
 /**
+ * Get available trial requests matching tutor's subjects (Tutor)
+ * Shows requests tutor can accept based on their teaching subjects
+ */
+const getAvailableTrialRequests = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const result = await TrialRequestService.getAvailableTrialRequests(tutorId, req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Available trial requests retrieved successfully',
+    pagination: result.pagination,
+    data: result.data,
+  });
+});
+
+/**
+ * Get tutor's accepted trial requests (Tutor)
+ * Shows requests the tutor has already accepted
+ */
+const getMyAcceptedTrialRequests = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const result = await TrialRequestService.getMyAcceptedTrialRequests(tutorId, req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Accepted trial requests retrieved successfully',
+    pagination: result.pagination,
+    data: result.data,
+  });
+});
+
+/**
  * Get single trial request
  */
 const getSingleTrialRequest = catchAsync(async (req: Request, res: Response) => {
@@ -43,11 +77,14 @@ const getSingleTrialRequest = catchAsync(async (req: Request, res: Response) => 
 
 /**
  * Accept trial request (Tutor)
+ * Creates chat with student and sends introductory message
  */
 const acceptTrialRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const tutorId = req.user!.id as string;
-  const result = await TrialRequestService.acceptTrialRequest(id, tutorId);
+  const { introductoryMessage } = req.body;
+
+  const result = await TrialRequestService.acceptTrialRequest(id, tutorId, introductoryMessage);
 
   sendResponse(res, {
     success: true,
@@ -142,6 +179,8 @@ const expireOldRequests = catchAsync(async (req: Request, res: Response) => {
 
 export const TrialRequestController = {
   createTrialRequest,
+  getAvailableTrialRequests,
+  getMyAcceptedTrialRequests,
   getSingleTrialRequest,
   acceptTrialRequest,
   cancelTrialRequest,

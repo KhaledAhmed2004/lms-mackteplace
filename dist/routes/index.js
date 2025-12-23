@@ -22,6 +22,7 @@ const monthlyBilling_route_1 = require("../app/modules/monthlyBilling/monthlyBil
 const tutorEarnings_route_1 = require("../app/modules/tutorEarnings/tutorEarnings.route");
 const admin_route_1 = require("../app/modules/admin/admin.route");
 const sessionReview_route_1 = require("../app/modules/sessionReview/sessionReview.route");
+const tutorSessionFeedback_route_1 = require("../app/modules/tutorSessionFeedback/tutorSessionFeedback.route");
 const call_route_1 = require("../app/modules/call/call.route");
 const whiteboard_route_1 = require("../app/modules/whiteboard/whiteboard.route");
 const router = express_1.default.Router();
@@ -97,6 +98,10 @@ const apiRoutes = [
     {
         path: '/reviews',
         route: sessionReview_route_1.SessionReviewRoutes,
+    },
+    {
+        path: '/tutor-feedback',
+        route: tutorSessionFeedback_route_1.TutorSessionFeedbackRoutes,
     },
     {
         path: '/calls',

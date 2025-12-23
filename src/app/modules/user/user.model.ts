@@ -27,10 +27,7 @@ const userSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: function (this: IUser) {
-        // Password is not required for OAuth users (users with googleId)
-        return !this.googleId;
-      },
+      required: true,
       minlength: 8,
       select: false, // hide password by default
     },
@@ -76,10 +73,6 @@ const userSchema = new Schema<IUser>(
     },
     about: {
       type: String,
-    },
-    googleId: {
-      type: String,
-      sparse: true, // allows multiple null values but unique non-null values
     },
     achievements: {
       type: [String],
@@ -149,6 +142,28 @@ const userSchema = new Schema<IUser>(
           default: 0,
         },
         totalHoursTaught: {
+          type: Number,
+          default: 0,
+        },
+        totalStudents: {
+          type: Number,
+          default: 0,
+        },
+        // Level System
+        level: {
+          type: String,
+          enum: ['STARTER', 'INTERMEDIATE', 'EXPERT'],
+          default: 'STARTER',
+        },
+        levelUpdatedAt: {
+          type: Date,
+        },
+        // Earnings
+        totalEarnings: {
+          type: Number,
+          default: 0,
+        },
+        pendingFeedbackCount: {
           type: Number,
           default: 0,
         },
@@ -226,13 +241,11 @@ userSchema.pre('save', async function (next) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already exist!');
   }
 
-  //password hash - only hash if password is provided (not for OAuth users)
-  if (this.password) {
-    this.password = await bcrypt.hash(
-      this.password,
-      Number(config.bcrypt_salt_rounds)
-    );
-  }
+  //password hash
+  this.password = await bcrypt.hash(
+    this.password,
+    Number(config.bcrypt_salt_rounds)
+  );
   next();
 });
 

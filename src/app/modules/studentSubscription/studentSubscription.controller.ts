@@ -8,7 +8,7 @@ import { StudentSubscriptionService } from './studentSubscription.service';
  * Subscribe to a plan (Student)
  */
 const subscribeToPlan = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const { tier } = req.body;
   const result = await StudentSubscriptionService.subscribeToPlan(studentId, tier);
 
@@ -24,7 +24,7 @@ const subscribeToPlan = catchAsync(async (req: Request, res: Response) => {
  * Get student's active subscription
  */
 const getMySubscription = catchAsync(async (req: Request, res: Response) => {
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const result = await StudentSubscriptionService.getMySubscription(studentId);
 
   sendResponse(res, {
@@ -70,7 +70,7 @@ const getSingleSubscription = catchAsync(async (req: Request, res: Response) => 
  */
 const cancelSubscription = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const studentId = req.user?.id;
+  const studentId = req.user!.id as string;
   const { cancellationReason } = req.body;
 
   const result = await StudentSubscriptionService.cancelSubscription(
@@ -101,6 +101,22 @@ const expireOldSubscriptions = catchAsync(async (req: Request, res: Response) =>
   });
 });
 
+/**
+ * Get plan usage details (Student)
+ * Includes: plan details, usage stats, spending, upcoming sessions
+ */
+const getMyPlanUsage = catchAsync(async (req: Request, res: Response) => {
+  const studentId = req.user!.id as string;
+  const result = await StudentSubscriptionService.getMyPlanUsage(studentId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Plan usage retrieved successfully',
+    data: result,
+  });
+});
+
 export const StudentSubscriptionController = {
   subscribeToPlan,
   getMySubscription,
@@ -108,4 +124,5 @@ export const StudentSubscriptionController = {
   getSingleSubscription,
   cancelSubscription,
   expireOldSubscriptions,
+  getMyPlanUsage,
 };

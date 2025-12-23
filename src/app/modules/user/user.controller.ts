@@ -111,6 +111,109 @@ const getUserDetailsById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// ============ ADMIN: STUDENT MANAGEMENT ============
+
+const getAllStudents = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getAllStudents(req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Students retrieved successfully',
+    pagination: result.pagination,
+    data: result.data,
+  });
+});
+
+const blockStudent = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.blockStudent(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Student blocked successfully',
+    data: result,
+  });
+});
+
+const unblockStudent = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.unblockStudent(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Student unblocked successfully',
+    data: result,
+  });
+});
+
+// ============ ADMIN: TUTOR MANAGEMENT ============
+
+const getAllTutors = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getAllTutors(req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutors retrieved successfully',
+    pagination: result.pagination,
+    data: result.data,
+  });
+});
+
+const blockTutor = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.blockTutor(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor blocked successfully',
+    data: result,
+  });
+});
+
+const unblockTutor = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.unblockTutor(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor unblocked successfully',
+    data: result,
+  });
+});
+
+const updateTutorSubjects = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { subjects } = req.body;
+  const result = await UserService.updateTutorSubjects(id, subjects);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor subjects updated successfully',
+    data: result,
+  });
+});
+
+// ============ TUTOR: STATISTICS ============
+
+const getTutorStatistics = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as JwtPayload;
+  const result = await UserService.getTutorStatistics(user.id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor statistics retrieved successfully',
+    data: result,
+  });
+});
+
 export const UserController = {
   createUser,
   getUserProfile,
@@ -120,4 +223,15 @@ export const UserController = {
   unblockUser,
   getUserById,
   getUserDetailsById,
+  // Admin: Student Management
+  getAllStudents,
+  blockStudent,
+  unblockStudent,
+  // Admin: Tutor Management
+  getAllTutors,
+  blockTutor,
+  unblockTutor,
+  updateTutorSubjects,
+  // Tutor: Statistics
+  getTutorStatistics,
 };

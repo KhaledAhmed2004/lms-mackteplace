@@ -107,6 +107,66 @@ const getUserGrowth = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, 
         data: result,
     });
 }));
+/**
+ * Get overview stats with percentage changes
+ * Query: ?period=month (day|week|month|quarter|year)
+ */
+const getOverviewStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { period } = req.query;
+    const periodValue = period || 'month';
+    const result = yield admin_service_1.AdminService.getOverviewStats(periodValue);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Overview statistics retrieved successfully',
+        data: result,
+    });
+}));
+/**
+ * Get monthly revenue with filters
+ * Query: ?year=2024&months=1,2,3&tutorId=xxx&studentId=xxx&subscriptionTier=FLEXIBLE&subject=Math
+ */
+const getMonthlyRevenue = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { year, months, tutorId, studentId, subscriptionTier, subject } = req.query;
+    const yearNumber = year ? parseInt(year) : new Date().getFullYear();
+    const monthsArray = months
+        ? months.split(',').map(m => parseInt(m.trim()))
+        : undefined;
+    const filters = {
+        tutorId: tutorId,
+        studentId: studentId,
+        subscriptionTier: subscriptionTier,
+        subject: subject,
+    };
+    // Remove undefined values
+    Object.keys(filters).forEach(key => {
+        if (filters[key] === undefined) {
+            delete filters[key];
+        }
+    });
+    const result = yield admin_service_1.AdminService.getMonthlyRevenue(yearNumber, monthsArray, Object.keys(filters).length > 0 ? filters : undefined);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Monthly revenue statistics retrieved successfully',
+        data: result,
+    });
+}));
+/**
+ * Get user distribution
+ * Query: ?groupBy=role (role|status|both)
+ */
+const getUserDistribution = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { groupBy } = req.query;
+    const groupByValue = groupBy || 'role';
+    const result = yield admin_service_1.AdminService.getUserDistribution(groupByValue);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'User distribution retrieved successfully',
+        data: result,
+    });
+}));
 exports.AdminController = {
     getDashboardStats,
     getRevenueByMonth,
@@ -114,4 +174,7 @@ exports.AdminController = {
     getTopTutors,
     getTopStudents,
     getUserGrowth,
+    getOverviewStats,
+    getMonthlyRevenue,
+    getUserDistribution,
 };

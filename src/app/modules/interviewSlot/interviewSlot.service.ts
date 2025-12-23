@@ -40,7 +40,7 @@ const createInterviewSlot = async (
 /**
  * Get all interview slots with filtering
  * Admin: See all slots
- * Applicant: See only available slots
+ * Applicant: Must be SELECTED_FOR_INTERVIEW to see available slots
  */
 const getAllInterviewSlots = async (
   query: Record<string, unknown>,
@@ -49,15 +49,33 @@ const getAllInterviewSlots = async (
 ) => {
   let filter = {};
 
-  // If applicant or tutor, only show available slots
-  if (userRole === 'APPLICANT' || userRole === 'TUTOR') {
+  // If applicant, check if they are SELECTED_FOR_INTERVIEW
+  if (userRole === 'APPLICANT') {
+    // Get user's email
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    }
+
+    // Check application status
+    const application = await TutorApplication.findOne({ email: user.email });
+    if (!application) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'No application found');
+    }
+
+    // Only SELECTED_FOR_INTERVIEW can view slots
+    if (application.status !== APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'You must be selected for interview to view available slots'
+      );
+    }
+
+    // Only show available slots
     filter = { status: INTERVIEW_SLOT_STATUS.AVAILABLE };
   }
 
-  const slotQuery = new QueryBuilder(
-    InterviewSlot.find(filter),
-    query
-  )
+  const slotQuery = new QueryBuilder(InterviewSlot.find(filter), query)
     .filter()
     .sort()
     .paginate()
@@ -124,14 +142,11 @@ const bookInterviewSlot = async (
     );
   }
 
-  // Check if application is in correct status (SUBMITTED or REVISION can book)
-  if (
-    application.status !== APPLICATION_STATUS.SUBMITTED &&
-    application.status !== APPLICATION_STATUS.REVISION
-  ) {
+  // Check if application is SELECTED_FOR_INTERVIEW status
+  if (application.status !== APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      'Application must be in SUBMITTED or REVISION status to book interview'
+      'Only applications selected for interview can book interview slots'
     );
   }
 

@@ -211,23 +211,6 @@ const resendVerifyEmailToDB = (email) => __awaiter(void 0, void 0, void 0, funct
     yield emailHelper_1.emailHelper.sendEmail(emailData);
     return { otp }; // optional: just for logging/debugging
 });
-// Google OAuth login
-const googleLoginToDB = (user) => __awaiter(void 0, void 0, void 0, function* () {
-    // Check if user exists and is active
-    if (!user) {
-        console.error('❌ No user provided to googleLoginToDB');
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Google authentication failed!');
-    }
-    // Check user status
-    if (user.status === user_1.USER_STATUS.DELETE) {
-        console.error('❌ User account is deleted');
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Your account has been deactivated. Contact support.');
-    }
-    // Create JWT token
-    const createToken = jwtHelper_1.jwtHelper.createToken({ id: user._id, role: user.role, email: user.email }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
-    console.log('✅ JWT token created successfully');
-    return { createToken };
-});
 // Refresh token: verify and issue new tokens
 const refreshTokenToDB = (token) => __awaiter(void 0, void 0, void 0, function* () {
     if (!token) {
@@ -257,6 +240,5 @@ exports.AuthService = {
     changePasswordToDB,
     resendVerifyEmailToDB,
     logoutUserFromDB,
-    googleLoginToDB,
     refreshTokenToDB,
 };

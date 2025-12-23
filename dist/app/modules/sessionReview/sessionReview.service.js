@@ -59,7 +59,7 @@ const getMyReviews = (studentId, query) => __awaiter(void 0, void 0, void 0, fun
         .paginate()
         .fields();
     const result = yield reviewQuery.modelQuery;
-    const meta = yield reviewQuery.countTotal();
+    const meta = yield reviewQuery.getPaginationInfo();
     return { data: result, meta };
 });
 /**
@@ -77,7 +77,7 @@ const getTutorReviews = (tutorId_1, query_1, ...args_1) => __awaiter(void 0, [tu
         .paginate()
         .fields();
     const result = yield reviewQuery.modelQuery;
-    const meta = yield reviewQuery.countTotal();
+    const meta = yield reviewQuery.getPaginationInfo();
     return { data: result, meta };
 });
 /**

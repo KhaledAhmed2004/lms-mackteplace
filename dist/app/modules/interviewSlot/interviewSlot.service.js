@@ -40,12 +40,27 @@ const createInterviewSlot = (adminId, payload) => __awaiter(void 0, void 0, void
 /**
  * Get all interview slots with filtering
  * Admin: See all slots
- * Applicant: See only available slots
+ * Applicant: Must be SELECTED_FOR_INTERVIEW to see available slots
  */
 const getAllInterviewSlots = (query, userId, userRole) => __awaiter(void 0, void 0, void 0, function* () {
     let filter = {};
-    // If applicant or tutor, only show available slots
-    if (userRole === 'APPLICANT' || userRole === 'TUTOR') {
+    // If applicant, check if they are SELECTED_FOR_INTERVIEW
+    if (userRole === 'APPLICANT') {
+        // Get user's email
+        const user = yield user_model_1.User.findById(userId);
+        if (!user) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'User not found');
+        }
+        // Check application status
+        const application = yield tutorApplication_model_1.TutorApplication.findOne({ email: user.email });
+        if (!application) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'No application found');
+        }
+        // Only SELECTED_FOR_INTERVIEW can view slots
+        if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You must be selected for interview to view available slots');
+        }
+        // Only show available slots
         filter = { status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE };
     }
     const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find(filter), query)
@@ -95,10 +110,9 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     if (!user || application.email !== user.email) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'This application does not belong to you');
     }
-    // Check if application is in correct status (SUBMITTED or REVISION can book)
-    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED &&
-        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be in SUBMITTED or REVISION status to book interview');
+    // Check if application is SELECTED_FOR_INTERVIEW status
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only applications selected for interview can book interview slots');
     }
     // Check if applicant already has a booked slot
     const existingBooking = yield interviewSlot_model_1.InterviewSlot.findOne({

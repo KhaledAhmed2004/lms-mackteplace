@@ -126,7 +126,7 @@ const getMyBillings = (studentId, query) => __awaiter(void 0, void 0, void 0, fu
         .paginate()
         .fields();
     const result = yield billingQuery.modelQuery;
-    const meta = yield billingQuery.countTotal();
+    const meta = yield billingQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -143,7 +143,7 @@ const getAllBillings = (query) => __awaiter(void 0, void 0, void 0, function* ()
         .paginate()
         .fields();
     const result = yield billingQuery.modelQuery;
-    const meta = yield billingQuery.countTotal();
+    const meta = yield billingQuery.getPaginationInfo();
     return {
         meta,
         data: result,

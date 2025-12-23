@@ -176,9 +176,29 @@ const cancelTrialRequestZodSchema = z.object({
   }),
 });
 
+// Accept trial request validation (Tutor) - with optional introductory message
+const acceptTrialRequestZodSchema = z.object({
+  params: z.object({
+    id: z
+      .string({
+        required_error: 'Trial request ID is required',
+      })
+      .regex(/^[0-9a-fA-F]{24}$/, 'Invalid trial request ID format'),
+  }),
+  body: z.object({
+    introductoryMessage: z
+      .string()
+      .trim()
+      .min(10, 'Introductory message must be at least 10 characters')
+      .max(500, 'Introductory message cannot exceed 500 characters')
+      .optional(),
+  }),
+});
+
 export const TrialRequestValidation = {
   createTrialRequestZodSchema,
   cancelTrialRequestZodSchema,
+  acceptTrialRequestZodSchema,
   guardianInfoSchema,
   studentInfoSchema,
 };

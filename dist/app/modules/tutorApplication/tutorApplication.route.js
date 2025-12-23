@@ -46,10 +46,18 @@ router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), tutorApplica
  */
 router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), tutorApplication_controller_1.TutorApplicationController.getSingleApplication);
 /**
- * @route   PATCH /api/v1/applications/:id/approve
- * @desc    Approve application (changes user role to TUTOR)
+ * @route   PATCH /api/v1/applications/:id/select-for-interview
+ * @desc    Select application for interview (after initial review)
  * @access  Admin only
  * @body    { adminNotes?: string }
+ */
+router.patch('/:id/select-for-interview', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.selectForInterviewZodSchema), tutorApplication_controller_1.TutorApplicationController.selectForInterview);
+/**
+ * @route   PATCH /api/v1/applications/:id/approve
+ * @desc    Approve application after interview (changes user role to TUTOR)
+ * @access  Admin only
+ * @body    { adminNotes?: string }
+ * @note    Application must be SELECTED_FOR_INTERVIEW status first
  */
 router.patch('/:id/approve', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.approveApplicationZodSchema), tutorApplication_controller_1.TutorApplicationController.approveApplication);
 /**
@@ -66,13 +74,6 @@ router.patch('/:id/reject', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), 
  * @body    { revisionNote: string }
  */
 router.patch('/:id/revision', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.sendForRevisionZodSchema), tutorApplication_controller_1.TutorApplicationController.sendForRevision);
-/**
- * @route   PATCH /api/v1/applications/:id
- * @desc    Update application status (generic update)
- * @access  Admin only
- * @body    { status?, rejectionReason?, revisionNote?, adminNotes? }
- */
-router.patch('/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.updateApplicationStatusZodSchema), tutorApplication_controller_1.TutorApplicationController.updateApplicationStatus);
 /**
  * @route   DELETE /api/v1/applications/:id
  * @desc    Delete application (hard delete)

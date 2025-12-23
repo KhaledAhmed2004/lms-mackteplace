@@ -88,10 +88,38 @@ const completeSessionZodSchema = zod_1.z.object({
             .regex(/^[0-9a-fA-F]{24}$/, 'Invalid session ID format'),
     }),
 });
+// Reschedule session validation
+const rescheduleSessionZodSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        id: zod_1.z
+            .string({
+            required_error: 'Session ID is required',
+        })
+            .regex(/^[0-9a-fA-F]{24}$/, 'Invalid session ID format'),
+    }),
+    body: zod_1.z.object({
+        newStartTime: zod_1.z
+            .string({
+            required_error: 'New start time is required',
+        })
+            .refine(date => !isNaN(Date.parse(date)), {
+            message: 'Invalid start time format',
+        })
+            .refine(date => new Date(date) > new Date(), {
+            message: 'New start time must be in the future',
+        }),
+        reason: zod_1.z
+            .string()
+            .trim()
+            .min(10, 'Reason must be at least 10 characters')
+            .optional(),
+    }),
+});
 exports.SessionValidation = {
     proposeSessionZodSchema,
     acceptSessionProposalZodSchema,
     rejectSessionProposalZodSchema,
     cancelSessionZodSchema,
     completeSessionZodSchema,
+    rescheduleSessionZodSchema,
 };

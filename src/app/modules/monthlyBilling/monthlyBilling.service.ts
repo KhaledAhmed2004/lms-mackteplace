@@ -142,7 +142,7 @@ const getMyBillings = async (
     .fields();
 
   const result = await billingQuery.modelQuery;
-  const meta = await billingQuery.countTotal();
+  const meta = await billingQuery.getPaginationInfo();
 
   return {
     meta,
@@ -165,7 +165,7 @@ const getAllBillings = async (query: Record<string, unknown>) => {
     .fields();
 
   const result = await billingQuery.modelQuery;
-  const meta = await billingQuery.countTotal();
+  const meta = await billingQuery.getPaginationInfo();
 
   return {
     meta,

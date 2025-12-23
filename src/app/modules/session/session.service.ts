@@ -6,8 +6,10 @@ import { User } from '../user/user.model';
 import { Chat } from '../chat/chat.model';
 import { Message } from '../message/message.model';
 import { USER_ROLES } from '../../../enums/user';
-import { ISession, SESSION_STATUS } from './session.interface';
+import { ISession, SESSION_STATUS, RESCHEDULE_STATUS } from './session.interface';
 import { Session } from './session.model';
+import { TutorSessionFeedbackService } from '../tutorSessionFeedback/tutorSessionFeedback.service';
+import { UserService } from '../user/user.service';
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 
 /**
@@ -67,9 +69,9 @@ const proposeSession = async (
 
   // Get price based on student's subscription tier
   let pricePerHour = 30; // Default: Flexible
-  if (student.studentProfile?.subscriptionTier === 'REGULAR') {
+  if (student.studentProfile?.currentPlan === 'REGULAR') {
     pricePerHour = 28;
-  } else if (student.studentProfile?.subscriptionTier === 'LONG_TERM') {
+  } else if (student.studentProfile?.currentPlan === 'LONG_TERM') {
     pricePerHour = 25;
   }
 
@@ -267,7 +269,7 @@ const getAllSessions = async (
     .fields();
 
   const result = await sessionQuery.modelQuery;
-  const meta = await sessionQuery.countTotal();
+  const meta = await sessionQuery.getPaginationInfo();
 
   return {
     meta,
@@ -384,6 +386,419 @@ const autoCompleteSessions = async (): Promise<number> => {
   return result.modifiedCount;
 };
 
+/**
+ * Get upcoming sessions for user
+ * Includes: SCHEDULED, STARTING_SOON, IN_PROGRESS, AWAITING_RESPONSE, RESCHEDULE_REQUESTED
+ */
+const getUpcomingSessions = async (
+  userId: string,
+  userRole: string,
+  query: Record<string, unknown>
+) => {
+  const now = new Date();
+  const filterField = userRole === USER_ROLES.STUDENT ? 'studentId' : 'tutorId';
+
+  const sessionQuery = new QueryBuilder(
+    Session.find({
+      [filterField]: new Types.ObjectId(userId),
+      status: {
+        $in: [
+          SESSION_STATUS.SCHEDULED,
+          SESSION_STATUS.STARTING_SOON,
+          SESSION_STATUS.IN_PROGRESS,
+          SESSION_STATUS.AWAITING_RESPONSE,
+          SESSION_STATUS.RESCHEDULE_REQUESTED,
+        ],
+      },
+      startTime: { $gte: now },
+    })
+      .populate('studentId', 'name email profilePicture')
+      .populate('tutorId', 'name email profilePicture averageRating')
+      .populate('reviewId')
+      .populate('tutorFeedbackId'),
+    query
+  )
+    .sort()
+    .paginate()
+    .fields();
+
+  const result = await sessionQuery.modelQuery;
+  const meta = await sessionQuery.getPaginationInfo();
+
+  return { data: result, meta };
+};
+
+/**
+ * Get completed sessions for user
+ * Includes: COMPLETED, CANCELLED, EXPIRED, NO_SHOW
+ * Also includes review status information
+ */
+const getCompletedSessions = async (
+  userId: string,
+  userRole: string,
+  query: Record<string, unknown>
+) => {
+  const filterField = userRole === USER_ROLES.STUDENT ? 'studentId' : 'tutorId';
+
+  const sessionQuery = new QueryBuilder(
+    Session.find({
+      [filterField]: new Types.ObjectId(userId),
+      status: {
+        $in: [
+          SESSION_STATUS.COMPLETED,
+          SESSION_STATUS.CANCELLED,
+          SESSION_STATUS.EXPIRED,
+          SESSION_STATUS.NO_SHOW,
+        ],
+      },
+    })
+      .populate('studentId', 'name email profilePicture')
+      .populate('tutorId', 'name email profilePicture averageRating')
+      .populate('reviewId')
+      .populate('tutorFeedbackId'),
+    query
+  )
+    .sort()
+    .paginate()
+    .fields();
+
+  const result = await sessionQuery.modelQuery;
+  const meta = await sessionQuery.getPaginationInfo();
+
+  // Add review status flags
+  const sessionsWithReviewStatus = result.map((session: any) => {
+    const sessionObj = session.toObject();
+    return {
+      ...sessionObj,
+      studentReviewStatus: session.reviewId ? 'COMPLETED' : 'PENDING',
+      tutorFeedbackStatus: session.tutorFeedbackId ? 'COMPLETED' : 'PENDING',
+    };
+  });
+
+  return { data: sessionsWithReviewStatus, meta };
+};
+
+/**
+ * Request session reschedule
+ * Can be requested by student or tutor up to 10 minutes before start
+ */
+const requestReschedule = async (
+  sessionId: string,
+  userId: string,
+  payload: {
+    newStartTime: string;
+    reason?: string;
+  }
+): Promise<ISession | null> => {
+  const session = await Session.findById(sessionId);
+
+  if (!session) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  // Verify user is student or tutor
+  const isStudent = session.studentId.toString() === userId;
+  const isTutor = session.tutorId.toString() === userId;
+
+  if (!isStudent && !isTutor) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You are not authorized to reschedule this session'
+    );
+  }
+
+  // Check if session can be rescheduled
+  if (
+    session.status !== SESSION_STATUS.SCHEDULED &&
+    session.status !== SESSION_STATUS.STARTING_SOON
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Cannot reschedule session with status: ${session.status}`
+    );
+  }
+
+  // Check if already has pending reschedule request
+  if (
+    session.rescheduleRequest &&
+    session.rescheduleRequest.status === RESCHEDULE_STATUS.PENDING
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'This session already has a pending reschedule request'
+    );
+  }
+
+  // Check if within 10 minutes of start
+  const now = new Date();
+  const tenMinutesBefore = new Date(session.startTime.getTime() - 10 * 60 * 1000);
+
+  if (now >= tenMinutesBefore) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot reschedule within 10 minutes of session start'
+    );
+  }
+
+  // Calculate new end time (maintain same duration)
+  const newStartTime = new Date(payload.newStartTime);
+  const newEndTime = new Date(newStartTime.getTime() + session.duration * 60 * 1000);
+
+  // Validate new time is in future
+  if (newStartTime <= now) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New start time must be in the future');
+  }
+
+  // Store previous times
+  session.previousStartTime = session.startTime;
+  session.previousEndTime = session.endTime;
+
+  // Create reschedule request
+  session.rescheduleRequest = {
+    requestedBy: new Types.ObjectId(userId),
+    requestedAt: now,
+    newStartTime,
+    newEndTime,
+    reason: payload.reason,
+    status: RESCHEDULE_STATUS.PENDING,
+  };
+
+  session.status = SESSION_STATUS.RESCHEDULE_REQUESTED;
+  await session.save();
+
+  // TODO: Send notification to other party
+  // const otherPartyId = isStudent ? session.tutorId : session.studentId;
+  // io.to(otherPartyId.toString()).emit('rescheduleRequested', {...});
+
+  return session;
+};
+
+/**
+ * Approve reschedule request
+ */
+const approveReschedule = async (
+  sessionId: string,
+  userId: string
+): Promise<ISession | null> => {
+  const session = await Session.findById(sessionId);
+
+  if (!session) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  // Verify user is the OTHER party (not the one who requested)
+  const isStudent = session.studentId.toString() === userId;
+  const isTutor = session.tutorId.toString() === userId;
+
+  if (!isStudent && !isTutor) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You are not authorized to approve this reschedule'
+    );
+  }
+
+  if (!session.rescheduleRequest) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'No reschedule request found');
+  }
+
+  if (session.rescheduleRequest.status !== RESCHEDULE_STATUS.PENDING) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Reschedule request is already ${session.rescheduleRequest.status.toLowerCase()}`
+    );
+  }
+
+  // Verify approver is NOT the requester
+  if (session.rescheduleRequest.requestedBy.toString() === userId) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You cannot approve your own reschedule request'
+    );
+  }
+
+  // Update session times
+  session.startTime = session.rescheduleRequest.newStartTime;
+  session.endTime = session.rescheduleRequest.newEndTime;
+
+  // Update reschedule request
+  session.rescheduleRequest.status = RESCHEDULE_STATUS.APPROVED;
+  session.rescheduleRequest.respondedAt = new Date();
+  session.rescheduleRequest.respondedBy = new Types.ObjectId(userId);
+
+  // Reset status to SCHEDULED
+  session.status = SESSION_STATUS.SCHEDULED;
+
+  await session.save();
+
+  // TODO: Update Google Calendar event
+  // TODO: Send notification to requester
+
+  return session;
+};
+
+/**
+ * Reject reschedule request
+ */
+const rejectReschedule = async (
+  sessionId: string,
+  userId: string
+): Promise<ISession | null> => {
+  const session = await Session.findById(sessionId);
+
+  if (!session) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  // Verify user is the OTHER party
+  const isStudent = session.studentId.toString() === userId;
+  const isTutor = session.tutorId.toString() === userId;
+
+  if (!isStudent && !isTutor) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You are not authorized to reject this reschedule'
+    );
+  }
+
+  if (!session.rescheduleRequest) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'No reschedule request found');
+  }
+
+  if (session.rescheduleRequest.status !== RESCHEDULE_STATUS.PENDING) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Reschedule request is already ${session.rescheduleRequest.status.toLowerCase()}`
+    );
+  }
+
+  // Verify rejector is NOT the requester
+  if (session.rescheduleRequest.requestedBy.toString() === userId) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'You cannot reject your own reschedule request'
+    );
+  }
+
+  // Update reschedule request
+  session.rescheduleRequest.status = RESCHEDULE_STATUS.REJECTED;
+  session.rescheduleRequest.respondedAt = new Date();
+  session.rescheduleRequest.respondedBy = new Types.ObjectId(userId);
+
+  // Reset status to SCHEDULED (keep original times)
+  session.status = SESSION_STATUS.SCHEDULED;
+
+  await session.save();
+
+  // TODO: Send notification to requester
+
+  return session;
+};
+
+/**
+ * Session status auto-transitions (Cron job)
+ * SCHEDULED -> STARTING_SOON (10 min before)
+ * STARTING_SOON -> IN_PROGRESS (at start time)
+ * IN_PROGRESS -> EXPIRED (at end time if not completed)
+ */
+const autoTransitionSessionStatuses = async (): Promise<{
+  startingSoon: number;
+  inProgress: number;
+  expired: number;
+}> => {
+  const now = new Date();
+  const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+
+  // SCHEDULED -> STARTING_SOON (10 minutes before start)
+  const startingSoonResult = await Session.updateMany(
+    {
+      status: SESSION_STATUS.SCHEDULED,
+      startTime: { $lte: tenMinutesFromNow, $gt: now },
+    },
+    { $set: { status: SESSION_STATUS.STARTING_SOON } }
+  );
+
+  // STARTING_SOON/SCHEDULED -> IN_PROGRESS (at start time)
+  const inProgressResult = await Session.updateMany(
+    {
+      status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
+      startTime: { $lte: now },
+      endTime: { $gt: now },
+    },
+    {
+      $set: {
+        status: SESSION_STATUS.IN_PROGRESS,
+        startedAt: now,
+      },
+    }
+  );
+
+  // IN_PROGRESS -> EXPIRED (at end time if not manually completed)
+  const expiredResult = await Session.updateMany(
+    {
+      status: SESSION_STATUS.IN_PROGRESS,
+      endTime: { $lte: now },
+    },
+    {
+      $set: {
+        status: SESSION_STATUS.EXPIRED,
+        expiredAt: now,
+      },
+    }
+  );
+
+  return {
+    startingSoon: startingSoonResult.modifiedCount,
+    inProgress: inProgressResult.modifiedCount,
+    expired: expiredResult.modifiedCount,
+  };
+};
+
+/**
+ * Mark session as completed (Enhanced - with tutor feedback creation)
+ */
+const markAsCompletedEnhanced = async (sessionId: string): Promise<ISession | null> => {
+  const session = await Session.findById(sessionId);
+
+  if (!session) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  if (session.status === SESSION_STATUS.COMPLETED) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Session is already completed');
+  }
+
+  // Update session
+  session.status = SESSION_STATUS.COMPLETED;
+  session.completedAt = new Date();
+  await session.save();
+
+  // Create pending tutor feedback record
+  try {
+    await TutorSessionFeedbackService.createPendingFeedback(
+      sessionId,
+      session.tutorId.toString(),
+      session.studentId.toString(),
+      session.completedAt
+    );
+  } catch {
+    // Feedback creation failed, but session is still completed
+    // Log error but don't fail the completion
+  }
+
+  // Update tutor level after session completion
+  try {
+    await UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+  } catch {
+    // Level update failed, but session is still completed
+    // Log error but don't fail the completion
+  }
+
+  // TODO: Send review request email to student
+  // TODO: Send feedback reminder to tutor
+
+  return session;
+};
+
 export const SessionService = {
   proposeSession,
   acceptSessionProposal,
@@ -393,4 +808,11 @@ export const SessionService = {
   cancelSession,
   markAsCompleted,
   autoCompleteSessions,
+  getUpcomingSessions,
+  getCompletedSessions,
+  requestReschedule,
+  approveReschedule,
+  rejectReschedule,
+  autoTransitionSessionStatuses,
+  markAsCompletedEnhanced,
 };

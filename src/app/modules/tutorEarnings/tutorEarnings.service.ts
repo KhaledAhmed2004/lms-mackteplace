@@ -91,7 +91,7 @@ const getMyEarnings = async (tutorId: string, query: Record<string, unknown>) =>
     .fields();
 
   const result = await earningsQuery.modelQuery;
-  const meta = await earningsQuery.countTotal();
+  const meta = await earningsQuery.getPaginationInfo();
 
   return { data: result, meta };
 };
@@ -111,7 +111,7 @@ const getAllEarnings = async (query: Record<string, unknown>) => {
     .fields();
 
   const result = await earningsQuery.modelQuery;
-  const meta = await earningsQuery.countTotal();
+  const meta = await earningsQuery.getPaginationInfo();
 
   return { data: result, meta };
 };

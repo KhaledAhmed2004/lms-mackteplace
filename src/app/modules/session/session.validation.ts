@@ -101,10 +101,42 @@ const completeSessionZodSchema = z.object({
   }),
 });
 
+// Reschedule session validation
+const rescheduleSessionZodSchema = z.object({
+  params: z.object({
+    id: z
+      .string({
+        required_error: 'Session ID is required',
+      })
+      .regex(/^[0-9a-fA-F]{24}$/, 'Invalid session ID format'),
+  }),
+  body: z.object({
+    newStartTime: z
+      .string({
+        required_error: 'New start time is required',
+      })
+      .refine(date => !isNaN(Date.parse(date)), {
+        message: 'Invalid start time format',
+      })
+      .refine(
+        date => new Date(date) > new Date(),
+        {
+          message: 'New start time must be in the future',
+        }
+      ),
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Reason must be at least 10 characters')
+      .optional(),
+  }),
+});
+
 export const SessionValidation = {
   proposeSessionZodSchema,
   acceptSessionProposalZodSchema,
   rejectSessionProposalZodSchema,
   cancelSessionZodSchema,
   completeSessionZodSchema,
+  rescheduleSessionZodSchema,
 };

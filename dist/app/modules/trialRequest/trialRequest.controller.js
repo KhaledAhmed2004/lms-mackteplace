@@ -38,6 +38,36 @@ const createTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
 // NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed
 // Use /session-requests endpoints instead (unified view with requestType filter)
 /**
+ * Get available trial requests matching tutor's subjects (Tutor)
+ * Shows requests tutor can accept based on their teaching subjects
+ */
+const getAvailableTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const result = yield trialRequest_service_1.TrialRequestService.getAvailableTrialRequests(tutorId, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Available trial requests retrieved successfully',
+        pagination: result.pagination,
+        data: result.data,
+    });
+}));
+/**
+ * Get tutor's accepted trial requests (Tutor)
+ * Shows requests the tutor has already accepted
+ */
+const getMyAcceptedTrialRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const result = yield trialRequest_service_1.TrialRequestService.getMyAcceptedTrialRequests(tutorId, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Accepted trial requests retrieved successfully',
+        pagination: result.pagination,
+        data: result.data,
+    });
+}));
+/**
  * Get single trial request
  */
 const getSingleTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -52,11 +82,13 @@ const getSingleTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(
 }));
 /**
  * Accept trial request (Tutor)
+ * Creates chat with student and sends introductory message
  */
 const acceptTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const tutorId = req.user.id;
-    const result = yield trialRequest_service_1.TrialRequestService.acceptTrialRequest(id, tutorId);
+    const { introductoryMessage } = req.body;
+    const result = yield trialRequest_service_1.TrialRequestService.acceptTrialRequest(id, tutorId, introductoryMessage);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -134,6 +166,8 @@ const expireOldRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void
 }));
 exports.TrialRequestController = {
     createTrialRequest,
+    getAvailableTrialRequests,
+    getMyAcceptedTrialRequests,
     getSingleTrialRequest,
     acceptTrialRequest,
     cancelTrialRequest,

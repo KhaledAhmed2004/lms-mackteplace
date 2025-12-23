@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.post(
   '/',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   fileUploadHandler(),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -70,14 +70,14 @@ router.post(
 
 router.get(
   '/:id',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   MessageController.getMessage
 );
 
 // Mark all messages in a chat as read
 router.post(
   '/chat/:chatId/read',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   MessageController.markChatRead
 );
 

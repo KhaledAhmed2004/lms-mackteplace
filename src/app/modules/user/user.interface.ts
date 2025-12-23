@@ -30,6 +30,13 @@ export enum VERIFICATION_STATUS {
   REJECTED = 'REJECTED',
 }
 
+// Tutor level system based on completed sessions
+export enum TUTOR_LEVEL {
+  STARTER = 'STARTER',           // 0-20 completed sessions
+  INTERMEDIATE = 'INTERMEDIATE', // 21-50 completed sessions
+  EXPERT = 'EXPERT',             // 51+ completed sessions
+}
+
 export type StudentProfile = {
   schoolType?: string; // German school types
   grade?: string; // Which class/grade
@@ -66,6 +73,15 @@ export type TutorProfile = {
   totalSessions: number;
   completedSessions: number;
   totalHoursTaught: number;
+  totalStudents: number; // Unique students taught
+
+  // Level System
+  level: TUTOR_LEVEL;
+  levelUpdatedAt?: Date;
+
+  // Earnings (cached for quick access)
+  totalEarnings: number; // Net earnings after commission
+  pendingFeedbackCount: number; // Number of pending session feedbacks
 
   // Verification
   isVerified: boolean;
@@ -94,7 +110,6 @@ export type IUser = {
   ratingsCount: number;
   about?: string;
   achievements?: AchievementType[];
-  googleId?: string;
 
   // Role-specific profiles
   studentProfile?: StudentProfile;

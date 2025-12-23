@@ -11,7 +11,6 @@ const path = require('path');
  * - Pre-request and test scripts
  * - File upload support
  * - Environment files generation
- * - Automatic backups
  *
  * Usage:
  *   node scripts/postman/generate-all.js              # All modules
@@ -131,7 +130,6 @@ class EnhancedPostmanGenerator {
       force: false,
       env: false,
       help: false,
-      noBackup: false,
     };
 
     args.forEach(arg => {
@@ -141,8 +139,6 @@ class EnhancedPostmanGenerator {
         options.force = true;
       } else if (arg === '--env') {
         options.env = true;
-      } else if (arg === '--no-backup') {
-        options.noBackup = true;
       } else if (!arg.startsWith('--')) {
         options.module = arg;
       }
@@ -165,7 +161,6 @@ Options:
   --help, -h          Show this help message
   --env               Generate environment files
   --force, -f         Force fresh generation (ignore existing)
-  --no-backup         Skip backup creation
 
 Examples:
   node scripts/postman/generate-all.js              Generate all modules
@@ -179,7 +174,6 @@ Features:
   ✅ Auto ID extraction (tokens, chatId, messageId auto-saved)
   ✅ File upload support
   ✅ Collection variables
-  ✅ Automatic backups
 
 Available Modules (auto-detected from routes/index.ts):
   ${Object.keys(this.moduleConfig).join(', ')}
@@ -200,11 +194,6 @@ Available Modules (auto-detected from routes/index.ts):
     if (existingCollection && !options.force) {
       console.log('📂 Found existing collection');
       console.log('🔍 Analyzing changes...\n');
-    }
-
-    // Backup existing collection
-    if (existingCollection && !options.noBackup) {
-      this.createBackup(outputFile);
     }
 
     // Set collection name
@@ -319,11 +308,6 @@ Available Modules (auto-detected from routes/index.ts):
     if (existingCollection && !options.force) {
       console.log('📂 Found existing collection');
       console.log('🔍 Analyzing changes...\n');
-    }
-
-    // Backup
-    if (existingCollection && !options.noBackup) {
-      this.createBackup(outputFile);
     }
 
     // Set collection name
@@ -1084,39 +1068,6 @@ if (response.success && response.data) {
     }
 
     return null;
-  }
-
-  /**
-   * Create backup
-   */
-  createBackup(filename) {
-    const sourcePath = path.join(
-      process.cwd(),
-      'postman-collections',
-      filename
-    );
-
-    if (!fs.existsSync(sourcePath)) return;
-
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/:/g, '-')
-      .replace(/\..+/, '');
-    const backupDir = path.join(
-      process.cwd(),
-      'postman-collections',
-      'backups'
-    );
-
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-
-    const backupFilename = filename.replace('.json', `-backup-${timestamp}.json`);
-    const backupPath = path.join(backupDir, backupFilename);
-
-    fs.copyFileSync(sourcePath, backupPath);
-    console.log(`💾 Backup created: ${backupFilename}\n`);
   }
 
   /**

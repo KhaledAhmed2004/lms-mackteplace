@@ -117,8 +117,42 @@ const getSingleApplication = (id) => __awaiter(void 0, void 0, void 0, function*
     return application;
 });
 /**
+ * Select application for interview (admin only)
+ * After initial review, admin selects candidate for interview
+ */
+const selectForInterview = (id, adminNotes) => __awaiter(void 0, void 0, void 0, function* () {
+    const application = yield tutorApplication_model_1.TutorApplication.findById(id);
+    if (!application) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
+    }
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application is already selected for interview');
+    }
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.APPROVED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application is already approved');
+    }
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.REJECTED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot select a rejected application for interview');
+    }
+    // Only SUBMITTED or REVISION status can be selected for interview
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED &&
+        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only submitted or revision applications can be selected for interview');
+    }
+    // Update application status
+    application.status = tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW;
+    application.selectedForInterviewAt = new Date();
+    if (adminNotes) {
+        application.adminNotes = adminNotes;
+    }
+    yield application.save();
+    // TODO: Send email notification to applicant about interview selection
+    return application;
+});
+/**
  * Approve application (admin only)
  * Changes status to APPROVED and user role to TUTOR
+ * Can only approve after interview (SELECTED_FOR_INTERVIEW status)
  */
 const approveApplication = (id, adminNotes) => __awaiter(void 0, void 0, void 0, function* () {
     const application = yield tutorApplication_model_1.TutorApplication.findById(id);
@@ -130,6 +164,10 @@ const approveApplication = (id, adminNotes) => __awaiter(void 0, void 0, void 0,
     }
     if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.REJECTED) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot approve a rejected application');
+    }
+    // Must be SELECTED_FOR_INTERVIEW to approve (after interview)
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Application must be selected for interview before approval. Please select for interview first.');
     }
     // Update application status
     application.status = tutorApplication_interface_1.APPLICATION_STATUS.APPROVED;
@@ -188,21 +226,6 @@ const sendForRevision = (id, revisionNote) => __awaiter(void 0, void 0, void 0, 
     return application;
 });
 /**
- * Update application status (admin only)
- * Generic update function
- */
-const updateApplicationStatus = (id, payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const application = yield tutorApplication_model_1.TutorApplication.findById(id);
-    if (!application) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
-    }
-    const updated = yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(id, payload, {
-        new: true,
-        runValidators: true,
-    });
-    return updated;
-});
-/**
  * Delete application (admin only)
  */
 const deleteApplication = (id) => __awaiter(void 0, void 0, void 0, function* () {
@@ -218,9 +241,9 @@ exports.TutorApplicationService = {
     getMyApplication,
     getAllApplications,
     getSingleApplication,
+    selectForInterview,
     approveApplication,
     rejectApplication,
     sendForRevision,
-    updateApplicationStatus,
     deleteApplication,
 };

@@ -1,5 +1,4 @@
-import { StatusCodes } from 'http-status-codes';
-import ApiError from '../../../errors/ApiError';
+import { Types } from 'mongoose';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { TutorApplication } from '../tutorApplication/tutorApplication.model';
@@ -11,12 +10,16 @@ import { BILLING_STATUS } from '../monthlyBilling/monthlyBilling.interface';
 import { TutorEarnings } from '../tutorEarnings/tutorEarnings.model';
 import { StudentSubscription } from '../studentSubscription/studentSubscription.model';
 import { SUBSCRIPTION_STATUS } from '../studentSubscription/studentSubscription.interface';
+import AggregationBuilder from '../../builder/AggregationBuilder';
 import {
   IDashboardStats,
   IRevenueStats,
   IPopularSubject,
   ITopTutor,
   ITopStudent,
+  IOverviewStats,
+  IMonthlyRevenue,
+  IUserDistribution,
 } from './admin.interface';
 
 /**
@@ -523,6 +526,196 @@ const getUserGrowth = async (year: number, months?: number[]) => {
   return stats;
 };
 
+/**
+ * Get overview stats with percentage changes
+ * Returns Total Revenue, Total Students, Total Tutors with growth metrics
+ */
+const getOverviewStats = async (
+  period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'month'
+): Promise<IOverviewStats> => {
+  const [revenue, students, tutors] = await Promise.all([
+    // Revenue from MonthlyBilling (sum of 'total' field)
+    new AggregationBuilder(MonthlyBilling).calculateGrowth({
+      sumField: 'total',
+      filter: { status: BILLING_STATUS.PAID },
+      period,
+    }),
+    // Students count
+    new AggregationBuilder(User).calculateGrowth({
+      filter: { role: USER_ROLES.STUDENT },
+      period,
+    }),
+    // Tutors count
+    new AggregationBuilder(User).calculateGrowth({
+      filter: { role: USER_ROLES.TUTOR },
+      period,
+    }),
+  ]);
+
+  return { revenue, students, tutors };
+};
+
+/**
+ * Get monthly revenue with advanced filters
+ */
+const getMonthlyRevenue = async (
+  year: number,
+  months?: number[],
+  filters?: {
+    tutorId?: string;
+    studentId?: string;
+    subscriptionTier?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM';
+    subject?: string;
+  }
+): Promise<IMonthlyRevenue[]> => {
+  const targetMonths = months || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const stats: IMonthlyRevenue[] = [];
+
+  for (const month of targetMonths) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // Build session filter
+    const sessionFilter: Record<string, unknown> = {
+      status: SESSION_STATUS.COMPLETED,
+      completedAt: { $gte: startDate, $lte: endDate },
+    };
+
+    if (filters?.tutorId) {
+      sessionFilter.tutorId = new Types.ObjectId(filters.tutorId);
+    }
+    if (filters?.studentId) {
+      sessionFilter.studentId = new Types.ObjectId(filters.studentId);
+    }
+    if (filters?.subject) {
+      sessionFilter.subject = filters.subject;
+    }
+
+    // Get sessions with filters
+    const sessions = await Session.find(sessionFilter);
+
+    // Calculate session stats
+    const sessionCount = sessions.length;
+    const totalHours = sessions.reduce((sum, s) => sum + s.duration / 60, 0);
+    const sessionRevenue = sessions.reduce((sum, s) => sum + (s.totalPrice || 0), 0);
+    const averageSessionPrice = sessionCount > 0 ? sessionRevenue / sessionCount : 0;
+
+    // Build billing filter
+    const billingFilter: Record<string, unknown> = {
+      billingYear: year,
+      billingMonth: month,
+      status: BILLING_STATUS.PAID,
+    };
+
+    if (filters?.studentId) {
+      billingFilter.studentId = new Types.ObjectId(filters.studentId);
+    }
+
+    // Get billings with tier filter if needed
+    let billings = await MonthlyBilling.find(billingFilter).populate('studentId');
+
+    // Filter by subscription tier if provided
+    if (filters?.subscriptionTier) {
+      const studentsWithTier = await StudentSubscription.find({
+        tier: filters.subscriptionTier,
+        status: SUBSCRIPTION_STATUS.ACTIVE,
+      }).distinct('studentId');
+
+      billings = billings.filter(billing =>
+        studentsWithTier.some(
+          studentId => studentId.toString() === billing.studentId?.toString()
+        )
+      );
+    }
+
+    const totalRevenue = billings.reduce((sum, billing) => sum + billing.total, 0);
+
+    // Get earnings for commission/payout calculation
+    const earningsFilter: Record<string, unknown> = {
+      payoutYear: year,
+      payoutMonth: month,
+    };
+
+    if (filters?.tutorId) {
+      earningsFilter.tutorId = new Types.ObjectId(filters.tutorId);
+    }
+
+    const earnings = await TutorEarnings.find(earningsFilter);
+
+    const totalCommission = earnings.reduce(
+      (sum, earning) => sum + earning.platformCommission,
+      0
+    );
+    const totalPayouts = earnings.reduce(
+      (sum, earning) => sum + earning.netEarnings,
+      0
+    );
+
+    stats.push({
+      month,
+      year,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalCommission: Math.round(totalCommission * 100) / 100,
+      totalPayouts: Math.round(totalPayouts * 100) / 100,
+      netProfit: Math.round(totalCommission * 100) / 100,
+      sessionCount,
+      totalHours: Math.round(totalHours * 100) / 100,
+      averageSessionPrice: Math.round(averageSessionPrice * 100) / 100,
+    });
+  }
+
+  return stats;
+};
+
+/**
+ * Get user distribution by role and/or status
+ */
+const getUserDistribution = async (
+  groupBy: 'role' | 'status' | 'both' = 'role'
+): Promise<IUserDistribution> => {
+  const total = await User.countDocuments();
+
+  const result: IUserDistribution = { total };
+
+  if (groupBy === 'role' || groupBy === 'both') {
+    const byRole = await User.aggregate([
+      { $group: { _id: '$role', count: { $sum: 1 } } },
+      {
+        $project: {
+          _id: 0,
+          role: '$_id',
+          count: 1,
+          percentage: {
+            $round: [{ $multiply: [{ $divide: ['$count', total] }, 100] }, 2],
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+    result.byRole = byRole;
+  }
+
+  if (groupBy === 'status' || groupBy === 'both') {
+    const byStatus = await User.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      {
+        $project: {
+          _id: 0,
+          status: '$_id',
+          count: 1,
+          percentage: {
+            $round: [{ $multiply: [{ $divide: ['$count', total] }, 100] }, 2],
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+    result.byStatus = byStatus;
+  }
+
+  return result;
+};
+
 export const AdminService = {
   getDashboardStats,
   getRevenueByMonth,
@@ -530,4 +723,7 @@ export const AdminService = {
   getTopTutors,
   getTopStudents,
   getUserGrowth,
+  getOverviewStats,
+  getMonthlyRevenue,
+  getUserDistribution,
 };

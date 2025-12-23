@@ -34,8 +34,7 @@ const generateTutorEarnings = (0, catchAsync_1.default)((req, res) => __awaiter(
  * Get tutor's earnings history
  */
 const getMyEarnings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const tutorId = req.user.id;
     const result = yield tutorEarnings_service_1.TutorEarningsService.getMyEarnings(tutorId, req.query);
     (0, sendResponse_1.default)(res, {
         success: true,

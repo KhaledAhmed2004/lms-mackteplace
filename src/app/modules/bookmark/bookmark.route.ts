@@ -10,7 +10,7 @@ const router = express.Router();
 // Toggle bookmark (add if not exists, remove if exists)
 router.post(
   '/',
-  auth(USER_ROLES.TASKER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   validateRequest(BookmarkValidation.toggle),
   BookmarkController.toggleBookmark
 );
@@ -18,7 +18,7 @@ router.post(
 // Get all bookmarks of the current user
 router.get(
   '/my-bookmarks',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   validateRequest(BookmarkValidation.getUserBookmarksQuery),
   BookmarkController.getUserBookmarks
 );

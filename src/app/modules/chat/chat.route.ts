@@ -6,13 +6,13 @@ const router = express.Router();
 
 router.post(
   '/:otherUserId',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   ChatController.createChat
 );
 
 router.get(
   '/',
-  auth(USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   ChatController.getChat
 );
 

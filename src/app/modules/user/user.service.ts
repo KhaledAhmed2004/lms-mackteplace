@@ -1,5 +1,6 @@
 import { StatusCodes } from 'http-status-codes';
 import { JwtPayload } from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import { USER_ROLES, USER_STATUS } from '../../../enums/user';
 import ApiError from '../../../errors/ApiError';
 import { emailHelper } from '../../../helpers/emailHelper';
@@ -9,7 +10,12 @@ import generateOTP from '../../../util/generateOTP';
 import { User } from './user.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import AggregationBuilder from '../../builder/AggregationBuilder';
-import { IUser } from './user.interface';
+import { IUser, TUTOR_LEVEL } from './user.interface';
+import { Session } from '../session/session.model';
+import { SESSION_STATUS } from '../session/session.interface';
+import { TutorEarnings } from '../tutorEarnings/tutorEarnings.model';
+import { TutorSessionFeedback } from '../tutorSessionFeedback/tutorSessionFeedback.model';
+import { FEEDBACK_STATUS } from '../tutorSessionFeedback/tutorSessionFeedback.interface';
 
 const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
   const createUser = await User.create(payload);
@@ -161,6 +167,366 @@ const getUserDetailsById = async (id: string) => {
   return user;
 };
 
+// ============ ADMIN: STUDENT MANAGEMENT ============
+
+const getAllStudents = async (query: Record<string, unknown>) => {
+  const studentQuery = new QueryBuilder(
+    User.find({ role: USER_ROLES.STUDENT }).select('-password -authentication'),
+    query
+  )
+    .search(['name', 'email'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+
+  const students = await studentQuery.modelQuery;
+  const paginationInfo = await studentQuery.getPaginationInfo();
+
+  return {
+    pagination: paginationInfo,
+    data: students,
+  };
+};
+
+const blockStudent = async (id: string) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.STUDENT) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a student');
+  }
+  if (user.status === USER_STATUS.RESTRICTED) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Student is already blocked');
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { status: USER_STATUS.RESTRICTED },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
+const unblockStudent = async (id: string) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.STUDENT) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a student');
+  }
+  if (user.status === USER_STATUS.ACTIVE) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Student is already active');
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { status: USER_STATUS.ACTIVE },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
+// ============ ADMIN: TUTOR MANAGEMENT ============
+
+const getAllTutors = async (query: Record<string, unknown>) => {
+  const tutorQuery = new QueryBuilder(
+    User.find({ role: USER_ROLES.TUTOR }).select('-password -authentication'),
+    query
+  )
+    .search(['name', 'email'])
+    .filter()
+    .sort()
+    .paginate()
+    .fields();
+
+  const tutors = await tutorQuery.modelQuery;
+  const paginationInfo = await tutorQuery.getPaginationInfo();
+
+  return {
+    pagination: paginationInfo,
+    data: tutors,
+  };
+};
+
+const blockTutor = async (id: string) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a tutor');
+  }
+  if (user.status === USER_STATUS.RESTRICTED) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Tutor is already blocked');
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { status: USER_STATUS.RESTRICTED },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
+const unblockTutor = async (id: string) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a tutor');
+  }
+  if (user.status === USER_STATUS.ACTIVE) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Tutor is already active');
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { status: USER_STATUS.ACTIVE },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
+const updateTutorSubjects = async (id: string, subjects: string[]) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a tutor');
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { 'tutorProfile.subjects': subjects },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
+// ============ TUTOR STATISTICS ============
+
+/**
+ * Calculate tutor level based on completed sessions
+ */
+const calculateTutorLevel = (completedSessions: number): TUTOR_LEVEL => {
+  if (completedSessions >= 51) {
+    return TUTOR_LEVEL.EXPERT;
+  } else if (completedSessions >= 21) {
+    return TUTOR_LEVEL.INTERMEDIATE;
+  }
+  return TUTOR_LEVEL.STARTER;
+};
+
+/**
+ * Get sessions to next level
+ */
+const getSessionsToNextLevel = (
+  completedSessions: number,
+  currentLevel: TUTOR_LEVEL
+): number | null => {
+  switch (currentLevel) {
+    case TUTOR_LEVEL.STARTER:
+      return 21 - completedSessions; // Need 21 for INTERMEDIATE
+    case TUTOR_LEVEL.INTERMEDIATE:
+      return 51 - completedSessions; // Need 51 for EXPERT
+    case TUTOR_LEVEL.EXPERT:
+      return null; // Already at max level
+    default:
+      return null;
+  }
+};
+
+type TutorStatisticsResponse = {
+  // Level info
+  currentLevel: TUTOR_LEVEL;
+  sessionsToNextLevel: number | null;
+  nextLevel: TUTOR_LEVEL | null;
+
+  // Session stats
+  totalSessions: number;
+  completedSessions: number;
+  totalHoursTaught: number;
+  totalStudents: number;
+
+  // Ratings
+  averageRating: number;
+  ratingsCount: number;
+
+  // Earnings
+  totalEarnings: number;
+  pendingEarnings: number;
+
+  // Feedback
+  pendingFeedbackCount: number;
+  overdueFeedbackCount: number;
+};
+
+/**
+ * Get comprehensive tutor statistics
+ */
+const getTutorStatistics = async (tutorId: string): Promise<TutorStatisticsResponse> => {
+  // Verify tutor exists
+  const tutor = await User.findById(tutorId);
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can access this endpoint');
+  }
+
+  // Get session stats
+  const sessionStats = await Session.aggregate([
+    {
+      $match: {
+        tutorId: new Types.ObjectId(tutorId),
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalSessions: { $sum: 1 },
+        completedSessions: {
+          $sum: { $cond: [{ $eq: ['$status', SESSION_STATUS.COMPLETED] }, 1, 0] },
+        },
+        totalHours: {
+          $sum: {
+            $cond: [
+              { $eq: ['$status', SESSION_STATUS.COMPLETED] },
+              { $divide: ['$duration', 60] },
+              0,
+            ],
+          },
+        },
+        uniqueStudents: { $addToSet: '$studentId' },
+      },
+    },
+    {
+      $project: {
+        totalSessions: 1,
+        completedSessions: 1,
+        totalHours: 1,
+        totalStudents: { $size: '$uniqueStudents' },
+      },
+    },
+  ]);
+
+  const stats = sessionStats[0] || {
+    totalSessions: 0,
+    completedSessions: 0,
+    totalHours: 0,
+    totalStudents: 0,
+  };
+
+  // Get earnings
+  const earningsStats = await TutorEarnings.aggregate([
+    {
+      $match: {
+        tutorId: new Types.ObjectId(tutorId),
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalEarnings: {
+          $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, '$netEarnings', 0] },
+        },
+        pendingEarnings: {
+          $sum: {
+            $cond: [{ $in: ['$status', ['PENDING', 'PROCESSING']] }, '$netEarnings', 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  const earnings = earningsStats[0] || {
+    totalEarnings: 0,
+    pendingEarnings: 0,
+  };
+
+  // Get pending feedback count
+  const pendingFeedbackCount = await TutorSessionFeedback.countDocuments({
+    tutorId: new Types.ObjectId(tutorId),
+    status: FEEDBACK_STATUS.PENDING,
+  });
+
+  // Get overdue feedback count
+  const now = new Date();
+  const overdueFeedbackCount = await TutorSessionFeedback.countDocuments({
+    tutorId: new Types.ObjectId(tutorId),
+    status: FEEDBACK_STATUS.PENDING,
+    dueDate: { $lt: now },
+  });
+
+  // Calculate level
+  const currentLevel = calculateTutorLevel(stats.completedSessions);
+  const sessionsToNextLevel = getSessionsToNextLevel(stats.completedSessions, currentLevel);
+
+  // Determine next level
+  let nextLevel: TUTOR_LEVEL | null = null;
+  if (currentLevel === TUTOR_LEVEL.STARTER) {
+    nextLevel = TUTOR_LEVEL.INTERMEDIATE;
+  } else if (currentLevel === TUTOR_LEVEL.INTERMEDIATE) {
+    nextLevel = TUTOR_LEVEL.EXPERT;
+  }
+
+  return {
+    currentLevel,
+    sessionsToNextLevel,
+    nextLevel,
+    totalSessions: stats.totalSessions,
+    completedSessions: stats.completedSessions,
+    totalHoursTaught: Math.round(stats.totalHours * 10) / 10,
+    totalStudents: stats.totalStudents,
+    averageRating: tutor.averageRating || 0,
+    ratingsCount: tutor.ratingsCount || 0,
+    totalEarnings: earnings.totalEarnings,
+    pendingEarnings: earnings.pendingEarnings,
+    pendingFeedbackCount,
+    overdueFeedbackCount,
+  };
+};
+
+/**
+ * Update tutor level after session completion
+ */
+const updateTutorLevelAfterSession = async (tutorId: string): Promise<void> => {
+  const tutor = await User.findById(tutorId);
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    return;
+  }
+
+  // Get completed sessions count
+  const completedSessions = await Session.countDocuments({
+    tutorId: new Types.ObjectId(tutorId),
+    status: SESSION_STATUS.COMPLETED,
+  });
+
+  // Calculate new level
+  const newLevel = calculateTutorLevel(completedSessions);
+
+  // Update if level changed
+  if (tutor.tutorProfile?.level !== newLevel) {
+    await User.findByIdAndUpdate(tutorId, {
+      'tutorProfile.level': newLevel,
+      'tutorProfile.levelUpdatedAt': new Date(),
+      'tutorProfile.completedSessions': completedSessions,
+    });
+  } else {
+    // Just update the session count
+    await User.findByIdAndUpdate(tutorId, {
+      'tutorProfile.completedSessions': completedSessions,
+    });
+  }
+};
+
 export const UserService = {
   createUserToDB,
   getUserProfileFromDB,
@@ -170,4 +536,17 @@ export const UserService = {
   updateUserStatus,
   getUserById,
   getUserDetailsById,
+  // Admin: Student Management
+  getAllStudents,
+  blockStudent,
+  unblockStudent,
+  // Admin: Tutor Management
+  getAllTutors,
+  blockTutor,
+  unblockTutor,
+  updateTutorSubjects,
+  // Tutor Statistics
+  getTutorStatistics,
+  updateTutorLevelAfterSession,
+  calculateTutorLevel,
 };

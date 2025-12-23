@@ -55,7 +55,24 @@ const getSingleApplication = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Approve application (Admin only)
+// Select for interview (Admin only) - after initial review
+const selectForInterview = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { adminNotes } = req.body;
+  const result = await TutorApplicationService.selectForInterview(
+    id,
+    adminNotes
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Application selected for interview',
+    data: result,
+  });
+});
+
+// Approve application (Admin only) - after interview
 const approveApplication = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { adminNotes } = req.body;
@@ -67,7 +84,7 @@ const approveApplication = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'Application approved successfully',
+    message: 'Application approved successfully. User is now a TUTOR.',
     data: result,
   });
 });
@@ -93,7 +110,10 @@ const rejectApplication = catchAsync(async (req: Request, res: Response) => {
 const sendForRevision = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { revisionNote } = req.body;
-  const result = await TutorApplicationService.sendForRevision(id, revisionNote);
+  const result = await TutorApplicationService.sendForRevision(
+    id,
+    revisionNote
+  );
 
   sendResponse(res, {
     success: true,
@@ -102,24 +122,6 @@ const sendForRevision = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
-
-// Update application status (Admin only)
-const updateApplicationStatus = catchAsync(
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const result = await TutorApplicationService.updateApplicationStatus(
-      id,
-      req.body
-    );
-
-    sendResponse(res, {
-      success: true,
-      statusCode: StatusCodes.OK,
-      message: 'Application status updated successfully',
-      data: result,
-    });
-  }
-);
 
 // Delete application (Admin only)
 const deleteApplication = catchAsync(async (req: Request, res: Response) => {
@@ -139,9 +141,9 @@ export const TutorApplicationController = {
   getMyApplication,
   getAllApplications,
   getSingleApplication,
+  selectForInterview,
   approveApplication,
   rejectApplication,
   sendForRevision,
-  updateApplicationStatus,
   deleteApplication,
 };

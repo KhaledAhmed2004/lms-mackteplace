@@ -10,6 +10,8 @@ import {
   SUBSCRIPTION_TIER,
 } from './studentSubscription.interface';
 import { StudentSubscription } from './studentSubscription.model';
+import { Session } from '../session/session.model';
+import { SESSION_STATUS } from '../session/session.interface';
 // import Stripe from 'stripe';
 // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -96,7 +98,7 @@ const getAllSubscriptions = async (query: Record<string, unknown>) => {
     .fields();
 
   const result = await subscriptionQuery.modelQuery;
-  const meta = await subscriptionQuery.countTotal();
+  const meta = await subscriptionQuery.getPaginationInfo();
 
   return {
     meta,
@@ -217,6 +219,183 @@ const expireOldSubscriptions = async (): Promise<number> => {
   return result.modifiedCount;
 };
 
+/**
+ * Get plan usage details (Student)
+ * Returns comprehensive usage data for student's subscription
+ */
+type PlanUsageResponse = {
+  // Plan details
+  plan: {
+    name: SUBSCRIPTION_TIER | null;
+    pricePerHour: number;
+    commitmentMonths: number;
+    minimumHours: number;
+    status: SUBSCRIPTION_STATUS | null;
+    startDate: Date | null;
+    endDate: Date | null;
+  };
+  // Usage stats
+  usage: {
+    hoursUsed: number;
+    sessionsCompleted: number;
+    hoursRemaining: number | null; // null for FLEXIBLE plan (no minimum)
+    sessionsRemaining: number | null; // For plans with minimum hours
+  };
+  // Spending
+  spending: {
+    currentMonthSpending: number;
+    totalSpending: number;
+    bufferCharges: number; // Extra time charges
+  };
+  // Upcoming
+  upcoming: {
+    scheduledSessions: number;
+    upcomingHours: number;
+  };
+};
+
+const getMyPlanUsage = async (studentId: string): Promise<PlanUsageResponse> => {
+  // Get active subscription
+  const subscription = await StudentSubscription.findOne({
+    studentId: new Types.ObjectId(studentId),
+    status: SUBSCRIPTION_STATUS.ACTIVE,
+  });
+
+  // Get current month dates
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  // Get completed sessions for current month
+  const currentMonthSessions = await Session.find({
+    studentId: new Types.ObjectId(studentId),
+    status: SESSION_STATUS.COMPLETED,
+    completedAt: { $gte: startOfMonth, $lte: endOfMonth },
+  });
+
+  // Calculate current month spending
+  let currentMonthSpending = 0;
+  let bufferCharges = 0;
+  for (const session of currentMonthSessions) {
+    currentMonthSpending += session.totalPrice || 0;
+    bufferCharges += session.bufferPrice || 0;
+  }
+
+  // Get all completed sessions for total stats
+  const allCompletedSessions = await Session.aggregate([
+    {
+      $match: {
+        studentId: new Types.ObjectId(studentId),
+        status: SESSION_STATUS.COMPLETED,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalSessions: { $sum: 1 },
+        totalHours: { $sum: { $divide: ['$duration', 60] } },
+        totalSpending: { $sum: '$totalPrice' },
+        totalBufferCharges: { $sum: '$bufferPrice' },
+      },
+    },
+  ]);
+
+  const stats = allCompletedSessions[0] || {
+    totalSessions: 0,
+    totalHours: 0,
+    totalSpending: 0,
+    totalBufferCharges: 0,
+  };
+
+  // Get upcoming scheduled sessions
+  const upcomingSessions = await Session.aggregate([
+    {
+      $match: {
+        studentId: new Types.ObjectId(studentId),
+        status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
+        startTime: { $gte: now },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        count: { $sum: 1 },
+        totalHours: { $sum: { $divide: ['$duration', 60] } },
+      },
+    },
+  ]);
+
+  const upcomingStats = upcomingSessions[0] || { count: 0, totalHours: 0 };
+
+  // Build response based on subscription status
+  if (!subscription) {
+    // No active subscription
+    return {
+      plan: {
+        name: null,
+        pricePerHour: 30, // Default FLEXIBLE rate
+        commitmentMonths: 0,
+        minimumHours: 0,
+        status: null,
+        startDate: null,
+        endDate: null,
+      },
+      usage: {
+        hoursUsed: stats.totalHours,
+        sessionsCompleted: stats.totalSessions,
+        hoursRemaining: null,
+        sessionsRemaining: null,
+      },
+      spending: {
+        currentMonthSpending,
+        totalSpending: stats.totalSpending,
+        bufferCharges: stats.totalBufferCharges,
+      },
+      upcoming: {
+        scheduledSessions: upcomingStats.count,
+        upcomingHours: upcomingStats.totalHours,
+      },
+    };
+  }
+
+  // Calculate remaining hours (only for REGULAR and LONG_TERM)
+  let hoursRemaining: number | null = null;
+  let sessionsRemaining: number | null = null;
+
+  if (subscription.tier !== SUBSCRIPTION_TIER.FLEXIBLE) {
+    hoursRemaining = Math.max(0, subscription.minimumHours - subscription.totalHoursTaken);
+    // Assuming 1 hour per session
+    sessionsRemaining = Math.ceil(hoursRemaining);
+  }
+
+  return {
+    plan: {
+      name: subscription.tier,
+      pricePerHour: subscription.pricePerHour,
+      commitmentMonths: subscription.commitmentMonths,
+      minimumHours: subscription.minimumHours,
+      status: subscription.status,
+      startDate: subscription.startDate,
+      endDate: subscription.endDate,
+    },
+    usage: {
+      hoursUsed: subscription.totalHoursTaken,
+      sessionsCompleted: stats.totalSessions,
+      hoursRemaining,
+      sessionsRemaining,
+    },
+    spending: {
+      currentMonthSpending,
+      totalSpending: stats.totalSpending,
+      bufferCharges: stats.totalBufferCharges,
+    },
+    upcoming: {
+      scheduledSessions: upcomingStats.count,
+      upcomingHours: upcomingStats.totalHours,
+    },
+  };
+};
+
 export const StudentSubscriptionService = {
   subscribeToPlan,
   getMySubscription,
@@ -225,4 +404,5 @@ export const StudentSubscriptionService = {
   cancelSubscription,
   incrementHoursTaken,
   expireOldSubscriptions,
+  getMyPlanUsage,
 };

@@ -23,6 +23,8 @@ const message_model_1 = require("../message/message.model");
 const user_1 = require("../../../enums/user");
 const session_interface_1 = require("./session.interface");
 const session_model_1 = require("./session.model");
+const tutorSessionFeedback_service_1 = require("../tutorSessionFeedback/tutorSessionFeedback.service");
+const user_service_1 = require("../user/user.service");
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 /**
  * Propose session (Tutor sends proposal in chat)
@@ -62,10 +64,10 @@ const proposeSession = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60); // minutes
     // Get price based on student's subscription tier
     let pricePerHour = 30; // Default: Flexible
-    if (((_b = student.studentProfile) === null || _b === void 0 ? void 0 : _b.subscriptionTier) === 'REGULAR') {
+    if (((_b = student.studentProfile) === null || _b === void 0 ? void 0 : _b.currentPlan) === 'REGULAR') {
         pricePerHour = 28;
     }
-    else if (((_c = student.studentProfile) === null || _c === void 0 ? void 0 : _c.subscriptionTier) === 'LONG_TERM') {
+    else if (((_c = student.studentProfile) === null || _c === void 0 ? void 0 : _c.currentPlan) === 'LONG_TERM') {
         pricePerHour = 25;
     }
     const totalPrice = (pricePerHour * duration) / 60;
@@ -214,7 +216,7 @@ const getAllSessions = (query, userId, userRole) => __awaiter(void 0, void 0, vo
         .paginate()
         .fields();
     const result = yield sessionQuery.modelQuery;
-    const meta = yield sessionQuery.countTotal();
+    const meta = yield sessionQuery.getPaginationInfo();
     return {
         meta,
         data: result,
@@ -296,6 +298,276 @@ const autoCompleteSessions = () => __awaiter(void 0, void 0, void 0, function* (
     });
     return result.modifiedCount;
 });
+/**
+ * Get upcoming sessions for user
+ * Includes: SCHEDULED, STARTING_SOON, IN_PROGRESS, AWAITING_RESPONSE, RESCHEDULE_REQUESTED
+ */
+const getUpcomingSessions = (userId, userRole, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const filterField = userRole === user_1.USER_ROLES.STUDENT ? 'studentId' : 'tutorId';
+    const sessionQuery = new QueryBuilder_1.default(session_model_1.Session.find({
+        [filterField]: new mongoose_1.Types.ObjectId(userId),
+        status: {
+            $in: [
+                session_interface_1.SESSION_STATUS.SCHEDULED,
+                session_interface_1.SESSION_STATUS.STARTING_SOON,
+                session_interface_1.SESSION_STATUS.IN_PROGRESS,
+                session_interface_1.SESSION_STATUS.AWAITING_RESPONSE,
+                session_interface_1.SESSION_STATUS.RESCHEDULE_REQUESTED,
+            ],
+        },
+        startTime: { $gte: now },
+    })
+        .populate('studentId', 'name email profilePicture')
+        .populate('tutorId', 'name email profilePicture averageRating')
+        .populate('reviewId')
+        .populate('tutorFeedbackId'), query)
+        .sort()
+        .paginate()
+        .fields();
+    const result = yield sessionQuery.modelQuery;
+    const meta = yield sessionQuery.getPaginationInfo();
+    return { data: result, meta };
+});
+/**
+ * Get completed sessions for user
+ * Includes: COMPLETED, CANCELLED, EXPIRED, NO_SHOW
+ * Also includes review status information
+ */
+const getCompletedSessions = (userId, userRole, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const filterField = userRole === user_1.USER_ROLES.STUDENT ? 'studentId' : 'tutorId';
+    const sessionQuery = new QueryBuilder_1.default(session_model_1.Session.find({
+        [filterField]: new mongoose_1.Types.ObjectId(userId),
+        status: {
+            $in: [
+                session_interface_1.SESSION_STATUS.COMPLETED,
+                session_interface_1.SESSION_STATUS.CANCELLED,
+                session_interface_1.SESSION_STATUS.EXPIRED,
+                session_interface_1.SESSION_STATUS.NO_SHOW,
+            ],
+        },
+    })
+        .populate('studentId', 'name email profilePicture')
+        .populate('tutorId', 'name email profilePicture averageRating')
+        .populate('reviewId')
+        .populate('tutorFeedbackId'), query)
+        .sort()
+        .paginate()
+        .fields();
+    const result = yield sessionQuery.modelQuery;
+    const meta = yield sessionQuery.getPaginationInfo();
+    // Add review status flags
+    const sessionsWithReviewStatus = result.map((session) => {
+        const sessionObj = session.toObject();
+        return Object.assign(Object.assign({}, sessionObj), { studentReviewStatus: session.reviewId ? 'COMPLETED' : 'PENDING', tutorFeedbackStatus: session.tutorFeedbackId ? 'COMPLETED' : 'PENDING' });
+    });
+    return { data: sessionsWithReviewStatus, meta };
+});
+/**
+ * Request session reschedule
+ * Can be requested by student or tutor up to 10 minutes before start
+ */
+const requestReschedule = (sessionId, userId, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    // Verify user is student or tutor
+    const isStudent = session.studentId.toString() === userId;
+    const isTutor = session.tutorId.toString() === userId;
+    if (!isStudent && !isTutor) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to reschedule this session');
+    }
+    // Check if session can be rescheduled
+    if (session.status !== session_interface_1.SESSION_STATUS.SCHEDULED &&
+        session.status !== session_interface_1.SESSION_STATUS.STARTING_SOON) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Cannot reschedule session with status: ${session.status}`);
+    }
+    // Check if already has pending reschedule request
+    if (session.rescheduleRequest &&
+        session.rescheduleRequest.status === session_interface_1.RESCHEDULE_STATUS.PENDING) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This session already has a pending reschedule request');
+    }
+    // Check if within 10 minutes of start
+    const now = new Date();
+    const tenMinutesBefore = new Date(session.startTime.getTime() - 10 * 60 * 1000);
+    if (now >= tenMinutesBefore) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot reschedule within 10 minutes of session start');
+    }
+    // Calculate new end time (maintain same duration)
+    const newStartTime = new Date(payload.newStartTime);
+    const newEndTime = new Date(newStartTime.getTime() + session.duration * 60 * 1000);
+    // Validate new time is in future
+    if (newStartTime <= now) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'New start time must be in the future');
+    }
+    // Store previous times
+    session.previousStartTime = session.startTime;
+    session.previousEndTime = session.endTime;
+    // Create reschedule request
+    session.rescheduleRequest = {
+        requestedBy: new mongoose_1.Types.ObjectId(userId),
+        requestedAt: now,
+        newStartTime,
+        newEndTime,
+        reason: payload.reason,
+        status: session_interface_1.RESCHEDULE_STATUS.PENDING,
+    };
+    session.status = session_interface_1.SESSION_STATUS.RESCHEDULE_REQUESTED;
+    yield session.save();
+    // TODO: Send notification to other party
+    // const otherPartyId = isStudent ? session.tutorId : session.studentId;
+    // io.to(otherPartyId.toString()).emit('rescheduleRequested', {...});
+    return session;
+});
+/**
+ * Approve reschedule request
+ */
+const approveReschedule = (sessionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    // Verify user is the OTHER party (not the one who requested)
+    const isStudent = session.studentId.toString() === userId;
+    const isTutor = session.tutorId.toString() === userId;
+    if (!isStudent && !isTutor) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to approve this reschedule');
+    }
+    if (!session.rescheduleRequest) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'No reschedule request found');
+    }
+    if (session.rescheduleRequest.status !== session_interface_1.RESCHEDULE_STATUS.PENDING) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Reschedule request is already ${session.rescheduleRequest.status.toLowerCase()}`);
+    }
+    // Verify approver is NOT the requester
+    if (session.rescheduleRequest.requestedBy.toString() === userId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You cannot approve your own reschedule request');
+    }
+    // Update session times
+    session.startTime = session.rescheduleRequest.newStartTime;
+    session.endTime = session.rescheduleRequest.newEndTime;
+    // Update reschedule request
+    session.rescheduleRequest.status = session_interface_1.RESCHEDULE_STATUS.APPROVED;
+    session.rescheduleRequest.respondedAt = new Date();
+    session.rescheduleRequest.respondedBy = new mongoose_1.Types.ObjectId(userId);
+    // Reset status to SCHEDULED
+    session.status = session_interface_1.SESSION_STATUS.SCHEDULED;
+    yield session.save();
+    // TODO: Update Google Calendar event
+    // TODO: Send notification to requester
+    return session;
+});
+/**
+ * Reject reschedule request
+ */
+const rejectReschedule = (sessionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    // Verify user is the OTHER party
+    const isStudent = session.studentId.toString() === userId;
+    const isTutor = session.tutorId.toString() === userId;
+    if (!isStudent && !isTutor) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to reject this reschedule');
+    }
+    if (!session.rescheduleRequest) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'No reschedule request found');
+    }
+    if (session.rescheduleRequest.status !== session_interface_1.RESCHEDULE_STATUS.PENDING) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Reschedule request is already ${session.rescheduleRequest.status.toLowerCase()}`);
+    }
+    // Verify rejector is NOT the requester
+    if (session.rescheduleRequest.requestedBy.toString() === userId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You cannot reject your own reschedule request');
+    }
+    // Update reschedule request
+    session.rescheduleRequest.status = session_interface_1.RESCHEDULE_STATUS.REJECTED;
+    session.rescheduleRequest.respondedAt = new Date();
+    session.rescheduleRequest.respondedBy = new mongoose_1.Types.ObjectId(userId);
+    // Reset status to SCHEDULED (keep original times)
+    session.status = session_interface_1.SESSION_STATUS.SCHEDULED;
+    yield session.save();
+    // TODO: Send notification to requester
+    return session;
+});
+/**
+ * Session status auto-transitions (Cron job)
+ * SCHEDULED -> STARTING_SOON (10 min before)
+ * STARTING_SOON -> IN_PROGRESS (at start time)
+ * IN_PROGRESS -> EXPIRED (at end time if not completed)
+ */
+const autoTransitionSessionStatuses = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+    // SCHEDULED -> STARTING_SOON (10 minutes before start)
+    const startingSoonResult = yield session_model_1.Session.updateMany({
+        status: session_interface_1.SESSION_STATUS.SCHEDULED,
+        startTime: { $lte: tenMinutesFromNow, $gt: now },
+    }, { $set: { status: session_interface_1.SESSION_STATUS.STARTING_SOON } });
+    // STARTING_SOON/SCHEDULED -> IN_PROGRESS (at start time)
+    const inProgressResult = yield session_model_1.Session.updateMany({
+        status: { $in: [session_interface_1.SESSION_STATUS.SCHEDULED, session_interface_1.SESSION_STATUS.STARTING_SOON] },
+        startTime: { $lte: now },
+        endTime: { $gt: now },
+    }, {
+        $set: {
+            status: session_interface_1.SESSION_STATUS.IN_PROGRESS,
+            startedAt: now,
+        },
+    });
+    // IN_PROGRESS -> EXPIRED (at end time if not manually completed)
+    const expiredResult = yield session_model_1.Session.updateMany({
+        status: session_interface_1.SESSION_STATUS.IN_PROGRESS,
+        endTime: { $lte: now },
+    }, {
+        $set: {
+            status: session_interface_1.SESSION_STATUS.EXPIRED,
+            expiredAt: now,
+        },
+    });
+    return {
+        startingSoon: startingSoonResult.modifiedCount,
+        inProgress: inProgressResult.modifiedCount,
+        expired: expiredResult.modifiedCount,
+    };
+});
+/**
+ * Mark session as completed (Enhanced - with tutor feedback creation)
+ */
+const markAsCompletedEnhanced = (sessionId) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    if (session.status === session_interface_1.SESSION_STATUS.COMPLETED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session is already completed');
+    }
+    // Update session
+    session.status = session_interface_1.SESSION_STATUS.COMPLETED;
+    session.completedAt = new Date();
+    yield session.save();
+    // Create pending tutor feedback record
+    try {
+        yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.createPendingFeedback(sessionId, session.tutorId.toString(), session.studentId.toString(), session.completedAt);
+    }
+    catch (_a) {
+        // Feedback creation failed, but session is still completed
+        // Log error but don't fail the completion
+    }
+    // Update tutor level after session completion
+    try {
+        yield user_service_1.UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+    }
+    catch (_b) {
+        // Level update failed, but session is still completed
+        // Log error but don't fail the completion
+    }
+    // TODO: Send review request email to student
+    // TODO: Send feedback reminder to tutor
+    return session;
+});
 exports.SessionService = {
     proposeSession,
     acceptSessionProposal,
@@ -305,4 +577,11 @@ exports.SessionService = {
     cancelSession,
     markAsCompleted,
     autoCompleteSessions,
+    getUpcomingSessions,
+    getCompletedSessions,
+    requestReschedule,
+    approveReschedule,
+    rejectReschedule,
+    autoTransitionSessionStatuses,
+    markAsCompletedEnhanced,
 };

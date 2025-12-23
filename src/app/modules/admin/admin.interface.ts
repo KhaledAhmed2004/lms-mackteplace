@@ -91,3 +91,71 @@ export type ITopStudent = {
   totalSpent: number;
   subscriptionTier: string;
 };
+
+// ============ OVERVIEW STATS ============
+
+export type IStatistic = {
+  total: number;
+  thisPeriodCount: number;
+  lastPeriodCount: number;
+  growth: number;
+  formattedGrowth: string;
+  growthType: 'increase' | 'decrease' | 'no_change';
+};
+
+export type IOverviewStats = {
+  revenue: IStatistic;
+  students: IStatistic;
+  tutors: IStatistic;
+};
+
+export type IOverviewStatsQuery = {
+  period?: 'day' | 'week' | 'month' | 'quarter' | 'year';
+};
+
+// ============ MONTHLY REVENUE ============
+
+export type IMonthlyRevenue = {
+  month: number;
+  year: number;
+  totalRevenue: number;
+  totalCommission: number;
+  totalPayouts: number;
+  netProfit: number;
+  sessionCount: number;
+  totalHours: number;
+  averageSessionPrice: number;
+};
+
+export type IMonthlyRevenueQuery = {
+  year?: number;
+  months?: string; // comma-separated e.g. "1,2,3"
+  tutorId?: string;
+  studentId?: string;
+  subscriptionTier?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM';
+  subject?: string;
+};
+
+// ============ USER DISTRIBUTION ============
+
+export type IRoleDistribution = {
+  role: string;
+  count: number;
+  percentage: number;
+};
+
+export type IStatusDistribution = {
+  status: string;
+  count: number;
+  percentage: number;
+};
+
+export type IUserDistribution = {
+  total: number;
+  byRole?: IRoleDistribution[];
+  byStatus?: IStatusDistribution[];
+};
+
+export type IUserDistributionQuery = {
+  groupBy?: 'role' | 'status' | 'both';
+};

@@ -39,10 +39,7 @@ const userSchema = new mongoose_1.Schema({
     },
     password: {
         type: String,
-        required: function () {
-            // Password is not required for OAuth users (users with googleId)
-            return !this.googleId;
-        },
+        required: true,
         minlength: 8,
         select: false, // hide password by default
     },
@@ -88,10 +85,6 @@ const userSchema = new mongoose_1.Schema({
     },
     about: {
         type: String,
-    },
-    googleId: {
-        type: String,
-        sparse: true, // allows multiple null values but unique non-null values
     },
     achievements: {
         type: [String],
@@ -162,6 +155,28 @@ const userSchema = new mongoose_1.Schema({
                 type: Number,
                 default: 0,
             },
+            totalStudents: {
+                type: Number,
+                default: 0,
+            },
+            // Level System
+            level: {
+                type: String,
+                enum: ['STARTER', 'INTERMEDIATE', 'EXPERT'],
+                default: 'STARTER',
+            },
+            levelUpdatedAt: {
+                type: Date,
+            },
+            // Earnings
+            totalEarnings: {
+                type: Number,
+                default: 0,
+            },
+            pendingFeedbackCount: {
+                type: Number,
+                default: 0,
+            },
             isVerified: {
                 type: Boolean,
                 default: false,
@@ -226,10 +241,8 @@ userSchema.pre('save', function (next) {
         if (isExist) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Email already exist!');
         }
-        //password hash - only hash if password is provided (not for OAuth users)
-        if (this.password) {
-            this.password = yield bcrypt_1.default.hash(this.password, Number(config_1.default.bcrypt_salt_rounds));
-        }
+        //password hash
+        this.password = yield bcrypt_1.default.hash(this.password, Number(config_1.default.bcrypt_salt_rounds));
         next();
     });
 });

@@ -1,5 +1,50 @@
 import { model, Schema } from 'mongoose';
-import { ISession, SessionModel, SESSION_STATUS } from './session.interface';
+import {
+  ISession,
+  SessionModel,
+  SESSION_STATUS,
+  RESCHEDULE_STATUS,
+} from './session.interface';
+
+// Reschedule request sub-schema
+const rescheduleRequestSchema = new Schema(
+  {
+    requestedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    requestedAt: {
+      type: Date,
+      required: true,
+    },
+    newStartTime: {
+      type: Date,
+      required: true,
+    },
+    newEndTime: {
+      type: Date,
+      required: true,
+    },
+    reason: {
+      type: String,
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: Object.values(RESCHEDULE_STATUS),
+      default: RESCHEDULE_STATUS.PENDING,
+    },
+    respondedAt: {
+      type: Date,
+    },
+    respondedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  },
+  { _id: false }
+);
 
 const sessionSchema = new Schema<ISession>(
   {
@@ -32,7 +77,12 @@ const sessionSchema = new Schema<ISession>(
     },
     duration: {
       type: Number,
-      required: [true, 'Duration is required'], // in minutes
+      required: [true, 'Duration is required'],
+      default: 60, // Fixed 60 minutes
+    },
+    bufferMinutes: {
+      type: Number,
+      default: 10, // 10 minutes extra buffer
     },
     pricePerHour: {
       type: Number,
@@ -41,6 +91,10 @@ const sessionSchema = new Schema<ISession>(
     totalPrice: {
       type: Number,
       required: [true, 'Total price is required'], // EUR
+    },
+    bufferPrice: {
+      type: Number,
+      default: 0, // Price for buffer time
     },
     googleMeetLink: {
       type: String,
@@ -65,6 +119,23 @@ const sessionSchema = new Schema<ISession>(
       type: Schema.Types.ObjectId,
       ref: 'SessionReview',
     },
+    tutorFeedbackId: {
+      type: Schema.Types.ObjectId,
+      ref: 'TutorSessionFeedback',
+    },
+    trialRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: 'TrialRequest',
+    },
+    // Reschedule fields
+    rescheduleRequest: rescheduleRequestSchema,
+    previousStartTime: {
+      type: Date,
+    },
+    previousEndTime: {
+      type: Date,
+    },
+    // Cancellation fields
     cancellationReason: {
       type: String,
       trim: true,
@@ -73,6 +144,7 @@ const sessionSchema = new Schema<ISession>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
+    // Timestamp fields
     startedAt: {
       type: Date,
     },
@@ -80,6 +152,9 @@ const sessionSchema = new Schema<ISession>(
       type: Date,
     },
     cancelledAt: {
+      type: Date,
+    },
+    expiredAt: {
       type: Date,
     },
   },
@@ -92,9 +167,13 @@ sessionSchema.index({ tutorId: 1, createdAt: -1 });
 sessionSchema.index({ status: 1 });
 sessionSchema.index({ startTime: 1, endTime: 1 });
 sessionSchema.index({ chatId: 1 });
+sessionSchema.index({ trialRequestId: 1 });
 
 // Compound index for upcoming sessions
 sessionSchema.index({ status: 1, startTime: 1 });
+
+// Index for status transitions (cron jobs)
+sessionSchema.index({ status: 1, endTime: 1 });
 
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {
@@ -108,6 +187,10 @@ sessionSchema.pre('save', function (next) {
 sessionSchema.pre('save', function (next) {
   if (!this.totalPrice && this.pricePerHour && this.duration) {
     this.totalPrice = (this.pricePerHour * this.duration) / 60;
+  }
+  // Calculate buffer price
+  if (!this.bufferPrice && this.pricePerHour && this.bufferMinutes) {
+    this.bufferPrice = (this.pricePerHour * this.bufferMinutes) / 60;
   }
   next();
 });

@@ -21,8 +21,7 @@ const sessionReview_service_1 = require("./sessionReview.service");
  * Create a new review
  */
 const createReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield sessionReview_service_1.SessionReviewService.createReview(studentId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -35,8 +34,7 @@ const createReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
  * Get student's reviews
  */
 const getMyReviews = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield sessionReview_service_1.SessionReviewService.getMyReviews(studentId, req.query);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -79,9 +77,8 @@ const getSingleReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
  * Update review
  */
 const updateReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     const result = yield sessionReview_service_1.SessionReviewService.updateReview(id, studentId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -94,9 +91,8 @@ const updateReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
  * Delete review
  */
 const deleteReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const studentId = req.user.id;
     yield sessionReview_service_1.SessionReviewService.deleteReview(id, studentId);
     (0, sendResponse_1.default)(res, {
         success: true,

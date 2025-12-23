@@ -27,7 +27,7 @@ const generateTutorEarnings = catchAsync(async (req: Request, res: Response) => 
  * Get tutor's earnings history
  */
 const getMyEarnings = catchAsync(async (req: Request, res: Response) => {
-  const tutorId = req.user?.id;
+  const tutorId = req.user!.id as string;
   const result = await TutorEarningsService.getMyEarnings(tutorId, req.query);
 
   sendResponse(res, {

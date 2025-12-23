@@ -4,7 +4,7 @@ import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
 import { AuthController } from './auth.controller';
 import { AuthValidation } from './auth.validation';
-import passport from 'passport';
+
 const router = express.Router();
 
 // User Login
@@ -14,27 +14,10 @@ router.post(
   AuthController.loginUser
 );
 
-// Google OAuth Login
-router.get('/google', (req, res, next) => {
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  })(req, res, next);
-});
-
-// Google OAuth Callback
-router.get(
-  '/google/callback',
-  (req, res, next) => {
-    next();
-  },
-  passport.authenticate('google', { session: false }),
-  AuthController.googleCallback
-);
-
 // User Logout
 router.post(
   '/logout',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   AuthController.logoutUser
 );
 
@@ -62,7 +45,7 @@ router.post(
 // Change Password
 router.post(
   '/change-password',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.TASKER, USER_ROLES.POSTER),
+  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   validateRequest(AuthValidation.createChangePasswordZodSchema),
   AuthController.changePassword
 );

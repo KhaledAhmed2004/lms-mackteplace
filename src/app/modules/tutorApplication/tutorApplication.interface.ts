@@ -1,10 +1,11 @@
 import { Model, Types } from 'mongoose';
 
-// Simple status - NO phases
+// Application status flow: SUBMITTED → SELECTED_FOR_INTERVIEW → APPROVED/REJECTED
 export enum APPLICATION_STATUS {
   SUBMITTED = 'SUBMITTED',
   REVISION = 'REVISION', // Admin requests changes
-  APPROVED = 'APPROVED',
+  SELECTED_FOR_INTERVIEW = 'SELECTED_FOR_INTERVIEW', // Admin selected after initial review
+  APPROVED = 'APPROVED', // Approved after interview, becomes TUTOR
   REJECTED = 'REJECTED',
 }
 
@@ -40,6 +41,7 @@ export type ITutorApplication = {
 
   // Timestamps
   submittedAt: Date;
+  selectedForInterviewAt?: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
   revisionRequestedAt?: Date;

@@ -144,8 +144,68 @@ const getSingleApplication = async (
 };
 
 /**
+ * Select application for interview (admin only)
+ * After initial review, admin selects candidate for interview
+ */
+const selectForInterview = async (
+  id: string,
+  adminNotes?: string
+): Promise<ITutorApplication | null> => {
+  const application = await TutorApplication.findById(id);
+
+  if (!application) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+  }
+
+  if (application.status === APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Application is already selected for interview'
+    );
+  }
+
+  if (application.status === APPLICATION_STATUS.APPROVED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Application is already approved'
+    );
+  }
+
+  if (application.status === APPLICATION_STATUS.REJECTED) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot select a rejected application for interview'
+    );
+  }
+
+  // Only SUBMITTED or REVISION status can be selected for interview
+  if (
+    application.status !== APPLICATION_STATUS.SUBMITTED &&
+    application.status !== APPLICATION_STATUS.REVISION
+  ) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Only submitted or revision applications can be selected for interview'
+    );
+  }
+
+  // Update application status
+  application.status = APPLICATION_STATUS.SELECTED_FOR_INTERVIEW;
+  application.selectedForInterviewAt = new Date();
+  if (adminNotes) {
+    application.adminNotes = adminNotes;
+  }
+  await application.save();
+
+  // TODO: Send email notification to applicant about interview selection
+
+  return application;
+};
+
+/**
  * Approve application (admin only)
  * Changes status to APPROVED and user role to TUTOR
+ * Can only approve after interview (SELECTED_FOR_INTERVIEW status)
  */
 const approveApplication = async (
   id: string,
@@ -168,6 +228,14 @@ const approveApplication = async (
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'Cannot approve a rejected application'
+    );
+  }
+
+  // Must be SELECTED_FOR_INTERVIEW to approve (after interview)
+  if (application.status !== APPLICATION_STATUS.SELECTED_FOR_INTERVIEW) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Application must be selected for interview before approval. Please select for interview first.'
     );
   }
 
@@ -261,28 +329,6 @@ const sendForRevision = async (
 };
 
 /**
- * Update application status (admin only)
- * Generic update function
- */
-const updateApplicationStatus = async (
-  id: string,
-  payload: Partial<ITutorApplication>
-): Promise<ITutorApplication | null> => {
-  const application = await TutorApplication.findById(id);
-
-  if (!application) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
-  }
-
-  const updated = await TutorApplication.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true,
-  });
-
-  return updated;
-};
-
-/**
  * Delete application (admin only)
  */
 const deleteApplication = async (
@@ -303,9 +349,9 @@ export const TutorApplicationService = {
   getMyApplication,
   getAllApplications,
   getSingleApplication,
+  selectForInterview,
   approveApplication,
   rejectApplication,
   sendForRevision,
-  updateApplicationStatus,
   deleteApplication,
 };
