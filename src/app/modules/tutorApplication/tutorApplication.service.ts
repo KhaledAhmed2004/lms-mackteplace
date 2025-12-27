@@ -14,15 +14,15 @@ type TApplicationPayload = {
   password: string;
   name: string;
   birthDate: string;
-  phone: string;
+  phoneNumber: string;
   street: string;
   houseNumber: string;
-  zipCode: string;
+  zip: string;
   city: string;
   subjects: string[];
   cv: string;
   abiturCertificate: string;
-  officialIdDocument: string;
+  officialId: string;
 };
 
 /**
@@ -53,7 +53,7 @@ const submitApplication = async (payload: TApplicationPayload) => {
     name: payload.name,
     email: payload.email,
     password: payload.password,
-    phone: payload.phone,
+    phone: payload.phoneNumber,
     role: USER_ROLES.APPLICANT,
     dateOfBirth: new Date(payload.birthDate),
     tutorProfile: {
@@ -67,16 +67,16 @@ const submitApplication = async (payload: TApplicationPayload) => {
   const application = await TutorApplication.create({
     name: payload.name,
     email: payload.email,
-    phone: payload.phone,
+    phoneNumber: payload.phoneNumber,
     birthDate: new Date(payload.birthDate),
     street: payload.street,
     houseNumber: payload.houseNumber,
-    zipCode: payload.zipCode,
+    zip: payload.zip,
     city: payload.city,
     subjects: payload.subjects,
     cv: payload.cv,
     abiturCertificate: payload.abiturCertificate,
-    officialIdDocument: payload.officialIdDocument,
+    officialId: payload.officialId,
     status: APPLICATION_STATUS.SUBMITTED,
     submittedAt: new Date(),
   });
@@ -105,7 +105,7 @@ const getMyApplication = async (
  */
 const getAllApplications = async (query: Record<string, unknown>) => {
   const applicationQuery = new QueryBuilder(TutorApplication.find(), query)
-    .search(['name', 'email', 'phone', 'city'])
+    .search(['name', 'email', 'phoneNumber', 'city'])
     .filter()
     .sort()
     .paginate()

@@ -16,12 +16,12 @@ export type ITutorApplication = {
   subjects: Types.ObjectId[];
   name: string;
   email: string;
-  phone: string;
+  phoneNumber: string;
 
   // Address (structured)
   street: string;
   houseNumber: string;
-  zipCode: string;
+  zip: string;
   city: string;
 
   birthDate: Date;
@@ -29,7 +29,7 @@ export type ITutorApplication = {
   // Documents (all mandatory)
   cv: string;
   abiturCertificate: string;
-  officialIdDocument: string;
+  officialId: string;
 
   // Status Tracking (simple)
   status: APPLICATION_STATUS;

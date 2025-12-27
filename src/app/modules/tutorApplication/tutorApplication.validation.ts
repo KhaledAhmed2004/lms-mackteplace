@@ -1,9 +1,5 @@
 import { z } from 'zod';
 
-// Password regex - same as user registration
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={}[\]|;:'",.<>/?]).{8,}$/;
-
 // Create application validation (PUBLIC - creates user + application)
 const createApplicationZodSchema = z.object({
   body: z.object({
@@ -19,11 +15,7 @@ const createApplicationZodSchema = z.object({
       .string({
         required_error: 'Password is required',
       })
-      .min(8, 'Password must be at least 8 characters')
-      .regex(
-        passwordRegex,
-        'Password must contain uppercase, lowercase, number, and special character'
-      ),
+      .min(8, 'Password must be at least 8 characters'),
 
     // Personal info
     name: z
@@ -41,7 +33,7 @@ const createApplicationZodSchema = z.object({
         message: 'Invalid date format',
       }),
 
-    phone: z
+    phoneNumber: z
       .string({
         required_error: 'Phone number is required',
       })
@@ -63,7 +55,7 @@ const createApplicationZodSchema = z.object({
       .trim()
       .min(1, 'House number is required'),
 
-    zipCode: z
+    zip: z
       .string({
         required_error: 'ZIP code is required',
       })
@@ -95,7 +87,7 @@ const createApplicationZodSchema = z.object({
       })
       .url('Abitur certificate must be a valid URL'),
 
-    officialIdDocument: z
+    officialId: z
       .string({
         required_error: 'Official ID document is required',
       })

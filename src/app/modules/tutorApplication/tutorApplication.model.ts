@@ -28,7 +28,7 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       trim: true,
       unique: true,
     },
-    phone: {
+    phoneNumber: {
       type: String,
       required: [true, 'Phone number is required'],
       trim: true,
@@ -49,7 +49,7 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       required: [true, 'House number is required'],
       trim: true,
     },
-    zipCode: {
+    zip: {
       type: String,
       required: [true, 'ZIP code is required'],
       trim: true,
@@ -69,7 +69,7 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       type: String,
       required: [true, 'Abitur certificate is required'],
     },
-    officialIdDocument: {
+    officialId: {
       type: String,
       required: [true, 'Official ID document is required'],
     },

@@ -1,6 +1,7 @@
 import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
+import { fileHandler } from '../../middlewares/fileHandler';
 import validateRequest from '../../middlewares/validateRequest';
 import { TutorApplicationController } from './tutorApplication.controller';
 import { TutorApplicationValidation } from './tutorApplication.validation';
@@ -11,17 +12,20 @@ const router = express.Router();
  * @route   POST /api/v1/applications
  * @desc    Submit tutor application (PUBLIC - creates user + application)
  * @access  Public (no auth required)
- * @body    {
- *   email, password,
- *   name, birthDate, phone,
- *   street, houseNumber, zipCode, city,
- *   subjects[],
- *   cv, abiturCertificate, officialIdDocument
- * }
+ * @body    FormData with:
+ *   - data: JSON string { email, password, name, birthDate, phoneNumber, street, houseNumber, zip, city, subjects[] }
+ *   - cv: File (PDF/Image)
+ *   - abiturCertificate: File (PDF/Image)
+ *   - officialId: File (PDF/Image)
  * @note    First-time registration for tutors
  */
 router.post(
   '/',
+  fileHandler([
+    { name: 'cv', maxCount: 1 },
+    { name: 'abiturCertificate', maxCount: 1 },
+    { name: 'officialId', maxCount: 1 },
+  ]),
   validateRequest(TutorApplicationValidation.createApplicationZodSchema),
   TutorApplicationController.submitApplication
 );
