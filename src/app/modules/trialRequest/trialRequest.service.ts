@@ -1,5 +1,6 @@
 import { StatusCodes } from 'http-status-codes';
 import { Types } from 'mongoose';
+import { Secret } from 'jsonwebtoken';
 import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
@@ -11,6 +12,21 @@ import { SessionRequest } from '../sessionRequest/sessionRequest.model';
 import { SESSION_REQUEST_STATUS } from '../sessionRequest/sessionRequest.interface';
 import { Message } from '../message/message.model';
 import QueryBuilder from '../../builder/QueryBuilder';
+import { jwtHelper } from '../../../helpers/jwtHelper';
+import config from '../../../config';
+
+// Response type for createTrialRequest
+interface CreateTrialRequestResponse {
+  trialRequest: ITrialRequest;
+  accessToken?: string;
+  refreshToken?: string;
+  user?: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
 
 /**
  * Create trial request (First-time Student or Guest ONLY)
@@ -20,7 +36,7 @@ import QueryBuilder from '../../builder/QueryBuilder';
 const createTrialRequest = async (
   studentId: string | null,
   payload: Partial<ITrialRequest>
-): Promise<ITrialRequest> => {
+): Promise<CreateTrialRequestResponse> => {
   // Validate subject exists
   const subjectExists = await Subject.findById(payload.subject);
   if (!subjectExists) {
@@ -151,6 +167,10 @@ const createTrialRequest = async (
 
   // Auto-create User account for guest users when trial request is created
   let createdStudentId = studentId;
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  let userInfo: CreateTrialRequestResponse['user'] | undefined;
+
   if (!studentId && payload.studentInfo) {
     // Determine email and password based on age
     // For under 18: use guardian's email/password (guardian becomes the account holder)
@@ -185,6 +205,24 @@ const createTrialRequest = async (
       });
 
       createdStudentId = newUser._id.toString();
+
+      // Generate JWT tokens for auto-login
+      accessToken = jwtHelper.createToken(
+        { id: newUser._id, role: newUser.role, email: newUser.email },
+        config.jwt.jwt_secret as Secret,
+        config.jwt.jwt_expire_in as string
+      );
+      refreshToken = jwtHelper.createToken(
+        { id: newUser._id, role: newUser.role, email: newUser.email },
+        config.jwt.jwt_refresh_secret as Secret,
+        config.jwt.jwt_refresh_expire_in as string
+      );
+      userInfo = {
+        _id: newUser._id.toString(),
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      };
     }
   }
 
@@ -206,7 +244,12 @@ const createTrialRequest = async (
   // TODO: Send email notification to admin
   // TODO: Send confirmation email to student
 
-  return trialRequest;
+  return {
+    trialRequest,
+    accessToken,
+    refreshToken,
+    user: userInfo,
+  };
 };
 
 /**

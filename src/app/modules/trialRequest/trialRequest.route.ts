@@ -3,6 +3,7 @@ import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
 import optionalAuth from '../../middlewares/optionalAuth';
 import validateRequest from '../../middlewares/validateRequest';
+import { fileHandler } from '../../middlewares/fileHandler';
 import { TrialRequestController } from './trialRequest.controller';
 import { TrialRequestValidation } from './trialRequest.validation';
 
@@ -33,6 +34,7 @@ const router = express.Router();
  */
 router.post(
   '/',
+  fileHandler([{ name: 'documents', maxCount: 3 }]),
   validateRequest(TrialRequestValidation.createTrialRequestZodSchema),
   TrialRequestController.createTrialRequest
 );
@@ -173,4 +175,3 @@ router.post(
 );
 
 export const TrialRequestRoutes = router;
-

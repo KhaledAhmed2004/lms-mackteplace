@@ -18,11 +18,18 @@ import { TutorSessionFeedback } from '../tutorSessionFeedback/tutorSessionFeedba
 import { FEEDBACK_STATUS } from '../tutorSessionFeedback/tutorSessionFeedback.interface';
 
 const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
-  const createUser = await User.create(payload);
+  // Auto-verify user on creation (skipping email verification for now)
+  const createUser = await User.create({
+    ...payload,
+    verified: true,
+  });
   if (!createUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
   }
 
+  // NOTE: Email verification temporarily disabled
+  // Uncomment below to re-enable OTP email verification
+  /*
   //send email
   const otp = generateOTP();
   const values = {
@@ -44,6 +51,7 @@ const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
     { _id: createUser._id },
     { $set: { authentication } }
   );
+  */
 
   return createUser;
 };
@@ -152,11 +160,16 @@ const updateUserStatus = async (id: string, status: USER_STATUS) => {
 
 const getUserById = async (id: string) => {
   // Only return user info; remove task/bid side data
-  const user = await User.findById(id).select('-password -authentication');
+  const user = await User.findById(id)
+    .select('-password -authentication')
+    .populate({
+      path: 'tutorProfile.subjects',
+      select: 'name _id',
+    });
   if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
   }
-  return { user };
+  return user;
 };
 
 const getUserDetailsById = async (id: string) => {
@@ -235,7 +248,12 @@ const unblockStudent = async (id: string) => {
 
 const getAllTutors = async (query: Record<string, unknown>) => {
   const tutorQuery = new QueryBuilder(
-    User.find({ role: USER_ROLES.TUTOR }).select('-password -authentication'),
+    User.find({ role: USER_ROLES.TUTOR })
+      .select('-password -authentication')
+      .populate({
+        path: 'tutorProfile.subjects',
+        select: 'name _id',
+      }),
     query
   )
     .search(['name', 'email'])

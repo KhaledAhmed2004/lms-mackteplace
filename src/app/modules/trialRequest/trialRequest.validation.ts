@@ -159,8 +159,8 @@ const createTrialRequestZodSchema = z.object({
       })
       .optional(),
 
-    // Documents (Optional)
-    documents: z.array(z.string()).optional(),
+    // Documents (Optional) - can be single string or array from fileHandler
+    documents: z.union([z.string(), z.array(z.string())]).optional(),
   }),
 });
 

@@ -247,13 +247,21 @@ const approveApplication = async (
   }
   await application.save();
 
-  // Update user role to TUTOR
+  // Build full address from application fields
+  const fullAddress = `${application.street} ${application.houseNumber}, ${application.zip} ${application.city}`;
+
+  // Update user role to TUTOR and copy data from application
   await User.findOneAndUpdate(
     { email: application.email },
     {
       role: USER_ROLES.TUTOR,
       'tutorProfile.isVerified': true,
       'tutorProfile.verificationStatus': 'APPROVED',
+      'tutorProfile.subjects': application.subjects,
+      'tutorProfile.address': fullAddress,
+      'tutorProfile.birthDate': application.birthDate,
+      'tutorProfile.cvUrl': application.cv,
+      'tutorProfile.abiturCertificateUrl': application.abiturCertificate,
     }
   );
 

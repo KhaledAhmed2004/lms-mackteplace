@@ -15,11 +15,25 @@ const createTrialRequest = catchAsync(async (req: Request, res: Response) => {
   const studentId = req.user?.id || null;
   const result = await TrialRequestService.createTrialRequest(studentId, req.body);
 
+  // Set refresh token in cookie if new user was created (auto-login)
+  if (result.refreshToken) {
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+  }
+
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.CREATED,
     message: 'Trial request created successfully. Matching tutors will be notified.',
-    data: result,
+    data: {
+      trialRequest: result.trialRequest,
+      accessToken: result.accessToken,
+      user: result.user,
+    },
   });
 });
 

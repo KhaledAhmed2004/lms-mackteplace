@@ -125,7 +125,12 @@ const userSchema = new Schema<IUser>(
       type: {
         address: String,
         birthDate: Date,
-        subjects: [String],
+        subjects: [
+          {
+            type: Schema.Types.ObjectId,
+            ref: 'Subject',
+          },
+        ],
         bio: String,
         languages: [String],
         teachingExperience: String,
