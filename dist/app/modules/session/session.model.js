@@ -99,6 +99,11 @@ const sessionSchema = new mongoose_1.Schema({
         enum: Object.values(session_interface_1.SESSION_STATUS),
         default: session_interface_1.SESSION_STATUS.SCHEDULED,
     },
+    paymentStatus: {
+        type: String,
+        enum: Object.values(session_interface_1.PAYMENT_STATUS),
+        default: session_interface_1.PAYMENT_STATUS.PENDING,
+    },
     messageId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Message',
@@ -118,6 +123,10 @@ const sessionSchema = new mongoose_1.Schema({
     trialRequestId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'TrialRequest',
+    },
+    isTrial: {
+        type: Boolean,
+        default: false,
     },
     // Reschedule fields
     rescheduleRequest: rescheduleRequestSchema,

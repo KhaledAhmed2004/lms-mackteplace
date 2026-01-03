@@ -52,6 +52,12 @@ const studentSubscriptionSchema = new mongoose_1.Schema({
     stripeSubscriptionId: {
         type: String,
     },
+    stripePaymentIntentId: {
+        type: String,
+    },
+    paidAt: {
+        type: Date,
+    },
     cancellationReason: {
         type: String,
         trim: true,

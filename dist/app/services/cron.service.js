@@ -22,13 +22,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CronService = exports.initializeCronJobs = exports.generateTutorEarnings = exports.generateMonthlyBillings = exports.sendSessionReminders = exports.autoCompleteSessions = exports.expireTrialRequests = void 0;
-const logger_1 = __importDefault(require("../../shared/logger"));
-const errorLogger_1 = __importDefault(require("../../shared/errorLogger"));
+const logger_1 = require("../../shared/logger");
 // TODO: Install node-cron package
 // import cron from 'node-cron';
 // Import services
@@ -52,11 +48,11 @@ const expireTrialRequests = () => __awaiter(void 0, void 0, void 0, function* ()
             $set: { status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.EXPIRED },
         });
         if (expiredRequests.modifiedCount > 0) {
-            logger_1.default.info(`Expired ${expiredRequests.modifiedCount} trial requests`);
+            logger_1.logger.info(`Expired ${expiredRequests.modifiedCount} trial requests`);
         }
     }
     catch (error) {
-        errorLogger_1.default.error('Failed to expire trial requests', { error });
+        logger_1.errorLogger.error('Failed to expire trial requests', { error });
     }
 });
 exports.expireTrialRequests = expireTrialRequests;
@@ -77,11 +73,11 @@ const autoCompleteSessions = () => __awaiter(void 0, void 0, void 0, function* (
             },
         });
         if (completedSessions.modifiedCount > 0) {
-            logger_1.default.info(`Auto-completed ${completedSessions.modifiedCount} sessions`);
+            logger_1.logger.info(`Auto-completed ${completedSessions.modifiedCount} sessions`);
         }
     }
     catch (error) {
-        errorLogger_1.default.error('Failed to auto-complete sessions', { error });
+        logger_1.errorLogger.error('Failed to auto-complete sessions', { error });
     }
 });
 exports.autoCompleteSessions = autoCompleteSessions;
@@ -132,14 +128,14 @@ const sendSessionReminders = () => __awaiter(void 0, void 0, void 0, function* (
         //   });
         // }
         if (sessionsIn24Hours.length > 0) {
-            logger_1.default.info(`Sent 24-hour reminders for ${sessionsIn24Hours.length} sessions`);
+            logger_1.logger.info(`Sent 24-hour reminders for ${sessionsIn24Hours.length} sessions`);
         }
         if (sessionsIn1Hour.length > 0) {
-            logger_1.default.info(`Sent 1-hour reminders for ${sessionsIn1Hour.length} sessions`);
+            logger_1.logger.info(`Sent 1-hour reminders for ${sessionsIn1Hour.length} sessions`);
         }
     }
     catch (error) {
-        errorLogger_1.default.error('Failed to send session reminders', { error });
+        logger_1.errorLogger.error('Failed to send session reminders', { error });
     }
 });
 exports.sendSessionReminders = sendSessionReminders;
@@ -153,10 +149,10 @@ const generateMonthlyBillings = () => __awaiter(void 0, void 0, void 0, function
         const year = lastMonth === 0 ? now.getFullYear() - 1 : now.getFullYear();
         const month = lastMonth === 0 ? 12 : lastMonth;
         const result = yield monthlyBilling_service_1.MonthlyBillingService.generateMonthlyBillings(month, year);
-        logger_1.default.info(`Generated ${result.length} monthly billings for ${year}-${month}`);
+        logger_1.logger.info(`Generated ${result.length} monthly billings for ${year}-${month}`);
     }
     catch (error) {
-        errorLogger_1.default.error('Failed to generate monthly billings', { error });
+        logger_1.errorLogger.error('Failed to generate monthly billings', { error });
     }
 });
 exports.generateMonthlyBillings = generateMonthlyBillings;
@@ -170,10 +166,10 @@ const generateTutorEarnings = () => __awaiter(void 0, void 0, void 0, function* 
         const year = lastMonth === 0 ? now.getFullYear() - 1 : now.getFullYear();
         const month = lastMonth === 0 ? 12 : lastMonth;
         const result = yield tutorEarnings_service_1.TutorEarningsService.generateTutorEarnings(month, year, 0.2);
-        logger_1.default.info(`Generated ${result.length} tutor earnings for ${year}-${month}`);
+        logger_1.logger.info(`Generated ${result.length} tutor earnings for ${year}-${month}`);
     }
     catch (error) {
-        errorLogger_1.default.error('Failed to generate tutor earnings', { error });
+        logger_1.errorLogger.error('Failed to generate tutor earnings', { error });
     }
 });
 exports.generateTutorEarnings = generateTutorEarnings;
@@ -207,7 +203,7 @@ const initializeCronJobs = () => {
     //   logger.info('Running cron: Generate tutor earnings');
     //   generateTutorEarnings();
     // });
-    logger_1.default.info('Cron jobs initialized (placeholders - install node-cron to activate)');
+    logger_1.logger.info('Cron jobs initialized (placeholders - install node-cron to activate)');
 };
 exports.initializeCronJobs = initializeCronJobs;
 exports.CronService = {

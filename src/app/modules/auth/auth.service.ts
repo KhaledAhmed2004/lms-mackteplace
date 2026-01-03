@@ -72,12 +72,12 @@ const loginUserFromDB = async (
 };
 
 // logout
-const logoutUserFromDB = async (user: JwtPayload, deviceToken: string) => {
-  if (!deviceToken) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Device token is required');
+const logoutUserFromDB = async (user: JwtPayload, deviceToken?: string) => {
+  // Only remove device token if provided (for mobile apps)
+  if (deviceToken) {
+    await User.removeDeviceToken(user.id, deviceToken);
   }
-
-  await User.removeDeviceToken(user.id, deviceToken);
+  // For web: just clear the cookie (handled in controller)
 };
 
 //forget password

@@ -16,9 +16,9 @@ const router = express_1.default.Router();
 // Create a new user
 router.post('/', (0, rateLimit_1.rateLimitMiddleware)({ windowMs: 60000, max: 20, routeName: 'create-user' }), (0, validateRequest_1.default)(user_validation_1.UserValidation.createUserZodSchema), user_controller_1.UserController.createUser);
 // Get user own profile
-router.get('/profile', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getUserProfile);
+router.get('/profile', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.APPLICANT), user_controller_1.UserController.getUserProfile);
 // Update user profile
-router.patch('/profile', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), (0, fileHandler_1.fileHandler)(['profilePicture']), (0, validateRequest_1.default)(user_validation_1.UserValidation.updateUserZodSchema), user_controller_1.UserController.updateProfile);
+router.patch('/profile', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.APPLICANT), (0, fileHandler_1.fileHandler)(['profilePicture']), (0, validateRequest_1.default)(user_validation_1.UserValidation.updateUserZodSchema), user_controller_1.UserController.updateProfile);
 // ============ TUTOR: STATISTICS ============
 /**
  * @route   GET /api/v1/users/my-statistics

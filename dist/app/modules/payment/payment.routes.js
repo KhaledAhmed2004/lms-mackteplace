@@ -15,9 +15,10 @@ const router = express_1.default.Router();
 // Note: Raw body parsing is handled at app level for webhook routes
 router.post('/webhook', webhook_controller_1.default.handleStripeWebhook);
 // Stripe Connect account management
-router.post('/stripe/account', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), stripeConnect_controller_1.StripeConnectController.createStripeAccountController);
-router.get('/stripe/onboarding', (0, auth_1.default)(user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), stripeConnect_controller_1.StripeConnectController.getOnboardingLinkController);
-router.get('/stripe/onboarding-status', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), stripeConnect_controller_1.StripeConnectController.checkOnboardingStatusController);
+// APPLICANT can also create account when their application is APPROVED
+router.post('/stripe/account', (0, auth_1.default)(user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.APPLICANT), stripeConnect_controller_1.StripeConnectController.createStripeAccountController);
+router.get('/stripe/onboarding', (0, auth_1.default)(user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), stripeConnect_controller_1.StripeConnectController.getOnboardingLinkController);
+router.get('/stripe/onboarding-status', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), stripeConnect_controller_1.StripeConnectController.checkOnboardingStatusController);
 // Payment history route for poster, tasker, super admin
 router.get('/history', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), payment_controller_1.default.getPaymentHistoryController);
 // Retrieve current intent and client_secret by bidId

@@ -4,6 +4,7 @@ import {
   SessionModel,
   SESSION_STATUS,
   RESCHEDULE_STATUS,
+  PAYMENT_STATUS,
 } from './session.interface';
 
 // Reschedule request sub-schema
@@ -107,6 +108,11 @@ const sessionSchema = new Schema<ISession>(
       enum: Object.values(SESSION_STATUS),
       default: SESSION_STATUS.SCHEDULED,
     },
+    paymentStatus: {
+      type: String,
+      enum: Object.values(PAYMENT_STATUS),
+      default: PAYMENT_STATUS.PENDING,
+    },
     messageId: {
       type: Schema.Types.ObjectId,
       ref: 'Message',
@@ -126,6 +132,10 @@ const sessionSchema = new Schema<ISession>(
     trialRequestId: {
       type: Schema.Types.ObjectId,
       ref: 'TrialRequest',
+    },
+    isTrial: {
+      type: Boolean,
+      default: false,
     },
     // Reschedule fields
     rescheduleRequest: rescheduleRequestSchema,

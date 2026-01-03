@@ -20,12 +20,13 @@ const proposeSession = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
- * Accept session proposal (Student accepts)
+ * Accept session proposal (Student or Tutor accepts)
+ * Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
  */
 const acceptSessionProposal = catchAsync(async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const studentId = req.user!.id as string;
-  const result = await SessionService.acceptSessionProposal(messageId, studentId);
+  const userId = req.user!.id as string;
+  const result = await SessionService.acceptSessionProposal(messageId, userId);
 
   sendResponse(res, {
     success: true,
@@ -36,16 +37,38 @@ const acceptSessionProposal = catchAsync(async (req: Request, res: Response) => 
 });
 
 /**
- * Reject session proposal (Student rejects)
+ * Counter-propose session (Student suggests alternative time)
+ */
+const counterProposeSession = catchAsync(async (req: Request, res: Response) => {
+  const { messageId } = req.params;
+  const studentId = req.user!.id as string;
+
+  const result = await SessionService.counterProposeSession(
+    messageId,
+    studentId,
+    req.body
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.CREATED,
+    message: 'Counter-proposal sent successfully',
+    data: result,
+  });
+});
+
+/**
+ * Reject session proposal (Student or Tutor rejects)
+ * Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
  */
 const rejectSessionProposal = catchAsync(async (req: Request, res: Response) => {
   const { messageId } = req.params;
-  const studentId = req.user!.id as string;
+  const userId = req.user!.id as string;
   const { rejectionReason } = req.body;
 
   const result = await SessionService.rejectSessionProposal(
     messageId,
-    studentId,
+    userId,
     rejectionReason
   );
 
@@ -238,6 +261,7 @@ const autoTransitionStatuses = catchAsync(async (req: Request, res: Response) =>
 export const SessionController = {
   proposeSession,
   acceptSessionProposal,
+  counterProposeSession,
   rejectSessionProposal,
   getAllSessions,
   getSingleSession,

@@ -25,33 +25,53 @@ router.post(
   SessionController.proposeSession
 );
 
-// ============ STUDENT ROUTES ============
+// ============ PROPOSAL RESPONSE ROUTES (Student or Tutor) ============
 
 /**
  * @route   POST /api/v1/sessions/proposals/:messageId/accept
  * @desc    Accept session proposal
- * @access  Student only
+ * @access  Student or Tutor (recipient of proposal, not sender)
+ * @note    Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
+ * @note    User cannot accept their own proposal
  * @note    Creates session with status: SCHEDULED
  * @note    Generates Google Meet link (placeholder)
  * @note    Updates proposal message status to ACCEPTED
  */
 router.post(
   '/proposals/:messageId/accept',
-  auth(USER_ROLES.STUDENT),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   validateRequest(SessionValidation.acceptSessionProposalZodSchema),
   SessionController.acceptSessionProposal
 );
 
 /**
+ * @route   POST /api/v1/sessions/proposals/:messageId/counter
+ * @desc    Counter-propose session with alternative time
+ * @access  Student only
+ * @body    { newStartTime: Date, newEndTime: Date, reason?: string }
+ * @note    Original proposal status changes to COUNTER_PROPOSED
+ * @note    Creates new proposal message with student's preferred time
+ * @note    Tutor can then accept or reject the counter-proposal
+ */
+router.post(
+  '/proposals/:messageId/counter',
+  auth(USER_ROLES.STUDENT),
+  validateRequest(SessionValidation.counterProposeSessionZodSchema),
+  SessionController.counterProposeSession
+);
+
+/**
  * @route   POST /api/v1/sessions/proposals/:messageId/reject
  * @desc    Reject session proposal
- * @access  Student only
+ * @access  Student or Tutor (recipient of proposal, not sender)
  * @body    { rejectionReason: string }
+ * @note    Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
+ * @note    User cannot reject their own proposal
  * @note    Updates proposal message status to REJECTED
  */
 router.post(
   '/proposals/:messageId/reject',
-  auth(USER_ROLES.STUDENT),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   validateRequest(SessionValidation.rejectSessionProposalZodSchema),
   SessionController.rejectSessionProposal
 );

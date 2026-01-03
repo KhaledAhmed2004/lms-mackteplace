@@ -47,4 +47,16 @@ const markChatRead = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
-exports.MessageController = { sendMessage, getMessage, markChatRead };
+// Get all messages in a chat
+const getChatMessages = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const chatId = req.params.chatId;
+    const result = yield message_service_1.MessageService.getMessageFromDB(req.user, chatId, req.query);
+    (0, sendResponse_1.default)(res, {
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        success: true,
+        message: 'Chat messages retrieved successfully',
+        data: result.messages,
+        meta: result.pagination,
+    });
+}));
+exports.MessageController = { sendMessage, getMessage, markChatRead, getChatMessages };

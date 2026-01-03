@@ -5,6 +5,7 @@ import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { Chat } from '../chat/chat.model';
+import { Message } from '../message/message.model';
 import { Subject } from '../subject/subject.model';
 import { TrialRequest } from '../trialRequest/trialRequest.model';
 import { TRIAL_REQUEST_STATUS } from '../trialRequest/trialRequest.interface';
@@ -637,10 +638,12 @@ const getSingleSessionRequest = async (id: string): Promise<ISessionRequest | nu
 /**
  * Accept session request (Tutor)
  * Creates chat and connects student with tutor
+ * Sends introductory message to chat
  */
 const acceptSessionRequest = async (
   requestId: string,
-  tutorId: string
+  tutorId: string,
+  introductoryMessage?: string
 ): Promise<ISessionRequest | null> => {
   // Verify request exists and is pending
   const request = await SessionRequest.findById(requestId).populate('subject', 'name');
@@ -673,8 +676,12 @@ const acceptSessionRequest = async (
   }
 
   // Verify tutor teaches this subject (compare ObjectId)
+  // Handle both populated and non-populated subject field
   const tutorSubjectIds = tutor.tutorProfile?.subjects?.map(s => s.toString()) || [];
-  if (!tutorSubjectIds.includes(request.subject.toString())) {
+  const requestSubjectId = typeof request.subject === 'object' && request.subject._id
+    ? request.subject._id.toString()
+    : request.subject.toString();
+  if (!tutorSubjectIds.includes(requestSubjectId)) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'You do not teach this subject'
@@ -686,6 +693,16 @@ const acceptSessionRequest = async (
     participants: [request.studentId, new Types.ObjectId(tutorId)],
     sessionRequestId: request._id, // Link chat to session request
   });
+
+  // Send introductory message if provided
+  if (introductoryMessage && introductoryMessage.trim()) {
+    await Message.create({
+      chatId: chat._id,
+      sender: new Types.ObjectId(tutorId),
+      text: introductoryMessage.trim(),
+      type: 'text',
+    });
+  }
 
   // Update session request
   request.status = SESSION_REQUEST_STATUS.ACCEPTED;

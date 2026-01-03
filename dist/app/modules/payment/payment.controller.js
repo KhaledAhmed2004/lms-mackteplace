@@ -42,7 +42,7 @@ const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const payment_service_1 = __importStar(require("./payment.service"));
-const stripeConnect_service_1 = require("./stripeConnect.service");
+const stripeConnect_service_1 = __importDefault(require("./stripeConnect.service"));
 // Get current intent (and client_secret if applicable) by bidId
 exports.getCurrentIntentByBidController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { bidId } = req.params;
@@ -111,10 +111,7 @@ exports.getPaymentsController = (0, catchAsync_1.default)((req, res) => __awaite
         filters.dateFrom = new Date(dateFrom);
     if (dateTo)
         filters.dateTo = new Date(dateTo);
-    const result = yield (0, payment_service_1.getPayments)(filters, {
-        page: Number(page) || 1,
-        limit: Number(limit) || 10,
-    });
+    const result = yield (0, payment_service_1.getPayments)(filters, Number(page) || 1, Number(limit) || 10);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,
@@ -140,7 +137,7 @@ exports.getPaymentStatsController = (0, catchAsync_1.default)((_req, res) => __a
 }));
 const deleteStripeAccountController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { accountId } = req.params;
-    const deletedAccount = yield (0, stripeConnect_service_1.deleteStripeAccountService)(accountId);
+    const deletedAccount = yield stripeConnect_service_1.default.deleteStripeAccountService(accountId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_1.default.OK,
         success: true,

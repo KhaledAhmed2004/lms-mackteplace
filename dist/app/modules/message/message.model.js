@@ -127,4 +127,21 @@ messageSchema.pre('save', function (next) {
     }
     next();
 });
+// Virtual field: 'content' as alias for 'text' (for frontend compatibility)
+messageSchema.virtual('content').get(function () {
+    return this.text;
+});
+messageSchema.virtual('content').set(function (value) {
+    this.text = value;
+});
+// Ensure virtuals are included in JSON/Object output
+messageSchema.set('toJSON', { virtuals: true });
+messageSchema.set('toObject', { virtuals: true });
+// Auto-populate sender on find queries
+messageSchema.pre('find', function () {
+    this.populate('sender', '_id name profilePicture');
+});
+messageSchema.pre('findOne', function () {
+    this.populate('sender', '_id name profilePicture');
+});
 exports.Message = (0, mongoose_1.model)('Message', messageSchema);

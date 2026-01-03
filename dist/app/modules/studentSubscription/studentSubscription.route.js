@@ -43,6 +43,21 @@ router.get('/my-plan-usage', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), stu
  * @body    { cancellationReason: string }
  */
 router.patch('/:id/cancel', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(studentSubscription_validation_1.StudentSubscriptionValidation.cancelSubscriptionZodSchema), studentSubscription_controller_1.StudentSubscriptionController.cancelSubscription);
+/**
+ * @route   POST /api/v1/subscriptions/create-payment-intent
+ * @desc    Create Stripe PaymentIntent for subscription
+ * @access  Student only
+ * @body    { tier: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' }
+ * @returns { clientSecret, subscriptionId, amount, currency }
+ */
+router.post('/create-payment-intent', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(studentSubscription_validation_1.StudentSubscriptionValidation.subscribeToPlanZodSchema), studentSubscription_controller_1.StudentSubscriptionController.createPaymentIntent);
+/**
+ * @route   POST /api/v1/subscriptions/confirm-payment
+ * @desc    Confirm payment and activate subscription
+ * @access  Student only
+ * @body    { subscriptionId, paymentIntentId }
+ */
+router.post('/confirm-payment', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(studentSubscription_validation_1.StudentSubscriptionValidation.confirmPaymentZodSchema), studentSubscription_controller_1.StudentSubscriptionController.confirmPayment);
 // ============ ADMIN ROUTES ============
 /**
  * @route   GET /api/v1/subscriptions

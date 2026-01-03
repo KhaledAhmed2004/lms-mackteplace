@@ -10,6 +10,7 @@ import { ISession, SESSION_STATUS, RESCHEDULE_STATUS } from './session.interface
 import { Session } from './session.model';
 import { TutorSessionFeedbackService } from '../tutorSessionFeedback/tutorSessionFeedback.service';
 import { UserService } from '../user/user.service';
+import { ActivityLogService } from '../activityLog/activityLog.service';
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 
 /**
@@ -78,6 +79,7 @@ const proposeSession = async (
   const totalPrice = (pricePerHour * duration) / 60;
 
   // Create session proposal message
+  // expiresAt = startTime (proposal expires when session time passes)
   const message = await Message.create({
     chatId: new Types.ObjectId(payload.chatId),
     sender: new Types.ObjectId(tutorId),
@@ -91,6 +93,7 @@ const proposeSession = async (
       price: totalPrice,
       description: payload.description,
       status: 'PROPOSED',
+      expiresAt: startTime, // Expires when session start time passes
     },
   });
 
@@ -107,12 +110,13 @@ const proposeSession = async (
 };
 
 /**
- * Accept session proposal (Student accepts)
+ * Accept session proposal (Student or Tutor accepts)
+ * Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
  * Creates actual session and Google Meet link
  */
 const acceptSessionProposal = async (
   messageId: string,
-  studentId: string
+  userId: string
 ) => {
   // Get proposal message
   const message = await Message.findById(messageId).populate('chatId');
@@ -124,13 +128,18 @@ const acceptSessionProposal = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'This is not a session proposal');
   }
 
-  // Verify student is participant
+  // Verify user is participant
   const chat = message.chatId as any;
-  const isStudentParticipant = chat.participants.some(
-    (p: Types.ObjectId) => p.toString() === studentId
+  const isParticipant = chat.participants.some(
+    (p: Types.ObjectId) => p.toString() === userId
   );
-  if (!isStudentParticipant) {
+  if (!isParticipant) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+  }
+
+  // User cannot accept their own proposal
+  if (message.sender.toString() === userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You cannot accept your own proposal');
   }
 
   // Check if proposal is still valid
@@ -148,12 +157,38 @@ const acceptSessionProposal = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Session proposal has expired');
   }
 
-  // Get tutor ID (sender of proposal)
-  const tutorId = message.sender;
+  // Determine student and tutor IDs based on who sent the proposal
+  // If proposal sender is the tutor, then accepter is the student (normal flow)
+  // If proposal sender is the student (counter-proposal), then accepter is the tutor
+  const proposalSender = await User.findById(message.sender);
+  const accepter = await User.findById(userId);
+
+  if (!proposalSender || !accepter) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+  }
+
+  let studentId: Types.ObjectId;
+  let tutorId: Types.ObjectId;
+
+  if (proposalSender.role === USER_ROLES.TUTOR) {
+    // Normal flow: Tutor proposed, Student accepts
+    tutorId = message.sender;
+    studentId = new Types.ObjectId(userId);
+  } else if (proposalSender.role === USER_ROLES.STUDENT) {
+    // Counter-proposal flow: Student counter-proposed, Tutor accepts
+    studentId = message.sender;
+    tutorId = new Types.ObjectId(userId);
+  } else {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid proposal sender role');
+  }
+
+  // Check if this is a trial session (chat linked to a trial request)
+  const trialRequestId = chat.trialRequestId;
+  const isTrial = !!trialRequestId;
 
   // Create session
   const session = await Session.create({
-    studentId: new Types.ObjectId(studentId),
+    studentId,
     tutorId,
     subject: message.sessionProposal.subject,
     description: message.sessionProposal.description,
@@ -165,6 +200,8 @@ const acceptSessionProposal = async (
     status: SESSION_STATUS.SCHEDULED,
     messageId: message._id as Types.ObjectId,
     chatId: message.chatId as Types.ObjectId,
+    isTrial,
+    trialRequestId,
   });
 
   // TODO: Generate Google Meet link
@@ -182,9 +219,22 @@ const acceptSessionProposal = async (
   message.sessionProposal.sessionId = session._id as Types.ObjectId;
   await message.save();
 
+  // Log activity - Session scheduled
+  const student = await User.findById(studentId);
+  ActivityLogService.logActivity({
+    userId: studentId,
+    actionType: 'SESSION_SCHEDULED',
+    title: 'Session Scheduled',
+    description: `${student?.name || 'Student'} scheduled a ${session.subject} session`,
+    entityType: 'SESSION',
+    entityId: session._id as Types.ObjectId,
+    status: 'success',
+  });
+
   // TODO: Send notifications
-  // io.to(tutorId.toString()).emit('sessionAccepted', {
-  //   studentName: student.name,
+  // const otherPartyId = userId === studentId.toString() ? tutorId : studentId;
+  // io.to(otherPartyId.toString()).emit('sessionAccepted', {
+  //   accepterName: accepter.name,
   //   sessionId: session._id,
   //   meetLink: session.googleMeetLink
   // });
@@ -193,11 +243,124 @@ const acceptSessionProposal = async (
 };
 
 /**
- * Reject session proposal (Student rejects)
+ * Student counter-proposes alternative time for a session proposal
+ * Creates new session_proposal message with the student's preferred time
+ */
+const counterProposeSession = async (
+  originalMessageId: string,
+  studentId: string,
+  payload: {
+    newStartTime: string;
+    newEndTime: string;
+    reason?: string;
+  }
+) => {
+  // Get original proposal message
+  const originalMessage = await Message.findById(originalMessageId).populate('chatId');
+  if (!originalMessage) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session proposal not found');
+  }
+
+  if (originalMessage.type !== 'session_proposal' || !originalMessage.sessionProposal) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This is not a session proposal');
+  }
+
+  // Verify student is participant
+  const chat = originalMessage.chatId as any;
+  const isStudentParticipant = chat.participants.some(
+    (p: Types.ObjectId) => p.toString() === studentId
+  );
+  if (!isStudentParticipant) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+  }
+
+  // Check if proposal is still valid
+  if (originalMessage.sessionProposal.status !== 'PROPOSED') {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Session proposal is already ${originalMessage.sessionProposal.status.toLowerCase()}`
+    );
+  }
+
+  // Check if expired
+  if (new Date() > originalMessage.sessionProposal.expiresAt) {
+    originalMessage.sessionProposal.status = 'EXPIRED';
+    await originalMessage.save();
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Session proposal has expired');
+  }
+
+  // Validate new times
+  const newStartTime = new Date(payload.newStartTime);
+  const newEndTime = new Date(payload.newEndTime);
+
+  if (newStartTime <= new Date()) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New start time must be in the future');
+  }
+
+  if (newEndTime <= newStartTime) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'End time must be after start time');
+  }
+
+  // Calculate duration
+  const duration = (newEndTime.getTime() - newStartTime.getTime()) / (1000 * 60); // minutes
+
+  // Get student for price calculation
+  const student = await User.findById(studentId);
+  if (!student) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
+  }
+
+  // Get price based on student's subscription tier
+  let pricePerHour = 30; // Default: Flexible
+  if (student.studentProfile?.currentPlan === 'REGULAR') {
+    pricePerHour = 28;
+  } else if (student.studentProfile?.currentPlan === 'LONG_TERM') {
+    pricePerHour = 25;
+  }
+
+  const totalPrice = (pricePerHour * duration) / 60;
+
+  // Mark original proposal as COUNTER_PROPOSED
+  originalMessage.sessionProposal.status = 'COUNTER_PROPOSED';
+  await originalMessage.save();
+
+  // Create new counter-proposal message (sent by student)
+  const counterProposalMessage = await Message.create({
+    chatId: chat._id,
+    sender: new Types.ObjectId(studentId),
+    type: 'session_proposal',
+    text: `Counter-proposal: ${originalMessage.sessionProposal.subject}`,
+    sessionProposal: {
+      subject: originalMessage.sessionProposal.subject,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      duration,
+      price: totalPrice,
+      description: originalMessage.sessionProposal.description,
+      status: 'PROPOSED', // Counter-proposal is also a proposal that tutor can accept
+      expiresAt: newStartTime, // Expires when the proposed start time passes
+      originalProposalId: originalMessage._id,
+      counterProposalReason: payload.reason,
+    },
+  });
+
+  // TODO: Send real-time notification to tutor
+  // io.to(originalMessage.sender.toString()).emit('counterProposal', {
+  //   studentName: student.name,
+  //   newStartTime,
+  //   messageId: counterProposalMessage._id
+  // });
+
+  return counterProposalMessage;
+};
+
+/**
+ * Reject session proposal (Student or Tutor rejects)
+ * Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
  */
 const rejectSessionProposal = async (
   messageId: string,
-  studentId: string,
+  userId: string,
   rejectionReason: string
 ) => {
   const message = await Message.findById(messageId).populate('chatId');
@@ -209,13 +372,18 @@ const rejectSessionProposal = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'This is not a session proposal');
   }
 
-  // Verify student is participant
+  // Verify user is participant
   const chat = message.chatId as any;
-  const isStudentParticipant = chat.participants.some(
-    (p: Types.ObjectId) => p.toString() === studentId
+  const isParticipant = chat.participants.some(
+    (p: Types.ObjectId) => p.toString() === userId
   );
-  if (!isStudentParticipant) {
+  if (!isParticipant) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+  }
+
+  // User cannot reject their own proposal
+  if (message.sender.toString() === userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You cannot reject your own proposal');
   }
 
   // Check if proposal can be rejected
@@ -231,7 +399,7 @@ const rejectSessionProposal = async (
   message.sessionProposal.rejectionReason = rejectionReason;
   await message.save();
 
-  // TODO: Notify tutor
+  // TODO: Notify the proposal sender
   // io.to(message.sender.toString()).emit('sessionRejected', {
   //   rejectionReason
   // });
@@ -334,6 +502,18 @@ const cancelSession = async (
   session.cancelledBy = new Types.ObjectId(userId);
   session.cancelledAt = new Date();
   await session.save();
+
+  // Log activity - Session cancelled
+  const cancellingUser = await User.findById(userId);
+  ActivityLogService.logActivity({
+    userId: new Types.ObjectId(userId),
+    actionType: 'SESSION_CANCELLED',
+    title: 'Session Cancelled',
+    description: `${cancellingUser?.name || 'User'} cancelled a ${session.subject} session`,
+    entityType: 'SESSION',
+    entityId: session._id as Types.ObjectId,
+    status: 'warning',
+  });
 
   // TODO: Send notifications
   // TODO: Cancel Google Calendar event
@@ -793,6 +973,19 @@ const markAsCompletedEnhanced = async (sessionId: string): Promise<ISession | nu
     // Log error but don't fail the completion
   }
 
+  // Log activity - Session completed
+  const tutor = await User.findById(session.tutorId);
+  const student = await User.findById(session.studentId);
+  ActivityLogService.logActivity({
+    userId: session.studentId,
+    actionType: 'SESSION_COMPLETED',
+    title: 'Session Completed',
+    description: `${student?.name || 'Student'} completed a ${session.subject} session with ${tutor?.name || 'Tutor'}`,
+    entityType: 'SESSION',
+    entityId: session._id as Types.ObjectId,
+    status: 'success',
+  });
+
   // TODO: Send review request email to student
   // TODO: Send feedback reminder to tutor
 
@@ -802,6 +995,7 @@ const markAsCompletedEnhanced = async (sessionId: string): Promise<ISession | nu
 export const SessionService = {
   proposeSession,
   acceptSessionProposal,
+  counterProposeSession,
   rejectSessionProposal,
   getAllSessions,
   getSingleSession,

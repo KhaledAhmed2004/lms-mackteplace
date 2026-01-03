@@ -55,10 +55,11 @@ const loginUserFromDB = (payload) => __awaiter(void 0, void 0, void 0, function*
 });
 // logout
 const logoutUserFromDB = (user, deviceToken) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!deviceToken) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Device token is required');
+    // Only remove device token if provided (for mobile apps)
+    if (deviceToken) {
+        yield user_model_1.User.removeDeviceToken(user.id, deviceToken);
     }
-    yield user_model_1.User.removeDeviceToken(user.id, deviceToken);
+    // For web: just clear the cookie (handled in controller)
 });
 //forget password
 const forgetPasswordToDB = (email) => __awaiter(void 0, void 0, void 0, function* () {

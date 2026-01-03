@@ -28,12 +28,22 @@ const sendMessageToDB = async (payload: any): Promise<IMessage> => {
   // save to DB
   const response = await Message.create(payload);
 
+  // Populate sender for the socket event
+  const populatedMessage = await Message.findById(response._id)
+    .populate('sender', '_id name profilePicture')
+    .lean();
+
   //@ts-ignore
   const io = global.io;
-  if (io) {
+  if (io && populatedMessage) {
     // Room-based event for chat participants
-    io.to(`chat::${String(payload?.chatId)}`).emit('MESSAGE_SENT', {
-      message: response,
+    // Ensure chatId is a string for frontend matching
+    const chatIdStr = String(payload?.chatId);
+    io.to(`chat::${chatIdStr}`).emit('MESSAGE_SENT', {
+      message: {
+        ...populatedMessage,
+        chatId: chatIdStr, // Ensure string for frontend query key matching
+      },
     });
   }
 
@@ -84,7 +94,10 @@ const getMessageFromDB = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid Chat ID');
   }
 
-  const queryBuilder = new QueryBuilder(Message.find({ chatId: id }), query)
+  const queryBuilder = new QueryBuilder(
+    Message.find({ chatId: id }), // sender auto-populated via pre-hook
+    query
+  )
     .search(['text'])
     .filter()
     .sort()

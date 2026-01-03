@@ -117,6 +117,74 @@ const getMyPlanUsage = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Create Payment Intent for Subscription
+ * Called when student selects a plan to initiate payment
+ */
+const createPaymentIntent = catchAsync(async (req: Request, res: Response) => {
+  const studentId = req.user!.id as string;
+  const { tier } = req.body;
+
+  const result = await StudentSubscriptionService.createSubscriptionPaymentIntent(
+    studentId,
+    tier
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Payment intent created successfully',
+    data: result,
+  });
+});
+
+/**
+ * Confirm Subscription Payment
+ * Called after successful Stripe payment to activate subscription
+ */
+const confirmPayment = catchAsync(async (req: Request, res: Response) => {
+  const studentId = req.user!.id as string;
+  const { subscriptionId, paymentIntentId } = req.body;
+
+  const result = await StudentSubscriptionService.confirmSubscriptionPayment(
+    subscriptionId,
+    paymentIntentId,
+    studentId
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Subscription activated successfully',
+    data: result,
+  });
+});
+
+/**
+ * Get Payment History (Student)
+ * Returns paginated payment history
+ */
+const getPaymentHistory = catchAsync(async (req: Request, res: Response) => {
+  const studentId = req.user!.id as string;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const result = await StudentSubscriptionService.getPaymentHistory(studentId, page, limit);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Payment history retrieved successfully',
+    data: result.data,
+    pagination: {
+      page: result.meta.page,
+      limit: result.meta.limit,
+      total: result.meta.total,
+      totalPage: result.meta.totalPages,
+    },
+  });
+});
+
 export const StudentSubscriptionController = {
   subscribeToPlan,
   getMySubscription,
@@ -125,4 +193,7 @@ export const StudentSubscriptionController = {
   cancelSubscription,
   expireOldSubscriptions,
   getMyPlanUsage,
+  createPaymentIntent,
+  confirmPayment,
+  getPaymentHistory,
 };

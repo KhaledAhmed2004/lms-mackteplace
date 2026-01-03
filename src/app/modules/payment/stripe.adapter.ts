@@ -30,7 +30,7 @@ export const createExpressAccount = async (
         first_name: params.firstName,
         last_name: params.lastName || '',
         email: params.email,
-        dob: params.dob,
+        ...(params.dob && { dob: params.dob }),
         address: {
           city: params.city,
           country: 'US',

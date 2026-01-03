@@ -69,6 +69,8 @@ router.post('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLE
     }
 }), message_controller_1.MessageController.sendMessage);
 router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.getMessage);
+// Get all messages in a chat (alias route for frontend compatibility)
+router.get('/chat/:chatId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.getChatMessages);
 // Mark all messages in a chat as read
 router.post('/chat/:chatId/read', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.markChatRead);
 exports.MessageRoutes = router;

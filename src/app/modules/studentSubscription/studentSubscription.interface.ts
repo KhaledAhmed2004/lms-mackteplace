@@ -7,6 +7,7 @@ export enum SUBSCRIPTION_TIER {
 }
 
 export enum SUBSCRIPTION_STATUS {
+  PENDING = 'PENDING',           // Payment pending
   ACTIVE = 'ACTIVE',
   EXPIRED = 'EXPIRED',
   CANCELLED = 'CANCELLED',
@@ -32,10 +33,16 @@ export type IStudentSubscription = {
   // Billing
   stripeCustomerId?: string;         // Stripe customer ID
   stripeSubscriptionId?: string;     // Stripe subscription ID (for recurring)
+  stripePaymentIntentId?: string;    // Payment intent ID for initial payment
+  paidAt?: Date;                     // When payment was confirmed
 
   // Cancellation
   cancellationReason?: string;
   cancelledAt?: Date;
+
+  // Timestamps
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export type StudentSubscriptionModel = Model<IStudentSubscription>;

@@ -417,7 +417,11 @@ const acceptTrialRequest = async (
 
   // Verify tutor teaches this subject (compare ObjectId)
   const tutorSubjectIds = tutor.tutorProfile?.subjects?.map(s => s.toString()) || [];
-  if (!tutorSubjectIds.includes(request.subject.toString())) {
+  // Handle both populated and non-populated subject field
+  const requestSubjectId = typeof request.subject === 'object' && request.subject._id
+    ? request.subject._id.toString()
+    : request.subject.toString();
+  if (!tutorSubjectIds.includes(requestSubjectId)) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'You do not teach this subject'

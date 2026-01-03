@@ -16,6 +16,7 @@ import { SESSION_STATUS } from '../session/session.interface';
 import { TutorEarnings } from '../tutorEarnings/tutorEarnings.model';
 import { TutorSessionFeedback } from '../tutorSessionFeedback/tutorSessionFeedback.model';
 import { FEEDBACK_STATUS } from '../tutorSessionFeedback/tutorSessionFeedback.interface';
+import { ActivityLogService } from '../activityLog/activityLog.service';
 
 const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
   // Auto-verify user on creation (skipping email verification for now)
@@ -26,6 +27,19 @@ const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
   if (!createUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
   }
+
+  // Log activity for user registration
+  const roleLabel = createUser.role === USER_ROLES.STUDENT ? 'Student' :
+                    createUser.role === USER_ROLES.TUTOR ? 'Tutor' : 'User';
+  ActivityLogService.logActivity({
+    userId: createUser._id,
+    actionType: 'USER_REGISTERED',
+    title: `New ${roleLabel} Registered`,
+    description: `${createUser.name} joined the platform as a ${roleLabel.toLowerCase()}`,
+    entityType: 'USER',
+    entityId: createUser._id,
+    status: 'success',
+  });
 
   // NOTE: Email verification temporarily disabled
   // Uncomment below to re-enable OTP email verification
@@ -60,7 +74,9 @@ const getUserProfileFromDB = async (
   user: JwtPayload
 ): Promise<Partial<IUser>> => {
   const { id } = user;
-  const isExistUser = await User.isExistUserById(id);
+  const isExistUser = await User.findById(id)
+    .populate('tutorProfile.subjects', 'name');
+
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }

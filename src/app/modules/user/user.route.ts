@@ -20,14 +20,14 @@ router.post(
 // Get user own profile
 router.get(
   '/profile',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN, USER_ROLES.APPLICANT),
   UserController.getUserProfile
 );
 
 // Update user profile
 router.patch(
   '/profile',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN, USER_ROLES.APPLICANT),
   fileHandler(['profilePicture']),
   validateRequest(UserValidation.updateUserZodSchema),
   UserController.updateProfile

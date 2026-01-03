@@ -187,6 +187,58 @@ const getUserDistribution = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get unified sessions (Sessions + Trial Requests)
+ * Query: ?page=1&limit=10&status=SCHEDULED&paymentStatus=FREE_TRIAL&isTrial=true&search=john&sortBy=createdAt&sortOrder=desc
+ */
+const getUnifiedSessions = catchAsync(async (req: Request, res: Response) => {
+  const {
+    page,
+    limit,
+    status,
+    paymentStatus,
+    isTrial,
+    search,
+    sortBy,
+    sortOrder,
+  } = req.query;
+
+  const query = {
+    page: page ? parseInt(page as string) : undefined,
+    limit: limit ? parseInt(limit as string) : undefined,
+    status: status as string | undefined,
+    paymentStatus: paymentStatus as string | undefined,
+    isTrial: isTrial ? isTrial === 'true' : undefined,
+    search: search as string | undefined,
+    sortBy: sortBy as string | undefined,
+    sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+  };
+
+  const result = await AdminService.getUnifiedSessions(query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Unified sessions retrieved successfully',
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/**
+ * Get session stats for admin dashboard
+ */
+const getSessionStats = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getSessionStats();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Session stats retrieved successfully',
+    data: result,
+  });
+});
+
 export const AdminController = {
   getDashboardStats,
   getRevenueByMonth,
@@ -197,4 +249,6 @@ export const AdminController = {
   getOverviewStats,
   getMonthlyRevenue,
   getUserDistribution,
+  getUnifiedSessions,
+  getSessionStats,
 };

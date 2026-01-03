@@ -9,6 +9,7 @@ const user_1 = require("../../../enums/user");
 const auth_1 = __importDefault(require("../../middlewares/auth"));
 const optionalAuth_1 = __importDefault(require("../../middlewares/optionalAuth"));
 const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
+const fileHandler_1 = require("../../middlewares/fileHandler");
 const trialRequest_controller_1 = require("./trialRequest.controller");
 const trialRequest_validation_1 = require("./trialRequest.validation");
 const router = express_1.default.Router();
@@ -34,7 +35,7 @@ const router = express_1.default.Router();
  * @note    Request expires after 24 hours
  * @note    Guardian info required for students under 18
  */
-router.post('/', (0, validateRequest_1.default)(trialRequest_validation_1.TrialRequestValidation.createTrialRequestZodSchema), trialRequest_controller_1.TrialRequestController.createTrialRequest);
+router.post('/', (0, fileHandler_1.fileHandler)([{ name: 'documents', maxCount: 3 }]), (0, validateRequest_1.default)(trialRequest_validation_1.TrialRequestValidation.createTrialRequestZodSchema), trialRequest_controller_1.TrialRequestController.createTrialRequest);
 // ============ STUDENT ROUTES ============
 // NOTE: GET /my-requests removed - use /session-requests/my-requests instead (unified view)
 /**

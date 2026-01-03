@@ -59,6 +59,52 @@ const acceptSessionProposalZodSchema = z.object({
   }),
 });
 
+// Counter-propose session validation (Student suggests alternative time)
+const counterProposeSessionZodSchema = z.object({
+  params: z.object({
+    messageId: z
+      .string({
+        required_error: 'Message ID is required',
+      })
+      .regex(/^[0-9a-fA-F]{24}$/, 'Invalid message ID format'),
+  }),
+  body: z.object({
+    newStartTime: z
+      .string({
+        required_error: 'New start time is required',
+      })
+      .refine(date => !isNaN(Date.parse(date)), {
+        message: 'Invalid start time format',
+      })
+      .refine(
+        date => new Date(date) > new Date(),
+        {
+          message: 'New start time must be in the future',
+        }
+      ),
+
+    newEndTime: z
+      .string({
+        required_error: 'New end time is required',
+      })
+      .refine(date => !isNaN(Date.parse(date)), {
+        message: 'Invalid end time format',
+      }),
+
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Reason must be at least 10 characters')
+      .optional(),
+  }).refine(
+    data => new Date(data.newEndTime) > new Date(data.newStartTime),
+    {
+      message: 'End time must be after start time',
+      path: ['newEndTime'],
+    }
+  ),
+});
+
 // Reject session proposal validation (Student rejects)
 const rejectSessionProposalZodSchema = z.object({
   params: z.object({
@@ -135,6 +181,7 @@ const rescheduleSessionZodSchema = z.object({
 export const SessionValidation = {
   proposeSessionZodSchema,
   acceptSessionProposalZodSchema,
+  counterProposeSessionZodSchema,
   rejectSessionProposalZodSchema,
   cancelSessionZodSchema,
   completeSessionZodSchema,

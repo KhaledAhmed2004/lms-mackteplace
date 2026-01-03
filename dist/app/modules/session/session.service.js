@@ -25,6 +25,7 @@ const session_interface_1 = require("./session.interface");
 const session_model_1 = require("./session.model");
 const tutorSessionFeedback_service_1 = require("../tutorSessionFeedback/tutorSessionFeedback.service");
 const user_service_1 = require("../user/user.service");
+const activityLog_service_1 = require("../activityLog/activityLog.service");
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 /**
  * Propose session (Tutor sends proposal in chat)
@@ -72,6 +73,7 @@ const proposeSession = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     }
     const totalPrice = (pricePerHour * duration) / 60;
     // Create session proposal message
+    // expiresAt = startTime (proposal expires when session time passes)
     const message = yield message_model_1.Message.create({
         chatId: new mongoose_1.Types.ObjectId(payload.chatId),
         sender: new mongoose_1.Types.ObjectId(tutorId),
@@ -85,6 +87,7 @@ const proposeSession = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
             price: totalPrice,
             description: payload.description,
             status: 'PROPOSED',
+            expiresAt: startTime, // Expires when session start time passes
         },
     });
     // TODO: Send real-time notification to student
@@ -128,6 +131,9 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
     }
     // Get tutor ID (sender of proposal)
     const tutorId = message.sender;
+    // Check if this is a trial session (chat linked to a trial request)
+    const trialRequestId = chat.trialRequestId;
+    const isTrial = !!trialRequestId;
     // Create session
     const session = yield session_model_1.Session.create({
         studentId: new mongoose_1.Types.ObjectId(studentId),
@@ -142,6 +148,8 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
         status: session_interface_1.SESSION_STATUS.SCHEDULED,
         messageId: message._id,
         chatId: message.chatId,
+        isTrial,
+        trialRequestId,
     });
     // TODO: Generate Google Meet link
     // session.googleMeetLink = await generateGoogleMeetLink({
@@ -156,6 +164,17 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
     message.sessionProposal.status = 'ACCEPTED';
     message.sessionProposal.sessionId = session._id;
     yield message.save();
+    // Log activity - Session scheduled
+    const student = yield user_model_1.User.findById(studentId);
+    activityLog_service_1.ActivityLogService.logActivity({
+        userId: new mongoose_1.Types.ObjectId(studentId),
+        actionType: 'SESSION_SCHEDULED',
+        title: 'Session Scheduled',
+        description: `${(student === null || student === void 0 ? void 0 : student.name) || 'Student'} scheduled a ${session.subject} session`,
+        entityType: 'SESSION',
+        entityId: session._id,
+        status: 'success',
+    });
     // TODO: Send notifications
     // io.to(tutorId.toString()).emit('sessionAccepted', {
     //   studentName: student.name,
@@ -260,6 +279,17 @@ const cancelSession = (sessionId, userId, cancellationReason) => __awaiter(void 
     session.cancelledBy = new mongoose_1.Types.ObjectId(userId);
     session.cancelledAt = new Date();
     yield session.save();
+    // Log activity - Session cancelled
+    const cancellingUser = yield user_model_1.User.findById(userId);
+    activityLog_service_1.ActivityLogService.logActivity({
+        userId: new mongoose_1.Types.ObjectId(userId),
+        actionType: 'SESSION_CANCELLED',
+        title: 'Session Cancelled',
+        description: `${(cancellingUser === null || cancellingUser === void 0 ? void 0 : cancellingUser.name) || 'User'} cancelled a ${session.subject} session`,
+        entityType: 'SESSION',
+        entityId: session._id,
+        status: 'warning',
+    });
     // TODO: Send notifications
     // TODO: Cancel Google Calendar event
     return session;
@@ -564,6 +594,18 @@ const markAsCompletedEnhanced = (sessionId) => __awaiter(void 0, void 0, void 0,
         // Level update failed, but session is still completed
         // Log error but don't fail the completion
     }
+    // Log activity - Session completed
+    const tutor = yield user_model_1.User.findById(session.tutorId);
+    const student = yield user_model_1.User.findById(session.studentId);
+    activityLog_service_1.ActivityLogService.logActivity({
+        userId: session.studentId,
+        actionType: 'SESSION_COMPLETED',
+        title: 'Session Completed',
+        description: `${(student === null || student === void 0 ? void 0 : student.name) || 'Student'} completed a ${session.subject} session with ${(tutor === null || tutor === void 0 ? void 0 : tutor.name) || 'Tutor'}`,
+        entityType: 'SESSION',
+        entityId: session._id,
+        status: 'success',
+    });
     // TODO: Send review request email to student
     // TODO: Send feedback reminder to tutor
     return session;

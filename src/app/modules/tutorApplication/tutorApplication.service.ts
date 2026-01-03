@@ -1,4 +1,5 @@
 import { StatusCodes } from 'http-status-codes';
+import { Secret } from 'jsonwebtoken';
 import QueryBuilder from '../../builder/QueryBuilder';
 import ApiError from '../../../errors/ApiError';
 import { USER_ROLES } from '../../../enums/user';
@@ -8,6 +9,9 @@ import {
   ITutorApplication,
 } from './tutorApplication.interface';
 import { TutorApplication } from './tutorApplication.model';
+import { jwtHelper } from '../../../helpers/jwtHelper';
+import config from '../../../config';
+import { ActivityLogService } from '../activityLog/activityLog.service';
 
 type TApplicationPayload = {
   email: string;
@@ -63,6 +67,13 @@ const submitApplication = async (payload: TApplicationPayload) => {
     },
   });
 
+  // 3. Generate JWT token for auto-login
+  const accessToken = jwtHelper.createToken(
+    { id: newUser._id, role: newUser.role, email: newUser.email },
+    config.jwt.jwt_secret as Secret,
+    config.jwt.jwt_expire_in as string
+  );
+
   // 4. Create TutorApplication
   const application = await TutorApplication.create({
     name: payload.name,
@@ -81,7 +92,27 @@ const submitApplication = async (payload: TApplicationPayload) => {
     submittedAt: new Date(),
   });
 
-  return { application, user: { _id: newUser._id, email: newUser.email } };
+  // Log activity - Application submitted
+  ActivityLogService.logActivity({
+    userId: newUser._id,
+    actionType: 'APPLICATION_SUBMITTED',
+    title: 'New Tutor Application',
+    description: `${payload.name} submitted a tutor application`,
+    entityType: 'APPLICATION',
+    entityId: application._id,
+    status: 'success',
+  });
+
+  return {
+    application,
+    user: {
+      _id: newUser._id,
+      email: newUser.email,
+      name: newUser.name,
+      role: newUser.role,
+    },
+    accessToken,
+  };
 };
 
 // Get my application (for logged in applicant)
@@ -251,7 +282,7 @@ const approveApplication = async (
   const fullAddress = `${application.street} ${application.houseNumber}, ${application.zip} ${application.city}`;
 
   // Update user role to TUTOR and copy data from application
-  await User.findOneAndUpdate(
+  const updatedUser = await User.findOneAndUpdate(
     { email: application.email },
     {
       role: USER_ROLES.TUTOR,
@@ -262,8 +293,22 @@ const approveApplication = async (
       'tutorProfile.birthDate': application.birthDate,
       'tutorProfile.cvUrl': application.cv,
       'tutorProfile.abiturCertificateUrl': application.abiturCertificate,
-    }
+    },
+    { new: true }
   );
+
+  // Log activity - Tutor verified
+  if (updatedUser) {
+    ActivityLogService.logActivity({
+      userId: updatedUser._id,
+      actionType: 'TUTOR_VERIFIED',
+      title: 'Tutor Verified',
+      description: `${application.name} has been verified as a tutor`,
+      entityType: 'APPLICATION',
+      entityId: application._id,
+      status: 'success',
+    });
+  }
 
   return application;
 };
@@ -293,6 +338,20 @@ const rejectApplication = async (
   application.rejectionReason = rejectionReason;
   application.rejectedAt = new Date();
   await application.save();
+
+  // Log activity - Application rejected
+  const user = await User.findOne({ email: application.email });
+  if (user) {
+    ActivityLogService.logActivity({
+      userId: user._id,
+      actionType: 'APPLICATION_REJECTED',
+      title: 'Application Rejected',
+      description: `${application.name}'s tutor application was rejected`,
+      entityType: 'APPLICATION',
+      entityId: application._id,
+      status: 'warning',
+    });
+  }
 
   return application;
 };

@@ -55,6 +55,11 @@ const createReview = async (
     tutorId: session.tutorId,
   });
 
+  // Update session with reviewId
+  await Session.findByIdAndUpdate(payload.sessionId, {
+    reviewId: review._id,
+  });
+
   return review;
 };
 
@@ -262,6 +267,32 @@ const toggleVisibility = async (
   return review;
 };
 
+/**
+ * Link orphaned reviews to sessions (migration helper)
+ * This fixes reviews that were created before the reviewId update was added
+ */
+const linkOrphanedReviews = async (): Promise<{ linked: number; alreadyLinked: number }> => {
+  const reviews = await SessionReview.find({});
+  let linked = 0;
+  let alreadyLinked = 0;
+
+  for (const review of reviews) {
+    const session = await Session.findById(review.sessionId);
+    if (session) {
+      if (!session.reviewId) {
+        await Session.findByIdAndUpdate(review.sessionId, {
+          reviewId: review._id,
+        });
+        linked++;
+      } else {
+        alreadyLinked++;
+      }
+    }
+  }
+
+  return { linked, alreadyLinked };
+};
+
 export const SessionReviewService = {
   createReview,
   getMyReviews,
@@ -271,4 +302,5 @@ export const SessionReviewService = {
   deleteReview,
   getTutorStats,
   toggleVisibility,
+  linkOrphanedReviews,
 };

@@ -134,8 +134,8 @@ const createTrialRequestZodSchema = zod_1.z.object({
             message: 'Invalid preferred date/time format',
         })
             .optional(),
-        // Documents (Optional)
-        documents: zod_1.z.array(zod_1.z.string()).optional(),
+        // Documents (Optional) - can be single string or array from fileHandler
+        documents: zod_1.z.union([zod_1.z.string(), zod_1.z.array(zod_1.z.string())]).optional(),
     }),
 });
 // Cancel trial request validation (Student)

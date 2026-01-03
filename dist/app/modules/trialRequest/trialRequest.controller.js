@@ -28,11 +28,24 @@ const createTrialRequest = (0, catchAsync_1.default)((req, res) => __awaiter(voi
     // studentId will be null for guest users
     const studentId = ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id) || null;
     const result = yield trialRequest_service_1.TrialRequestService.createTrialRequest(studentId, req.body);
+    // Set refresh token in cookie if new user was created (auto-login)
+    if (result.refreshToken) {
+        res.cookie('refreshToken', result.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+    }
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.CREATED,
         message: 'Trial request created successfully. Matching tutors will be notified.',
-        data: result,
+        data: {
+            trialRequest: result.trialRequest,
+            accessToken: result.accessToken,
+            user: result.user,
+        },
     });
 }));
 // NOTE: getMatchingTrialRequests, getMyTrialRequests, getAllTrialRequests removed

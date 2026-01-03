@@ -12,6 +12,7 @@ type IData<T> = {
   statusCode: number;
   message?: string;
   pagination?: IPagination;
+  meta?: Record<string, unknown>;
   data?: T;
 };
 
@@ -23,6 +24,7 @@ const sendResponse = <T>(res: Response, data: IData<T>) => {
     success: data.success,
     message: data.message,
     pagination: data.pagination,
+    meta: data.meta,
     data: data.data,
   };
 

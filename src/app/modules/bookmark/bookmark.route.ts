@@ -8,6 +8,7 @@ import { BookmarkValidation } from './bookmark.validation';
 const router = express.Router();
 
 // Toggle bookmark (add if not exists, remove if exists)
+// ❌ NOT INTEGRATED IN FRONTEND
 router.post(
   '/',
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
@@ -16,6 +17,7 @@ router.post(
 );
 
 // Get all bookmarks of the current user
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/my-bookmarks',
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),

@@ -13,7 +13,7 @@ import PaymentService, {
 } from './payment.service';
 import { IPaymentFilters } from './payment.interface';
 import { JwtPayload } from 'jsonwebtoken';
-import { deleteStripeAccountService } from './stripeConnect.service';
+import StripeConnectService from './stripeConnect.service';
 
 // Get current intent (and client_secret if applicable) by bidId
 export const getCurrentIntentByBidController = catchAsync(
@@ -112,10 +112,11 @@ export const getPaymentsController = catchAsync(
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
 
-    const result = await getPayments(filters, {
-      page: Number(page) || 1,
-      limit: Number(limit) || 10,
-    });
+    const result = await getPayments(
+      filters,
+      Number(page) || 1,
+      Number(limit) || 10
+    );
 
     sendResponse(res, {
       success: true,
@@ -149,7 +150,7 @@ export const getPaymentStatsController = catchAsync(
 const deleteStripeAccountController = catchAsync(async (req, res) => {
   const { accountId } = req.params;
 
-  const deletedAccount = await deleteStripeAccountService(
+  const deletedAccount = await StripeConnectService.deleteStripeAccountService(
     accountId
   );
 

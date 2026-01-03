@@ -22,16 +22,10 @@ const createExpressAccount = (params) => __awaiter(void 0, void 0, void 0, funct
                 transfers: { requested: true },
             },
             business_type: 'individual',
-            individual: {
-                first_name: params.firstName,
-                last_name: params.lastName || '',
-                email: params.email,
-                dob: params.dob,
-                address: {
+            individual: Object.assign(Object.assign({ first_name: params.firstName, last_name: params.lastName || '', email: params.email }, (params.dob && { dob: params.dob })), { address: {
                     city: params.city,
                     country: 'US',
-                },
-            },
+                } }),
             metadata: params.metadata,
         });
         return account;

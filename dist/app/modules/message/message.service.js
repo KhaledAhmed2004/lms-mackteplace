@@ -37,12 +37,18 @@ const sendMessageToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     }
     // save to DB
     const response = yield message_model_1.Message.create(payload);
+    // Populate sender for the socket event
+    const populatedMessage = yield message_model_1.Message.findById(response._id)
+        .populate('sender', '_id name profilePicture')
+        .lean();
     //@ts-ignore
     const io = global.io;
-    if (io) {
+    if (io && populatedMessage) {
         // Room-based event for chat participants
-        io.to(`chat::${String(payload === null || payload === void 0 ? void 0 : payload.chatId)}`).emit('MESSAGE_SENT', {
-            message: response,
+        // Ensure chatId is a string for frontend matching
+        const chatIdStr = String(payload === null || payload === void 0 ? void 0 : payload.chatId);
+        io.to(`chat::${chatIdStr}`).emit('MESSAGE_SENT', {
+            message: Object.assign(Object.assign({}, populatedMessage), { chatId: chatIdStr }),
         });
     }
     // Offline notification triggers
@@ -83,7 +89,8 @@ const getMessageFromDB = (user, id, query) => __awaiter(void 0, void 0, void 0, 
     if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid Chat ID');
     }
-    const queryBuilder = new QueryBuilder_1.default(message_model_1.Message.find({ chatId: id }), query)
+    const queryBuilder = new QueryBuilder_1.default(message_model_1.Message.find({ chatId: id }), // sender auto-populated via pre-hook
+    query)
         .search(['text'])
         .filter()
         .sort()

@@ -311,6 +311,18 @@ const deleteInterviewSlot = (id) => __awaiter(void 0, void 0, void 0, function* 
     const result = yield interviewSlot_model_1.InterviewSlot.findByIdAndDelete(id);
     return result;
 });
+/**
+ * Get my booked interview slot (Applicant only)
+ */
+const getMyBookedInterview = (applicantId) => __awaiter(void 0, void 0, void 0, function* () {
+    const slot = yield interviewSlot_model_1.InterviewSlot.findOne({
+        applicantId: new mongoose_1.Types.ObjectId(applicantId),
+        status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED,
+    })
+        .populate('adminId', 'name email')
+        .populate('applicationId');
+    return slot;
+});
 exports.InterviewSlotService = {
     createInterviewSlot,
     getAllInterviewSlots,
@@ -321,4 +333,5 @@ exports.InterviewSlotService = {
     markAsCompleted,
     updateInterviewSlot,
     deleteInterviewSlot,
+    getMyBookedInterview,
 };

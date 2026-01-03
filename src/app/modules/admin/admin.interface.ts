@@ -159,3 +159,36 @@ export type IUserDistribution = {
 export type IUserDistributionQuery = {
   groupBy?: 'role' | 'status' | 'both';
 };
+
+// ============ UNIFIED SESSIONS ============
+
+export type IUnifiedSession = {
+  _id: string;
+  type: 'SESSION' | 'TRIAL_REQUEST';
+  studentName?: string;
+  studentEmail?: string;
+  studentPhone?: string;
+  tutorName?: string;
+  tutorEmail?: string;
+  tutorPhone?: string;
+  subject: string;
+  status: string;
+  paymentStatus: string; // 'FREE_TRIAL' | 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED'
+  startTime?: Date;
+  endTime?: Date;
+  createdAt: Date;
+  isTrial: boolean;
+  description?: string;
+  totalPrice?: number;
+};
+
+export type IUnifiedSessionsQuery = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  paymentStatus?: string;
+  isTrial?: boolean;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+};

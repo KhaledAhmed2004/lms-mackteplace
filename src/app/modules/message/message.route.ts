@@ -74,6 +74,13 @@ router.get(
   MessageController.getMessage
 );
 
+// Get all messages in a chat (alias route for frontend compatibility)
+router.get(
+  '/chat/:chatId',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
+  MessageController.getChatMessages
+);
+
 // Mark all messages in a chat as read
 router.post(
   '/chat/:chatId/read',

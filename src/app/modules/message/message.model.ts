@@ -50,7 +50,7 @@ const SessionProposalSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+      enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED'],
       default: 'PROPOSED',
     },
     sessionId: {
@@ -64,6 +64,14 @@ const SessionProposalSchema = new Schema(
     expiresAt: {
       type: Date,
       required: true,
+    },
+    originalProposalId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Message',
+    },
+    counterProposalReason: {
+      type: String,
+      trim: true,
     },
   },
   { _id: false }
@@ -145,6 +153,28 @@ messageSchema.pre('save', function (next) {
     this.sessionProposal.expiresAt = expirationDate;
   }
   next();
+});
+
+// Virtual field: 'content' as alias for 'text' (for frontend compatibility)
+messageSchema.virtual('content').get(function () {
+  return this.text;
+});
+
+messageSchema.virtual('content').set(function (value: string) {
+  this.text = value;
+});
+
+// Ensure virtuals are included in JSON/Object output
+messageSchema.set('toJSON', { virtuals: true });
+messageSchema.set('toObject', { virtuals: true });
+
+// Auto-populate sender on find queries
+messageSchema.pre('find', function () {
+  this.populate('sender', '_id name profilePicture');
+});
+
+messageSchema.pre('findOne', function () {
+  this.populate('sender', '_id name profilePicture');
 });
 
 export const Message = model<IMessage, MessageModel>('Message', messageSchema);

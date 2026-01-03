@@ -7,6 +7,7 @@ exports.TutorApplicationRoutes = void 0;
 const express_1 = __importDefault(require("express"));
 const user_1 = require("../../../enums/user");
 const auth_1 = __importDefault(require("../../middlewares/auth"));
+const fileHandler_1 = require("../../middlewares/fileHandler");
 const validateRequest_1 = __importDefault(require("../../middlewares/validateRequest"));
 const tutorApplication_controller_1 = require("./tutorApplication.controller");
 const tutorApplication_validation_1 = require("./tutorApplication.validation");
@@ -15,16 +16,18 @@ const router = express_1.default.Router();
  * @route   POST /api/v1/applications
  * @desc    Submit tutor application (PUBLIC - creates user + application)
  * @access  Public (no auth required)
- * @body    {
- *   email, password,
- *   name, birthDate, phone,
- *   street, houseNumber, zipCode, city,
- *   subjects[],
- *   cv, abiturCertificate, officialIdDocument
- * }
+ * @body    FormData with:
+ *   - data: JSON string { email, password, name, birthDate, phoneNumber, street, houseNumber, zip, city, subjects[] }
+ *   - cv: File (PDF/Image)
+ *   - abiturCertificate: File (PDF/Image)
+ *   - officialId: File (PDF/Image)
  * @note    First-time registration for tutors
  */
-router.post('/', (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.createApplicationZodSchema), tutorApplication_controller_1.TutorApplicationController.submitApplication);
+router.post('/', (0, fileHandler_1.fileHandler)([
+    { name: 'cv', maxCount: 1 },
+    { name: 'abiturCertificate', maxCount: 1 },
+    { name: 'officialId', maxCount: 1 },
+]), (0, validateRequest_1.default)(tutorApplication_validation_1.TutorApplicationValidation.createApplicationZodSchema), tutorApplication_controller_1.TutorApplicationController.submitApplication);
 /**
  * @route   GET /api/v1/applications/my-application
  * @desc    Get my application status

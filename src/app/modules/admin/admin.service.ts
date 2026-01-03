@@ -4,13 +4,16 @@ import { USER_ROLES } from '../../../enums/user';
 import { TutorApplication } from '../tutorApplication/tutorApplication.model';
 import { APPLICATION_STATUS } from '../tutorApplication/tutorApplication.interface';
 import { Session } from '../session/session.model';
-import { SESSION_STATUS } from '../session/session.interface';
+import { SESSION_STATUS, PAYMENT_STATUS } from '../session/session.interface';
 import { MonthlyBilling } from '../monthlyBilling/monthlyBilling.model';
 import { BILLING_STATUS } from '../monthlyBilling/monthlyBilling.interface';
 import { TutorEarnings } from '../tutorEarnings/tutorEarnings.model';
 import { StudentSubscription } from '../studentSubscription/studentSubscription.model';
 import { SUBSCRIPTION_STATUS } from '../studentSubscription/studentSubscription.interface';
 import AggregationBuilder from '../../builder/AggregationBuilder';
+import { TrialRequest } from '../trialRequest/trialRequest.model';
+import { TRIAL_REQUEST_STATUS } from '../trialRequest/trialRequest.interface';
+import QueryBuilder from '../../builder/QueryBuilder';
 import {
   IDashboardStats,
   IRevenueStats,
@@ -20,6 +23,8 @@ import {
   IOverviewStats,
   IMonthlyRevenue,
   IUserDistribution,
+  IUnifiedSession,
+  IUnifiedSessionsQuery,
 } from './admin.interface';
 
 /**
@@ -716,6 +721,186 @@ const getUserDistribution = async (
   return result;
 };
 
+/**
+ * Get unified sessions (Sessions + Trial Requests)
+ * Merges both sessions and pending trial requests into a single view
+ */
+const getUnifiedSessions = async (
+  query: IUnifiedSessionsQuery
+): Promise<{
+  data: IUnifiedSession[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPage: number;
+  };
+}> => {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    paymentStatus,
+    isTrial,
+    search,
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+  } = query;
+
+  // Get all sessions with populated fields
+  const sessions = await Session.find()
+    .populate('studentId', 'name email phone profilePicture')
+    .populate('tutorId', 'name email phone profilePicture')
+    .lean();
+
+  // Get pending/accepted trial requests (not yet converted to session or waiting)
+  const pendingTrialRequests = await TrialRequest.find({
+    status: { $in: [TRIAL_REQUEST_STATUS.PENDING, TRIAL_REQUEST_STATUS.ACCEPTED] },
+  })
+    .populate('studentId', 'name email phone profilePicture')
+    .populate('acceptedTutorId', 'name email phone profilePicture')
+    .populate('subject', 'name')
+    .lean();
+
+  // Transform sessions to unified format
+  const unifiedSessions: IUnifiedSession[] = sessions.map((s: any) => ({
+    _id: s._id.toString(),
+    type: 'SESSION' as const,
+    studentName: s.studentId?.name,
+    studentEmail: s.studentId?.email,
+    studentPhone: s.studentId?.phone,
+    tutorName: s.tutorId?.name,
+    tutorEmail: s.tutorId?.email,
+    tutorPhone: s.tutorId?.phone,
+    subject: s.subject,
+    status: s.status,
+    paymentStatus: s.isTrial ? 'FREE_TRIAL' : s.paymentStatus || PAYMENT_STATUS.PENDING,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    createdAt: s.createdAt,
+    isTrial: s.isTrial || false,
+    description: s.description,
+    totalPrice: s.totalPrice,
+  }));
+
+  // Transform trial requests to unified format
+  const unifiedTrialRequests: IUnifiedSession[] = pendingTrialRequests.map((tr: any) => ({
+    _id: tr._id.toString(),
+    type: 'TRIAL_REQUEST' as const,
+    studentName: tr.studentInfo?.name || tr.studentId?.name,
+    studentEmail: tr.studentInfo?.email || tr.studentInfo?.guardianInfo?.email || tr.studentId?.email,
+    studentPhone: tr.studentInfo?.guardianInfo?.phone || tr.studentId?.phone,
+    tutorName: tr.acceptedTutorId?.name || 'Pending Tutor',
+    tutorEmail: tr.acceptedTutorId?.email,
+    tutorPhone: tr.acceptedTutorId?.phone,
+    subject: tr.subject?.name || 'Unknown Subject',
+    status: tr.status,
+    paymentStatus: 'FREE_TRIAL',
+    startTime: tr.preferredDateTime,
+    endTime: undefined,
+    createdAt: tr.createdAt,
+    isTrial: true,
+    description: tr.description,
+    totalPrice: 0,
+  }));
+
+  // Merge all items
+  let unified = [...unifiedSessions, ...unifiedTrialRequests];
+
+  // Apply filters
+  if (status) {
+    unified = unified.filter(item => item.status === status);
+  }
+
+  if (paymentStatus) {
+    unified = unified.filter(item => item.paymentStatus === paymentStatus);
+  }
+
+  if (isTrial !== undefined) {
+    unified = unified.filter(item => item.isTrial === isTrial);
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    unified = unified.filter(
+      item =>
+        item.studentName?.toLowerCase().includes(searchLower) ||
+        item.studentEmail?.toLowerCase().includes(searchLower) ||
+        item.tutorName?.toLowerCase().includes(searchLower) ||
+        item.subject?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Sort
+  unified.sort((a, b) => {
+    const aValue = a[sortBy as keyof IUnifiedSession];
+    const bValue = b[sortBy as keyof IUnifiedSession];
+
+    if (aValue === undefined || aValue === null) return 1;
+    if (bValue === undefined || bValue === null) return -1;
+
+    if (aValue instanceof Date && bValue instanceof Date) {
+      return sortOrder === 'desc'
+        ? bValue.getTime() - aValue.getTime()
+        : aValue.getTime() - bValue.getTime();
+    }
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortOrder === 'desc'
+        ? bValue.localeCompare(aValue)
+        : aValue.localeCompare(bValue);
+    }
+
+    return 0;
+  });
+
+  // Pagination
+  const total = unified.length;
+  const totalPage = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const paginatedData = unified.slice(startIndex, startIndex + limit);
+
+  return {
+    data: paginatedData,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage,
+    },
+  };
+};
+
+/**
+ * Get session stats for admin dashboard
+ */
+const getSessionStats = async (): Promise<{
+  totalSessions: number;
+  pendingSessions: number;
+  completedSessions: number;
+  trialSessions: number;
+}> => {
+  const now = new Date();
+
+  const [totalSessions, pendingSessions, completedSessions, trialSessions] =
+    await Promise.all([
+      Session.countDocuments(),
+      Session.countDocuments({
+        status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
+        startTime: { $gte: now },
+      }),
+      Session.countDocuments({ status: SESSION_STATUS.COMPLETED }),
+      Session.countDocuments({ isTrial: true }),
+    ]);
+
+  return {
+    totalSessions,
+    pendingSessions,
+    completedSessions,
+    trialSessions,
+  };
+};
+
 export const AdminService = {
   getDashboardStats,
   getRevenueByMonth,
@@ -726,4 +911,6 @@ export const AdminService = {
   getOverviewStats,
   getMonthlyRevenue,
   getUserDistribution,
+  getUnifiedSessions,
+  getSessionStats,
 };

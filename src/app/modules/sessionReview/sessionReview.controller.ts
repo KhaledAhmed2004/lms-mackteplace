@@ -134,6 +134,20 @@ const toggleVisibility = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Link orphaned reviews to sessions (Admin only - migration helper)
+ */
+const linkOrphanedReviews = catchAsync(async (req: Request, res: Response) => {
+  const result = await SessionReviewService.linkOrphanedReviews();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: `Linked ${result.linked} reviews, ${result.alreadyLinked} already linked`,
+    data: result,
+  });
+});
+
 export const SessionReviewController = {
   createReview,
   getMyReviews,
@@ -143,4 +157,5 @@ export const SessionReviewController = {
   deleteReview,
   getTutorStats,
   toggleVisibility,
+  linkOrphanedReviews,
 };

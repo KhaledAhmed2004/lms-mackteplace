@@ -189,9 +189,14 @@ const acceptTrialRequestZodSchema = z.object({
     introductoryMessage: z
       .string()
       .trim()
-      .min(10, 'Introductory message must be at least 10 characters')
-      .max(500, 'Introductory message cannot exceed 500 characters')
-      .optional(),
+      .transform(val => val === '' ? undefined : val)
+      .optional()
+      .refine(
+        val => val === undefined || (val.length >= 10 && val.length <= 500),
+        {
+          message: 'Introductory message must be between 10 and 500 characters',
+        }
+      ),
   }),
 });
 

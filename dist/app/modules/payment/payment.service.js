@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -54,18 +31,12 @@ const mapPaymentToView = (payment) => {
 // Moved to stripeConnected.service.ts
 // Moved to stripeConnected.service.ts
 // Moved to stripeConnected.service.ts
+// TODO: Legacy Bid/Task escrow code - commented out as Bid/Task models don't exist in LMS
 // Create escrow payment when bid is accepted
 // Escrow helpers (internal)
-const getBidAndTask = (bidId) => __awaiter(void 0, void 0, void 0, function* () {
-    const bid = yield BidModel.findById(bidId).populate('taskId');
-    if (!bid) {
-        throw new ApiError_1.default(http_status_1.default.NOT_FOUND, 'Bid not found');
-    }
-    const task = bid.taskId;
-    if (!bid.taskerId) {
-        throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, 'Bid does not have an assigned freelancer');
-    }
-    return { bid, task };
+const getBidAndTask = (_bidId) => __awaiter(void 0, void 0, void 0, function* () {
+    // Legacy code - Bid/Task system not used in LMS
+    throw new ApiError_1.default(http_status_1.default.NOT_IMPLEMENTED, 'Bid/Task system not implemented in LMS');
 });
 // Moved to stripeConnected.service.ts
 const ensureNoExistingPaymentForBid = (bidId) => __awaiter(void 0, void 0, void 0, function* () {
@@ -149,11 +120,9 @@ const ensureHeldStatus = (payment) => {
         throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, `Payment is not in held status. Current status: ${payment.status}`);
     }
 };
-const ensureClientAuthorized = (taskId, clientId) => __awaiter(void 0, void 0, void 0, function* () {
-    const task = yield TaskModel.findById(taskId);
-    if (!task || task.userId.toString() !== (clientId === null || clientId === void 0 ? void 0 : clientId.toString())) {
-        throw new ApiError_1.default(http_status_1.default.FORBIDDEN, 'You are not authorized to release this payment');
-    }
+const ensureClientAuthorized = (_taskId, _clientId) => __awaiter(void 0, void 0, void 0, function* () {
+    // Legacy code - Task system not used in LMS
+    throw new ApiError_1.default(http_status_1.default.NOT_IMPLEMENTED, 'Task system not implemented in LMS');
 });
 const getChargeIdForIntent = (intentId) => __awaiter(void 0, void 0, void 0, function* () {
     const paymentIntent = yield stripe_1.stripe.paymentIntents.retrieve(intentId, {
@@ -188,9 +157,9 @@ const createTransferToFreelancer = (amount, currency, destination, sourceChargeI
         metadata,
     });
 });
-const markPaymentReleasedAndBidCompleted = (paymentId, bidId) => __awaiter(void 0, void 0, void 0, function* () {
+const markPaymentReleasedAndBidCompleted = (paymentId, _bidId) => __awaiter(void 0, void 0, void 0, function* () {
     yield payment_model_1.Payment.updatePaymentStatus(paymentId, payment_interface_1.PAYMENT_STATUS.RELEASED);
-    yield BidModel.findByIdAndUpdate(bidId, { status: 'completed' });
+    // Legacy: BidModel.findByIdAndUpdate(bidId, { status: 'completed' }) - not used in LMS
 });
 const releaseEscrowPayment = (data) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
@@ -251,9 +220,7 @@ const refundEscrowPayment = (paymentId, reason) => __awaiter(void 0, void 0, voi
         ensureRefundable(payment);
         const refund = yield createRefundForIntent(payment.stripePaymentIntentId, reason);
         yield markPaymentRefunded(paymentId, reason);
-        yield BidModel.findByIdAndUpdate(payment.bidId, {
-            status: 'cancelled',
-        });
+        // Legacy: BidModel update - not used in LMS
         return {
             success: true,
             message: 'Payment refunded successfully',
@@ -403,7 +370,6 @@ const handlePaymentSucceeded = (paymentIntent) => __awaiter(void 0, void 0, void
 });
 // Handle payment failed webhook
 const handlePaymentFailed = (paymentIntent) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     const bidId = paymentIntent.metadata.bid_id;
     // Update payment status to REFUNDED
     yield payment_model_1.Payment.updateMany({
@@ -412,32 +378,9 @@ const handlePaymentFailed = (paymentIntent) => __awaiter(void 0, void 0, void 0,
     }, {
         status: payment_interface_1.PAYMENT_STATUS.REFUNDED,
     });
-    // Reset bid status back to PENDING so it can be re-attempted
-    yield BidModel.findByIdAndUpdate(bidId, {
-        status: 'pending',
-        paymentIntentId: null, // Clear the failed payment intent
-    });
-    // Revert task assignment and status if this bid was already accepted
-    try {
-        const bid = yield BidModel.findById(bidId);
-        if (bid) {
-            const task = yield TaskModel.findById(bid.taskId);
-            if (task) {
-                // Only revert if the task is currently assigned to this tasker
-                const assignedMatches = ((_a = task.assignedTo) === null || _a === void 0 ? void 0 : _a.toString()) === ((_b = bid.taskerId) === null || _b === void 0 ? void 0 : _b.toString());
-                if (assignedMatches) {
-                    yield TaskModel.findByIdAndUpdate(task._id, {
-                        status: TaskStatus.OPEN,
-                        assignedTo: null,
-                        paymentIntentId: null,
-                    });
-                }
-            }
-        }
-    }
-    catch (revertErr) {
-        console.error('Failed to revert task state after payment failure:', revertErr);
-    }
+    // Legacy: Bid/Task system not used in LMS
+    // Original code reset bid status and reverted task assignment
+    console.log(`Payment failure handled for bidId: ${bidId}`);
 });
 // Moved to stripeConnected.service.ts
 // Handle amount capturable updated webhook (manual capture flow)
@@ -478,15 +421,8 @@ const handleAmountCapturableUpdated = (paymentIntent) => __awaiter(void 0, void 
                 return;
             }
         }
-        // Complete bid acceptance process after successful capture
-        const { BidService } = yield Promise.resolve().then(() => __importStar(require('../bid/bid.service')));
-        try {
-            yield BidService.completeBidAcceptance(bidId);
-            // console.log(`Bid ${bidId} acceptance completed after capture (amount_capturable_updated).`);
-        }
-        catch (error) {
-            console.error('Failed to complete bid acceptance after capture:', error);
-        }
+        // Legacy: Bid acceptance - not used in LMS
+        console.log(`Capture completed for bidId: ${bidId}`);
     }
     catch (error) {
         console.error(`Error in handleAmountCapturableUpdated for payment ${paymentIntent.id}:`, error);

@@ -61,7 +61,25 @@ const cancelSessionRequestZodSchema = z.object({
   }),
 });
 
+// Accept session request validation (Tutor)
+const acceptSessionRequestZodSchema = z.object({
+  body: z.object({
+    introductoryMessage: z
+      .string()
+      .trim()
+      .transform(val => val === '' ? undefined : val)
+      .optional()
+      .refine(
+        val => val === undefined || (val.length >= 10 && val.length <= 500),
+        {
+          message: 'Introductory message must be between 10 and 500 characters',
+        }
+      ),
+  }),
+});
+
 export const SessionRequestValidation = {
   createSessionRequestZodSchema,
   cancelSessionRequestZodSchema,
+  acceptSessionRequestZodSchema,
 };

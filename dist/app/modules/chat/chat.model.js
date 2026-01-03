@@ -13,6 +13,10 @@ const chatSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
+    trialRequestId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'TrialRequest',
+    },
 }, {
     timestamps: true,
 });

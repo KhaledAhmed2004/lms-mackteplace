@@ -108,4 +108,15 @@ router.patch(
   SessionReviewController.toggleVisibility
 );
 
+/**
+ * @route   POST /api/v1/reviews/link-orphaned
+ * @desc    Link orphaned reviews to sessions (migration helper)
+ * @access  Admin only
+ */
+router.post(
+  '/link-orphaned',
+  auth(USER_ROLES.SUPER_ADMIN),
+  SessionReviewController.linkOrphanedReviews
+);
+
 export const SessionReviewRoutes = router;

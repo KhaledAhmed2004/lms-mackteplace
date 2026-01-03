@@ -13,8 +13,7 @@
  * 2. Install @types/node-cron: npm install -D @types/node-cron
  */
 
-import logger from '../../shared/logger';
-import errorLogger from '../../shared/errorLogger';
+import { logger, errorLogger } from '../../shared/logger';
 
 // TODO: Install node-cron package
 // import cron from 'node-cron';

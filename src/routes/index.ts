@@ -20,6 +20,7 @@ import { SessionReviewRoutes } from '../app/modules/sessionReview/sessionReview.
 import { TutorSessionFeedbackRoutes } from '../app/modules/tutorSessionFeedback/tutorSessionFeedback.route';
 import { CallRoutes } from '../app/modules/call/call.route';
 import { WhiteboardRoutes } from '../app/modules/whiteboard/whiteboard.route';
+import { PaymentMethodRoutes } from '../app/modules/paymentMethod/paymentMethod.route';
 
 const router = express.Router();
 
@@ -107,6 +108,10 @@ const apiRoutes = [
   {
     path: '/whiteboard',
     route: WhiteboardRoutes,
+  },
+  {
+    path: '/payment-methods',
+    route: PaymentMethodRoutes,
   },
 ];
 

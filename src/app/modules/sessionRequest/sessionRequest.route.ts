@@ -44,6 +44,7 @@ router.get(
 router.patch(
   '/:id/accept',
   auth(USER_ROLES.TUTOR),
+  validateRequest(SessionRequestValidation.acceptSessionRequestZodSchema),
   SessionRequestController.acceptSessionRequest
 );
 

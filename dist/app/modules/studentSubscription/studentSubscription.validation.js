@@ -21,7 +21,19 @@ const cancelSubscriptionZodSchema = zod_1.z.object({
             .min(10, 'Cancellation reason must be at least 10 characters'),
     }),
 });
+// Confirm payment validation (Student)
+const confirmPaymentZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        subscriptionId: zod_1.z.string({
+            required_error: 'Subscription ID is required',
+        }),
+        paymentIntentId: zod_1.z.string({
+            required_error: 'Payment Intent ID is required',
+        }),
+    }),
+});
 exports.StudentSubscriptionValidation = {
     subscribeToPlanZodSchema,
     cancelSubscriptionZodSchema,
+    confirmPaymentZodSchema,
 };

@@ -5,6 +5,8 @@ import validateRequest from '../../middlewares/validateRequest';
 import { AdminController } from './admin.controller';
 import { ExportController } from './export.controller';
 import { AdminValidation } from './admin.validation';
+import { ActivityLogController } from '../activityLog/activityLog.controller';
+import { ActivityLogValidation } from '../activityLog/activityLog.validation';
 
 const router = express.Router();
 
@@ -16,6 +18,7 @@ const router = express.Router();
  * @access  Admin only
  * @query   ?period=month (day|week|month|quarter|year)
  */
+// ✅ FRONTEND: useOverviewStats | Used in: src/app/(admin)/admin/overview/page.tsx
 router.get(
   '/overview-stats',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -29,6 +32,7 @@ router.get(
  * @access  Admin only
  * @query   ?year=2024&months=1,2,3&tutorId=xxx&studentId=xxx&subscriptionTier=FLEXIBLE&subject=Math
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/monthly-revenue',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -42,6 +46,7 @@ router.get(
  * @access  Admin only
  * @query   ?groupBy=role (role|status|both)
  */
+// ✅ FRONTEND: useUserDistribution | Used in: src/app/(admin)/admin/overview/page.tsx
 router.get(
   '/user-distribution',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -55,6 +60,7 @@ router.get(
  * @access  Admin only
  * @returns User stats, application stats, session stats, revenue stats, subscription stats
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/dashboard',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -67,6 +73,7 @@ router.get(
  * @access  Admin only
  * @query   ?year=2024&months=1,2,3 (optional, defaults to current year, all months)
  */
+// ✅ FRONTEND: useRevenueByMonth | Used in: src/app/(admin)/admin/overview/page.tsx
 router.get(
   '/revenue-by-month',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -79,6 +86,7 @@ router.get(
  * @access  Admin only
  * @query   ?limit=10 (default: 10)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/popular-subjects',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -91,6 +99,7 @@ router.get(
  * @access  Admin only
  * @query   ?limit=10&sortBy=sessions (sortBy: sessions|earnings, default: sessions)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/top-tutors',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -103,6 +112,7 @@ router.get(
  * @access  Admin only
  * @query   ?limit=10&sortBy=spending (sortBy: spending|sessions, default: spending)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/top-students',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -115,10 +125,66 @@ router.get(
  * @access  Admin only
  * @query   ?year=2024&months=1,2,3 (optional, defaults to current year, all months)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/user-growth',
   auth(USER_ROLES.SUPER_ADMIN),
   AdminController.getUserGrowth
+);
+
+// ============ UNIFIED SESSIONS ============
+
+/**
+ * @route   GET /api/v1/admin/unified-sessions
+ * @desc    Get unified view of sessions and trial requests
+ * @access  Admin only
+ * @query   ?page=1&limit=10&status=SCHEDULED&paymentStatus=FREE_TRIAL&isTrial=true&search=john&sortBy=createdAt&sortOrder=desc
+ */
+// ✅ FRONTEND: useUnifiedSessions | Used in: src/app/(admin)/admin/session/page.tsx
+router.get(
+  '/unified-sessions',
+  auth(USER_ROLES.SUPER_ADMIN),
+  AdminController.getUnifiedSessions
+);
+
+/**
+ * @route   GET /api/v1/admin/session-stats
+ * @desc    Get session statistics
+ * @access  Admin only
+ */
+// ✅ FRONTEND: useSessionStats | Used in: src/app/(admin)/admin/session/page.tsx
+router.get(
+  '/session-stats',
+  auth(USER_ROLES.SUPER_ADMIN),
+  AdminController.getSessionStats
+);
+
+// ============ ACTIVITY LOG ============
+
+/**
+ * @route   GET /api/v1/admin/recent-activity
+ * @desc    Get recent platform activities
+ * @access  Admin only
+ * @query   ?page=1&limit=10&actionType=USER_REGISTERED&status=success&startDate=2024-01-01&endDate=2024-12-31
+ */
+// ✅ FRONTEND: useRecentActivity | Used in: src/app/(admin)/admin/overview/page.tsx
+router.get(
+  '/recent-activity',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(ActivityLogValidation.recentActivityQuerySchema),
+  ActivityLogController.getRecentActivities
+);
+
+/**
+ * @route   GET /api/v1/admin/activity-stats
+ * @desc    Get activity statistics
+ * @access  Admin only
+ */
+// ❌ NOT INTEGRATED IN FRONTEND
+router.get(
+  '/activity-stats',
+  auth(USER_ROLES.SUPER_ADMIN),
+  ActivityLogController.getActivityStats
 );
 
 // ============ CSV EXPORT ============
@@ -129,6 +195,7 @@ router.get(
  * @access  Admin only
  * @query   ?role=STUDENT (optional: filter by role)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/users',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -141,6 +208,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=SUBMITTED (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/applications',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -153,6 +221,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=COMPLETED&startDate=2024-01-01&endDate=2024-12-31
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/sessions',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -165,6 +234,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=PAID&year=2024&month=1
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/billings',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -177,6 +247,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=PAID&year=2024&month=1
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/earnings',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -189,6 +260,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=ACTIVE (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/subscriptions',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -201,6 +273,7 @@ router.get(
  * @access  Admin only
  * @query   ?status=PENDING (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get(
   '/export/trial-requests',
   auth(USER_ROLES.SUPER_ADMIN),

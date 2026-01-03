@@ -111,6 +111,36 @@ const getMyPlanUsage = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         data: result,
     });
 }));
+/**
+ * Create Payment Intent for Subscription
+ * Called when student selects a plan to initiate payment
+ */
+const createPaymentIntent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const studentId = req.user.id;
+    const { tier } = req.body;
+    const result = yield studentSubscription_service_1.StudentSubscriptionService.createSubscriptionPaymentIntent(studentId, tier);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Payment intent created successfully',
+        data: result,
+    });
+}));
+/**
+ * Confirm Subscription Payment
+ * Called after successful Stripe payment to activate subscription
+ */
+const confirmPayment = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const studentId = req.user.id;
+    const { subscriptionId, paymentIntentId } = req.body;
+    const result = yield studentSubscription_service_1.StudentSubscriptionService.confirmSubscriptionPayment(subscriptionId, paymentIntentId, studentId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Subscription activated successfully',
+        data: result,
+    });
+}));
 exports.StudentSubscriptionController = {
     subscribeToPlan,
     getMySubscription,
@@ -119,4 +149,6 @@ exports.StudentSubscriptionController = {
     cancelSubscription,
     expireOldSubscriptions,
     getMyPlanUsage,
+    createPaymentIntent,
+    confirmPayment,
 };

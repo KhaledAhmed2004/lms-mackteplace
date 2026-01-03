@@ -31,13 +31,18 @@ const createStripeAccount = (data) => __awaiter(void 0, void 0, void 0, function
             throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, 'User already has a Stripe account');
         }
         let dob;
-        if (user.dateOfBirth) {
+        if (user.dateOfBirth && typeof user.dateOfBirth === 'string') {
             const parts = user.dateOfBirth.split('-');
-            dob = {
-                year: Number(parts[0]),
-                month: Number(parts[1]),
-                day: Number(parts[2]),
-            };
+            // Validate that we have all parts and they are valid numbers
+            if (parts.length >= 3) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const day = parseInt(parts[2], 10);
+                // Only set dob if all values are valid numbers
+                if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                    dob = { year, month, day };
+                }
+            }
         }
         const account = yield (0, stripe_adapter_1.createExpressAccount)({
             email: user.email,
@@ -84,7 +89,7 @@ const createOnboardingLink = (userId) => __awaiter(void 0, void 0, void 0, funct
         if (stripeAccount.onboardingCompleted) {
             throw new ApiError_1.default(http_status_1.default.BAD_REQUEST, 'User has already completed onboarding');
         }
-        const url = yield (0, stripe_adapter_1.createOnboardingLink)(stripeAccount.stripeAccountId, `${process.env.FRONTEND_URL}/onboarding/refresh`, `${process.env.FRONTEND_URL}/onboarding/complete`);
+        const url = yield (0, stripe_adapter_1.createOnboardingLink)(stripeAccount.stripeAccountId, `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=refresh`, `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=success`);
         return url;
     }
     catch (error) {

@@ -2,8 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TutorApplicationValidation = void 0;
 const zod_1 = require("zod");
-// Password regex - same as user registration
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={}[\]|;:'",.<>/?]).{8,}$/;
 // Create application validation (PUBLIC - creates user + application)
 const createApplicationZodSchema = zod_1.z.object({
     body: zod_1.z.object({
@@ -18,8 +16,7 @@ const createApplicationZodSchema = zod_1.z.object({
             .string({
             required_error: 'Password is required',
         })
-            .min(8, 'Password must be at least 8 characters')
-            .regex(passwordRegex, 'Password must contain uppercase, lowercase, number, and special character'),
+            .min(8, 'Password must be at least 8 characters'),
         // Personal info
         name: zod_1.z
             .string({
@@ -34,7 +31,7 @@ const createApplicationZodSchema = zod_1.z.object({
             .refine((date) => !isNaN(Date.parse(date)), {
             message: 'Invalid date format',
         }),
-        phone: zod_1.z
+        phoneNumber: zod_1.z
             .string({
             required_error: 'Phone number is required',
         })
@@ -53,7 +50,7 @@ const createApplicationZodSchema = zod_1.z.object({
         })
             .trim()
             .min(1, 'House number is required'),
-        zipCode: zod_1.z
+        zip: zod_1.z
             .string({
             required_error: 'ZIP code is required',
         })
@@ -80,7 +77,7 @@ const createApplicationZodSchema = zod_1.z.object({
             required_error: 'Abitur certificate is required',
         })
             .url('Abitur certificate must be a valid URL'),
-        officialIdDocument: zod_1.z
+        officialId: zod_1.z
             .string({
             required_error: 'Official ID document is required',
         })

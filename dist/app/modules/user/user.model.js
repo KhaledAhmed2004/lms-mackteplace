@@ -17,8 +17,8 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const http_status_codes_1 = require("http-status-codes");
 const mongoose_1 = require("mongoose");
 const config_1 = __importDefault(require("../../../config"));
-const user_1 = require("../../../enums/user");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+const user_interface_1 = require("./user.interface");
 const userSchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -27,8 +27,8 @@ const userSchema = new mongoose_1.Schema({
     },
     role: {
         type: String,
-        enum: Object.values(user_1.USER_ROLES),
-        default: user_1.USER_ROLES.STUDENT,
+        enum: Object.values(user_interface_1.USER_ROLES),
+        default: user_interface_1.USER_ROLES.STUDENT,
     },
     email: {
         type: String,
@@ -64,8 +64,8 @@ const userSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: Object.values(user_1.USER_STATUS),
-        default: user_1.USER_STATUS.ACTIVE,
+        enum: Object.values(user_interface_1.USER_STATUS),
+        default: user_interface_1.USER_STATUS.ACTIVE,
     },
     verified: {
         type: Boolean,
@@ -135,7 +135,12 @@ const userSchema = new mongoose_1.Schema({
         type: {
             address: String,
             birthDate: Date,
-            subjects: [String],
+            subjects: [
+                {
+                    type: mongoose_1.Schema.Types.ObjectId,
+                    ref: 'Subject',
+                },
+            ],
             bio: String,
             languages: [String],
             teachingExperience: String,

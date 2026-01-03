@@ -18,6 +18,13 @@ export enum RESCHEDULE_STATUS {
   REJECTED = 'REJECTED',
 }
 
+export enum PAYMENT_STATUS {
+  PENDING = 'PENDING',       // Not yet paid
+  PAID = 'PAID',             // Payment successful
+  FAILED = 'FAILED',         // Payment failed
+  REFUNDED = 'REFUNDED',     // Payment refunded (e.g., session cancelled)
+}
+
 export type IRescheduleRequest = {
   requestedBy: Types.ObjectId;
   requestedAt: Date;
@@ -52,6 +59,10 @@ export type ISession = {
 
   // Status tracking
   status: SESSION_STATUS;
+  paymentStatus: PAYMENT_STATUS;
+
+  // Trial session flag
+  isTrial: boolean;                    // True if this is a free trial session
 
   // Related records
   messageId?: Types.ObjectId;          // Session proposal message

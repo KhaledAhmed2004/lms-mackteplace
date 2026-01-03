@@ -102,6 +102,7 @@ const getSingleSessionRequest = catchAsync(async (req: Request, res: Response) =
 const acceptSessionRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const tutorId = req.user?.id;
+  const { introductoryMessage } = req.body;
 
   if (!tutorId) {
     return sendResponse(res, {
@@ -111,7 +112,11 @@ const acceptSessionRequest = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await SessionRequestService.acceptSessionRequest(id, tutorId);
+  const result = await SessionRequestService.acceptSessionRequest(
+    id,
+    tutorId,
+    introductoryMessage
+  );
 
   sendResponse(res, {
     success: true,

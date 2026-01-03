@@ -29,32 +29,56 @@ const session_interface_1 = require("../session/session.interface");
 const tutorEarnings_model_1 = require("../tutorEarnings/tutorEarnings.model");
 const tutorSessionFeedback_model_1 = require("../tutorSessionFeedback/tutorSessionFeedback.model");
 const tutorSessionFeedback_interface_1 = require("../tutorSessionFeedback/tutorSessionFeedback.interface");
+const activityLog_service_1 = require("../activityLog/activityLog.service");
 const createUserToDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const createUser = yield user_model_1.User.create(payload);
+    // Auto-verify user on creation (skipping email verification for now)
+    const createUser = yield user_model_1.User.create(Object.assign(Object.assign({}, payload), { verified: true }));
     if (!createUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Failed to create user');
     }
+    // Log activity for user registration
+    const roleLabel = createUser.role === user_1.USER_ROLES.STUDENT ? 'Student' :
+        createUser.role === user_1.USER_ROLES.TUTOR ? 'Tutor' : 'User';
+    activityLog_service_1.ActivityLogService.logActivity({
+        userId: createUser._id,
+        actionType: 'USER_REGISTERED',
+        title: `New ${roleLabel} Registered`,
+        description: `${createUser.name} joined the platform as a ${roleLabel.toLowerCase()}`,
+        entityType: 'USER',
+        entityId: createUser._id,
+        status: 'success',
+    });
+    // NOTE: Email verification temporarily disabled
+    // Uncomment below to re-enable OTP email verification
+    /*
     //send email
-    const otp = (0, generateOTP_1.default)();
+    const otp = generateOTP();
     const values = {
-        name: createUser.name,
-        otp: otp,
-        email: createUser.email,
+      name: createUser.name,
+      otp: otp,
+      email: createUser.email!,
     };
     console.log('Sending email to:', createUser.email, 'with OTP:', otp);
-    const createAccountTemplate = emailTemplate_1.emailTemplate.createAccount(values);
-    emailHelper_1.emailHelper.sendEmail(createAccountTemplate);
+  
+    const createAccountTemplate = emailTemplate.createAccount(values);
+    emailHelper.sendEmail(createAccountTemplate);
+  
     //save to DB
     const authentication = {
-        oneTimeCode: otp,
-        expireAt: new Date(Date.now() + 3 * 60000),
+      oneTimeCode: otp,
+      expireAt: new Date(Date.now() + 3 * 60000),
     };
-    yield user_model_1.User.findOneAndUpdate({ _id: createUser._id }, { $set: { authentication } });
+    await User.findOneAndUpdate(
+      { _id: createUser._id },
+      { $set: { authentication } }
+    );
+    */
     return createUser;
 });
 const getUserProfileFromDB = (user) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = user;
-    const isExistUser = yield user_model_1.User.isExistUserById(id);
+    const isExistUser = yield user_model_1.User.findById(id)
+        .populate('tutorProfile.subjects', 'name');
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "User doesn't exist!");
     }
@@ -128,11 +152,16 @@ const updateUserStatus = (id, status) => __awaiter(void 0, void 0, void 0, funct
 });
 const getUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     // Only return user info; remove task/bid side data
-    const user = yield user_model_1.User.findById(id).select('-password -authentication');
+    const user = yield user_model_1.User.findById(id)
+        .select('-password -authentication')
+        .populate({
+        path: 'tutorProfile.subjects',
+        select: 'name _id',
+    });
     if (!user) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
     }
-    return { user };
+    return user;
 });
 const getUserDetailsById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const user = yield user_model_1.User.findById(id).select('-password -authentication');
@@ -186,7 +215,12 @@ const unblockStudent = (id) => __awaiter(void 0, void 0, void 0, function* () {
 });
 // ============ ADMIN: TUTOR MANAGEMENT ============
 const getAllTutors = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const tutorQuery = new QueryBuilder_1.default(user_model_1.User.find({ role: user_1.USER_ROLES.TUTOR }).select('-password -authentication'), query)
+    const tutorQuery = new QueryBuilder_1.default(user_model_1.User.find({ role: user_1.USER_ROLES.TUTOR })
+        .select('-password -authentication')
+        .populate({
+        path: 'tutorProfile.subjects',
+        select: 'name _id',
+    }), query)
         .search(['name', 'email'])
         .filter()
         .sort()

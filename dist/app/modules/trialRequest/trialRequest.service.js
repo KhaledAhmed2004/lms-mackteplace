@@ -26,6 +26,8 @@ const sessionRequest_model_1 = require("../sessionRequest/sessionRequest.model")
 const sessionRequest_interface_1 = require("../sessionRequest/sessionRequest.interface");
 const message_model_1 = require("../message/message.model");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
+const jwtHelper_1 = require("../../../helpers/jwtHelper");
+const config_1 = __importDefault(require("../../../config"));
 /**
  * Create trial request (First-time Student or Guest ONLY)
  * For returning students, use SessionRequest module instead
@@ -121,6 +123,9 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
     }
     // Auto-create User account for guest users when trial request is created
     let createdStudentId = studentId;
+    let accessToken;
+    let refreshToken;
+    let userInfo;
     if (!studentId && payload.studentInfo) {
         // Determine email and password based on age
         // For under 18: use guardian's email/password (guardian becomes the account holder)
@@ -153,6 +158,15 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
                 },
             });
             createdStudentId = newUser._id.toString();
+            // Generate JWT tokens for auto-login
+            accessToken = jwtHelper_1.jwtHelper.createToken({ id: newUser._id, role: newUser.role, email: newUser.email }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
+            refreshToken = jwtHelper_1.jwtHelper.createToken({ id: newUser._id, role: newUser.role, email: newUser.email }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
+            userInfo = {
+                _id: newUser._id.toString(),
+                name: newUser.name,
+                email: newUser.email,
+                role: newUser.role,
+            };
         }
     }
     // Create trial request
@@ -166,7 +180,12 @@ const createTrialRequest = (studentId, payload) => __awaiter(void 0, void 0, voi
     // TODO: Send real-time notification to matching tutors
     // TODO: Send email notification to admin
     // TODO: Send confirmation email to student
-    return trialRequest;
+    return {
+        trialRequest,
+        accessToken,
+        refreshToken,
+        user: userInfo,
+    };
 });
 /**
  * Get single trial request
@@ -297,7 +316,11 @@ const acceptTrialRequest = (requestId, tutorId, introductoryMessage) => __awaite
     }
     // Verify tutor teaches this subject (compare ObjectId)
     const tutorSubjectIds = ((_c = (_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) === null || _c === void 0 ? void 0 : _c.map(s => s.toString())) || [];
-    if (!tutorSubjectIds.includes(request.subject.toString())) {
+    // Handle both populated and non-populated subject field
+    const requestSubjectId = typeof request.subject === 'object' && request.subject._id
+        ? request.subject._id.toString()
+        : request.subject.toString();
+    if (!tutorSubjectIds.includes(requestSubjectId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You do not teach this subject');
     }
     // Prepare chat participants

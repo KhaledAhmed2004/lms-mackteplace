@@ -20,6 +20,9 @@ const user_1 = require("../../../enums/user");
 const user_model_1 = require("../user/user.model");
 const tutorApplication_interface_1 = require("./tutorApplication.interface");
 const tutorApplication_model_1 = require("./tutorApplication.model");
+const jwtHelper_1 = require("../../../helpers/jwtHelper");
+const config_1 = __importDefault(require("../../../config"));
+const activityLog_service_1 = require("../activityLog/activityLog.service");
 /**
  * Submit application (PUBLIC - creates user + application)
  * First-time registration for tutors
@@ -43,7 +46,7 @@ const submitApplication = (payload) => __awaiter(void 0, void 0, void 0, functio
         name: payload.name,
         email: payload.email,
         password: payload.password,
-        phone: payload.phone,
+        phone: payload.phoneNumber,
         role: user_1.USER_ROLES.APPLICANT,
         dateOfBirth: new Date(payload.birthDate),
         tutorProfile: {
@@ -52,24 +55,45 @@ const submitApplication = (payload) => __awaiter(void 0, void 0, void 0, functio
             abiturCertificateUrl: payload.abiturCertificate,
         },
     });
+    // 3. Generate JWT token for auto-login
+    const accessToken = jwtHelper_1.jwtHelper.createToken({ id: newUser._id, role: newUser.role, email: newUser.email }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
     // 4. Create TutorApplication
     const application = yield tutorApplication_model_1.TutorApplication.create({
         name: payload.name,
         email: payload.email,
-        phone: payload.phone,
+        phoneNumber: payload.phoneNumber,
         birthDate: new Date(payload.birthDate),
         street: payload.street,
         houseNumber: payload.houseNumber,
-        zipCode: payload.zipCode,
+        zip: payload.zip,
         city: payload.city,
         subjects: payload.subjects,
         cv: payload.cv,
         abiturCertificate: payload.abiturCertificate,
-        officialIdDocument: payload.officialIdDocument,
+        officialId: payload.officialId,
         status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED,
         submittedAt: new Date(),
     });
-    return { application, user: { _id: newUser._id, email: newUser.email } };
+    // Log activity - Application submitted
+    activityLog_service_1.ActivityLogService.logActivity({
+        userId: newUser._id,
+        actionType: 'APPLICATION_SUBMITTED',
+        title: 'New Tutor Application',
+        description: `${payload.name} submitted a tutor application`,
+        entityType: 'APPLICATION',
+        entityId: application._id,
+        status: 'success',
+    });
+    return {
+        application,
+        user: {
+            _id: newUser._id,
+            email: newUser.email,
+            name: newUser.name,
+            role: newUser.role,
+        },
+        accessToken,
+    };
 });
 // Get my application (for logged in applicant)
 const getMyApplication = (userEmail) => __awaiter(void 0, void 0, void 0, function* () {
@@ -87,7 +111,7 @@ const getMyApplication = (userEmail) => __awaiter(void 0, void 0, void 0, functi
  */
 const getAllApplications = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const applicationQuery = new QueryBuilder_1.default(tutorApplication_model_1.TutorApplication.find(), query)
-        .search(['name', 'email', 'phone', 'city'])
+        .search(['name', 'email', 'phoneNumber', 'city'])
         .filter()
         .sort()
         .paginate()
@@ -176,12 +200,31 @@ const approveApplication = (id, adminNotes) => __awaiter(void 0, void 0, void 0,
         application.adminNotes = adminNotes;
     }
     yield application.save();
-    // Update user role to TUTOR
-    yield user_model_1.User.findOneAndUpdate({ email: application.email }, {
+    // Build full address from application fields
+    const fullAddress = `${application.street} ${application.houseNumber}, ${application.zip} ${application.city}`;
+    // Update user role to TUTOR and copy data from application
+    const updatedUser = yield user_model_1.User.findOneAndUpdate({ email: application.email }, {
         role: user_1.USER_ROLES.TUTOR,
         'tutorProfile.isVerified': true,
         'tutorProfile.verificationStatus': 'APPROVED',
-    });
+        'tutorProfile.subjects': application.subjects,
+        'tutorProfile.address': fullAddress,
+        'tutorProfile.birthDate': application.birthDate,
+        'tutorProfile.cvUrl': application.cv,
+        'tutorProfile.abiturCertificateUrl': application.abiturCertificate,
+    }, { new: true });
+    // Log activity - Tutor verified
+    if (updatedUser) {
+        activityLog_service_1.ActivityLogService.logActivity({
+            userId: updatedUser._id,
+            actionType: 'TUTOR_VERIFIED',
+            title: 'Tutor Verified',
+            description: `${application.name} has been verified as a tutor`,
+            entityType: 'APPLICATION',
+            entityId: application._id,
+            status: 'success',
+        });
+    }
     return application;
 });
 /**
@@ -200,6 +243,19 @@ const rejectApplication = (id, rejectionReason) => __awaiter(void 0, void 0, voi
     application.rejectionReason = rejectionReason;
     application.rejectedAt = new Date();
     yield application.save();
+    // Log activity - Application rejected
+    const user = yield user_model_1.User.findOne({ email: application.email });
+    if (user) {
+        activityLog_service_1.ActivityLogService.logActivity({
+            userId: user._id,
+            actionType: 'APPLICATION_REJECTED',
+            title: 'Application Rejected',
+            description: `${application.name}'s tutor application was rejected`,
+            entityType: 'APPLICATION',
+            entityId: application._id,
+            status: 'warning',
+        });
+    }
     return application;
 });
 /**

@@ -62,6 +62,45 @@ router.patch(
   StudentSubscriptionController.cancelSubscription
 );
 
+/**
+ * @route   POST /api/v1/subscriptions/create-payment-intent
+ * @desc    Create Stripe PaymentIntent for subscription
+ * @access  Student only
+ * @body    { tier: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' }
+ * @returns { clientSecret, subscriptionId, amount, currency }
+ */
+router.post(
+  '/create-payment-intent',
+  auth(USER_ROLES.STUDENT),
+  validateRequest(StudentSubscriptionValidation.subscribeToPlanZodSchema),
+  StudentSubscriptionController.createPaymentIntent
+);
+
+/**
+ * @route   POST /api/v1/subscriptions/confirm-payment
+ * @desc    Confirm payment and activate subscription
+ * @access  Student only
+ * @body    { subscriptionId, paymentIntentId }
+ */
+router.post(
+  '/confirm-payment',
+  auth(USER_ROLES.STUDENT),
+  validateRequest(StudentSubscriptionValidation.confirmPaymentZodSchema),
+  StudentSubscriptionController.confirmPayment
+);
+
+/**
+ * @route   GET /api/v1/subscriptions/payment-history
+ * @desc    Get payment history
+ * @access  Student only
+ * @query   ?page=1&limit=10
+ */
+router.get(
+  '/payment-history',
+  auth(USER_ROLES.STUDENT),
+  StudentSubscriptionController.getPaymentHistory
+);
+
 // ============ ADMIN ROUTES ============
 
 /**

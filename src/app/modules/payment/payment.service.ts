@@ -44,21 +44,12 @@ const mapPaymentToView = (payment: any): IPaymentView => {
 
 // Moved to stripeConnected.service.ts
 
+// TODO: Legacy Bid/Task escrow code - commented out as Bid/Task models don't exist in LMS
 // Create escrow payment when bid is accepted
 // Escrow helpers (internal)
-const getBidAndTask = async (bidId: any) => {
-  const bid = await BidModel.findById(bidId).populate('taskId');
-  if (!bid) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Bid not found');
-  }
-  const task = bid.taskId as any;
-  if (!bid.taskerId) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'Bid does not have an assigned freelancer'
-    );
-  }
-  return { bid, task };
+const getBidAndTask = async (_bidId: any): Promise<{ bid: any; task: any }> => {
+  // Legacy code - Bid/Task system not used in LMS
+  throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'Bid/Task system not implemented in LMS');
 };
 
 // Moved to stripeConnected.service.ts
@@ -182,14 +173,9 @@ const ensureHeldStatus = (payment: any) => {
   }
 };
 
-const ensureClientAuthorized = async (taskId: any, clientId: any) => {
-  const task = await TaskModel.findById(taskId);
-  if (!task || task.userId.toString() !== clientId?.toString()) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      'You are not authorized to release this payment'
-    );
-  }
+const ensureClientAuthorized = async (_taskId: any, _clientId: any) => {
+  // Legacy code - Task system not used in LMS
+  throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'Task system not implemented in LMS');
 };
 
 const getChargeIdForIntent = async (
@@ -240,10 +226,10 @@ const createTransferToFreelancer = async (
 
 const markPaymentReleasedAndBidCompleted = async (
   paymentId: any,
-  bidId: any
+  _bidId: any
 ) => {
   await PaymentModel.updatePaymentStatus(paymentId, PAYMENT_STATUS.RELEASED);
-  await BidModel.findByIdAndUpdate(bidId, { status: 'completed' });
+  // Legacy: BidModel.findByIdAndUpdate(bidId, { status: 'completed' }) - not used in LMS
 };
 export const releaseEscrowPayment = async (
   data: IPaymentRelease
@@ -350,9 +336,7 @@ export const refundEscrowPayment = async (
 
     await markPaymentRefunded(paymentId, reason);
 
-    await BidModel.findByIdAndUpdate(payment.bidId, {
-      status: 'cancelled',
-    });
+    // Legacy: BidModel update - not used in LMS
 
     return {
       success: true,
@@ -558,36 +542,9 @@ const handlePaymentFailed = async (paymentIntent: any): Promise<void> => {
     }
   );
 
-  // Reset bid status back to PENDING so it can be re-attempted
-  await BidModel.findByIdAndUpdate(bidId, {
-    status: 'pending',
-    paymentIntentId: null, // Clear the failed payment intent
-  });
-
-  // Revert task assignment and status if this bid was already accepted
-  try {
-    const bid = await BidModel.findById(bidId);
-    if (bid) {
-      const task = await TaskModel.findById(bid.taskId);
-      if (task) {
-        // Only revert if the task is currently assigned to this tasker
-        const assignedMatches =
-          task.assignedTo?.toString() === bid.taskerId?.toString();
-        if (assignedMatches) {
-          await TaskModel.findByIdAndUpdate(task._id, {
-            status: TaskStatus.OPEN,
-            assignedTo: null,
-            paymentIntentId: null,
-          });
-        }
-      }
-    }
-  } catch (revertErr) {
-    console.error(
-      'Failed to revert task state after payment failure:',
-      revertErr
-    );
-  }
+  // Legacy: Bid/Task system not used in LMS
+  // Original code reset bid status and reverted task assignment
+  console.log(`Payment failure handled for bidId: ${bidId}`);
 };
 
 // Moved to stripeConnected.service.ts
@@ -650,14 +607,8 @@ const handleAmountCapturableUpdated = async (
       }
     }
 
-    // Complete bid acceptance process after successful capture
-    const { BidService } = await import('../bid/bid.service');
-    try {
-      await BidService.completeBidAcceptance(bidId);
-      // console.log(`Bid ${bidId} acceptance completed after capture (amount_capturable_updated).`);
-    } catch (error) {
-      console.error('Failed to complete bid acceptance after capture:', error);
-    }
+    // Legacy: Bid acceptance - not used in LMS
+    console.log(`Capture completed for bidId: ${bidId}`);
   } catch (error) {
     console.error(
       `Error in handleAmountCapturableUpdated for payment ${paymentIntent.id}:`,

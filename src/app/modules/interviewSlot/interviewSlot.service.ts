@@ -433,6 +433,22 @@ const deleteInterviewSlot = async (id: string): Promise<IInterviewSlot | null> =
   return result;
 };
 
+/**
+ * Get my booked interview slot (Applicant only)
+ */
+const getMyBookedInterview = async (
+  applicantId: string
+): Promise<IInterviewSlot | null> => {
+  const slot = await InterviewSlot.findOne({
+    applicantId: new Types.ObjectId(applicantId),
+    status: INTERVIEW_SLOT_STATUS.BOOKED,
+  })
+    .populate('adminId', 'name email')
+    .populate('applicationId');
+
+  return slot;
+};
+
 export const InterviewSlotService = {
   createInterviewSlot,
   getAllInterviewSlots,
@@ -443,4 +459,5 @@ export const InterviewSlotService = {
   markAsCompleted,
   updateInterviewSlot,
   deleteInterviewSlot,
+  getMyBookedInterview,
 };

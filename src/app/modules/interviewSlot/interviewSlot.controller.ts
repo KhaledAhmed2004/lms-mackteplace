@@ -164,6 +164,23 @@ const deleteInterviewSlot = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get my booked interview slot (Applicant only)
+ */
+const getMyBookedInterview = catchAsync(async (req: Request, res: Response) => {
+  const applicantId = req.user?.id as string;
+  const result = await InterviewSlotService.getMyBookedInterview(applicantId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: result
+      ? 'Booked interview slot retrieved successfully'
+      : 'No booked interview slot found',
+    data: result,
+  });
+});
+
 export const InterviewSlotController = {
   createInterviewSlot,
   getAllInterviewSlots,
@@ -174,4 +191,5 @@ export const InterviewSlotController = {
   markAsCompleted,
   updateInterviewSlot,
   deleteInterviewSlot,
+  getMyBookedInterview,
 };

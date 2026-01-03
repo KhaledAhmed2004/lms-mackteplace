@@ -26,6 +26,8 @@ const tutorEarnings_model_1 = require("../tutorEarnings/tutorEarnings.model");
 const studentSubscription_model_1 = require("../studentSubscription/studentSubscription.model");
 const studentSubscription_interface_1 = require("../studentSubscription/studentSubscription.interface");
 const AggregationBuilder_1 = __importDefault(require("../../builder/AggregationBuilder"));
+const trialRequest_model_1 = require("../trialRequest/trialRequest.model");
+const trialRequest_interface_1 = require("../trialRequest/trialRequest.interface");
 /**
  * Get comprehensive dashboard statistics
  */
@@ -583,6 +585,149 @@ const getUserDistribution = (...args_1) => __awaiter(void 0, [...args_1], void 0
     }
     return result;
 });
+/**
+ * Get unified sessions (Sessions + Trial Requests)
+ * Merges both sessions and pending trial requests into a single view
+ */
+const getUnifiedSessions = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const { page = 1, limit = 10, status, paymentStatus, isTrial, search, sortBy = 'createdAt', sortOrder = 'desc', } = query;
+    // Get all sessions with populated fields
+    const sessions = yield session_model_1.Session.find()
+        .populate('studentId', 'name email phone profilePicture')
+        .populate('tutorId', 'name email phone profilePicture')
+        .lean();
+    // Get pending/accepted trial requests (not yet converted to session or waiting)
+    const pendingTrialRequests = yield trialRequest_model_1.TrialRequest.find({
+        status: { $in: [trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING, trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED] },
+    })
+        .populate('studentId', 'name email phone profilePicture')
+        .populate('acceptedTutorId', 'name email phone profilePicture')
+        .populate('subject', 'name')
+        .lean();
+    // Transform sessions to unified format
+    const unifiedSessions = sessions.map((s) => {
+        var _a, _b, _c, _d, _e, _f;
+        return ({
+            _id: s._id.toString(),
+            type: 'SESSION',
+            studentName: (_a = s.studentId) === null || _a === void 0 ? void 0 : _a.name,
+            studentEmail: (_b = s.studentId) === null || _b === void 0 ? void 0 : _b.email,
+            studentPhone: (_c = s.studentId) === null || _c === void 0 ? void 0 : _c.phone,
+            tutorName: (_d = s.tutorId) === null || _d === void 0 ? void 0 : _d.name,
+            tutorEmail: (_e = s.tutorId) === null || _e === void 0 ? void 0 : _e.email,
+            tutorPhone: (_f = s.tutorId) === null || _f === void 0 ? void 0 : _f.phone,
+            subject: s.subject,
+            status: s.status,
+            paymentStatus: s.isTrial ? 'FREE_TRIAL' : s.paymentStatus || session_interface_1.PAYMENT_STATUS.PENDING,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            createdAt: s.createdAt,
+            isTrial: s.isTrial || false,
+            description: s.description,
+            totalPrice: s.totalPrice,
+        });
+    });
+    // Transform trial requests to unified format
+    const unifiedTrialRequests = pendingTrialRequests.map((tr) => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+        return ({
+            _id: tr._id.toString(),
+            type: 'TRIAL_REQUEST',
+            studentName: ((_a = tr.studentInfo) === null || _a === void 0 ? void 0 : _a.name) || ((_b = tr.studentId) === null || _b === void 0 ? void 0 : _b.name),
+            studentEmail: ((_c = tr.studentInfo) === null || _c === void 0 ? void 0 : _c.email) || ((_e = (_d = tr.studentInfo) === null || _d === void 0 ? void 0 : _d.guardianInfo) === null || _e === void 0 ? void 0 : _e.email) || ((_f = tr.studentId) === null || _f === void 0 ? void 0 : _f.email),
+            studentPhone: ((_h = (_g = tr.studentInfo) === null || _g === void 0 ? void 0 : _g.guardianInfo) === null || _h === void 0 ? void 0 : _h.phone) || ((_j = tr.studentId) === null || _j === void 0 ? void 0 : _j.phone),
+            tutorName: ((_k = tr.acceptedTutorId) === null || _k === void 0 ? void 0 : _k.name) || 'Pending Tutor',
+            tutorEmail: (_l = tr.acceptedTutorId) === null || _l === void 0 ? void 0 : _l.email,
+            tutorPhone: (_m = tr.acceptedTutorId) === null || _m === void 0 ? void 0 : _m.phone,
+            subject: ((_o = tr.subject) === null || _o === void 0 ? void 0 : _o.name) || 'Unknown Subject',
+            status: tr.status,
+            paymentStatus: 'FREE_TRIAL',
+            startTime: tr.preferredDateTime,
+            endTime: undefined,
+            createdAt: tr.createdAt,
+            isTrial: true,
+            description: tr.description,
+            totalPrice: 0,
+        });
+    });
+    // Merge all items
+    let unified = [...unifiedSessions, ...unifiedTrialRequests];
+    // Apply filters
+    if (status) {
+        unified = unified.filter(item => item.status === status);
+    }
+    if (paymentStatus) {
+        unified = unified.filter(item => item.paymentStatus === paymentStatus);
+    }
+    if (isTrial !== undefined) {
+        unified = unified.filter(item => item.isTrial === isTrial);
+    }
+    if (search) {
+        const searchLower = search.toLowerCase();
+        unified = unified.filter(item => {
+            var _a, _b, _c, _d;
+            return ((_a = item.studentName) === null || _a === void 0 ? void 0 : _a.toLowerCase().includes(searchLower)) ||
+                ((_b = item.studentEmail) === null || _b === void 0 ? void 0 : _b.toLowerCase().includes(searchLower)) ||
+                ((_c = item.tutorName) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(searchLower)) ||
+                ((_d = item.subject) === null || _d === void 0 ? void 0 : _d.toLowerCase().includes(searchLower));
+        });
+    }
+    // Sort
+    unified.sort((a, b) => {
+        const aValue = a[sortBy];
+        const bValue = b[sortBy];
+        if (aValue === undefined || aValue === null)
+            return 1;
+        if (bValue === undefined || bValue === null)
+            return -1;
+        if (aValue instanceof Date && bValue instanceof Date) {
+            return sortOrder === 'desc'
+                ? bValue.getTime() - aValue.getTime()
+                : aValue.getTime() - bValue.getTime();
+        }
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+            return sortOrder === 'desc'
+                ? bValue.localeCompare(aValue)
+                : aValue.localeCompare(bValue);
+        }
+        return 0;
+    });
+    // Pagination
+    const total = unified.length;
+    const totalPage = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedData = unified.slice(startIndex, startIndex + limit);
+    return {
+        data: paginatedData,
+        meta: {
+            page,
+            limit,
+            total,
+            totalPage,
+        },
+    };
+});
+/**
+ * Get session stats for admin dashboard
+ */
+const getSessionStats = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const [totalSessions, pendingSessions, completedSessions, trialSessions] = yield Promise.all([
+        session_model_1.Session.countDocuments(),
+        session_model_1.Session.countDocuments({
+            status: { $in: [session_interface_1.SESSION_STATUS.SCHEDULED, session_interface_1.SESSION_STATUS.STARTING_SOON] },
+            startTime: { $gte: now },
+        }),
+        session_model_1.Session.countDocuments({ status: session_interface_1.SESSION_STATUS.COMPLETED }),
+        session_model_1.Session.countDocuments({ isTrial: true }),
+    ]);
+    return {
+        totalSessions,
+        pendingSessions,
+        completedSessions,
+        trialSessions,
+    };
+});
 exports.AdminService = {
     getDashboardStats,
     getRevenueByMonth,
@@ -593,4 +738,6 @@ exports.AdminService = {
     getOverviewStats,
     getMonthlyRevenue,
     getUserDistribution,
+    getUnifiedSessions,
+    getSessionStats,
 };

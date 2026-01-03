@@ -15,21 +15,22 @@ router.post(
 );
 
 // Stripe Connect account management
+// APPLICANT can also create account when their application is APPROVED
 router.post(
   '/stripe/account',
-  auth(USER_ROLES.TUTOR),
+  auth(USER_ROLES.TUTOR, USER_ROLES.APPLICANT),
   StripeConnectController.createStripeAccountController
 );
 
 router.get(
   '/stripe/onboarding',
-  auth(USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.TUTOR, USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
   StripeConnectController.getOnboardingLinkController
 );
 
 router.get(
   '/stripe/onboarding-status',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
   StripeConnectController.checkOnboardingStatusController
 );
 

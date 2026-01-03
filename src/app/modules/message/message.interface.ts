@@ -21,16 +21,19 @@ export type ISessionProposal = {
   duration: number;                     // Duration in minutes
   price: number;                        // Price in EUR
   description?: string;                 // Session description
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'COUNTER_PROPOSED';
   sessionId?: Types.ObjectId;           // Created session (when accepted)
   rejectionReason?: string;             // Why rejected
   expiresAt: Date;                      // Proposal expiration (24 hours)
+  originalProposalId?: Types.ObjectId;  // Reference to original proposal (for counter-proposals)
+  counterProposalReason?: string;       // Why counter-proposed (e.g., "I'm not available at that time")
 };
 
 export type IMessage = {
   chatId: Types.ObjectId;
   sender: Types.ObjectId;
   text?: string;
+  content?: string; // Virtual alias for text (for frontend compatibility)
   type: 'text' | 'image' | 'media' | 'doc' | 'mixed' | 'session_proposal';
   attachments?: IMessageAttachment[]; // unified attachment system
 
@@ -41,6 +44,10 @@ export type IMessage = {
   readBy?: Types.ObjectId[];
   status?: 'sent' | 'delivered' | 'seen';
   editedAt?: Date;
+
+  // Timestamps
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export type MessageModel = Model<IMessage>;

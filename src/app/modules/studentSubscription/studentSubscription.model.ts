@@ -56,6 +56,12 @@ const studentSubscriptionSchema = new Schema<IStudentSubscription>(
     stripeSubscriptionId: {
       type: String,
     },
+    stripePaymentIntentId: {
+      type: String,
+    },
+    paidAt: {
+      type: Date,
+    },
     cancellationReason: {
       type: String,
       trim: true,

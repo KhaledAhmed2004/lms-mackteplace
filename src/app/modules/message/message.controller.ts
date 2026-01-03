@@ -42,4 +42,21 @@ const markChatRead = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const MessageController = { sendMessage, getMessage, markChatRead };
+// Get all messages in a chat
+const getChatMessages = catchAsync(async (req: Request, res: Response) => {
+  const chatId = req.params.chatId;
+  const result = await MessageService.getMessageFromDB(
+    req.user as JwtPayload,
+    chatId,
+    req.query
+  );
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Chat messages retrieved successfully',
+    data: result.messages,
+    meta: result.pagination,
+  });
+});
+
+export const MessageController = { sendMessage, getMessage, markChatRead, getChatMessages };

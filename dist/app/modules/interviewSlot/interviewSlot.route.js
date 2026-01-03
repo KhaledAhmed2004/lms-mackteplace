@@ -14,6 +14,12 @@ const router = express_1.default.Router();
 // ============ APPLICANT ROUTES ============
 // Note: Only applicants with SELECTED_FOR_INTERVIEW status can access these
 /**
+ * @route   GET /api/v1/interview-slots/my-interview
+ * @desc    Get my booked interview slot
+ * @access  Applicant only
+ */
+router.get('/my-interview', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT), interviewSlot_controller_1.InterviewSlotController.getMyBookedInterview);
+/**
  * @route   GET /api/v1/interview-slots
  * @desc    Get available interview slots
  * @access  Applicant (must be SELECTED_FOR_INTERVIEW) or Admin

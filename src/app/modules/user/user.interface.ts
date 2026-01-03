@@ -5,6 +5,7 @@ export enum USER_ROLES {
   STUDENT = 'STUDENT',
   TUTOR = 'TUTOR',
   APPLICANT = 'APPLICANT',
+  GUEST = 'GUEST',
 }
 
 export enum USER_STATUS {
@@ -48,8 +49,10 @@ export type StudentProfile = {
   trialRequestsCount: number; // Total trial requests made
   sessionRequestsCount: number; // Total session requests made (after trial)
   currentPlan?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' | null;
+  subscriptionTier?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' | null;
   totalHoursTaken: number;
   totalSpent: number;
+  stripeCustomerId?: string; // Stripe customer ID for payments
 };
 
 export type TutorProfile = {
@@ -105,6 +108,7 @@ export type IUser = {
   profilePicture?: string;
   status: USER_STATUS;
   verified: boolean;
+  isEmailVerified?: boolean;
   deviceTokens?: string[];
   averageRating: number;
   ratingsCount: number;
@@ -120,6 +124,10 @@ export type IUser = {
     oneTimeCode: number;
     expireAt: Date;
   };
+
+  // Timestamps
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export type UserModal = {
