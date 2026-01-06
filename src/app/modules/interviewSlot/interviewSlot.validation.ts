@@ -48,14 +48,7 @@ const bookInterviewSlotZodSchema = z.object({
 
 // Cancel interview slot validation
 const cancelInterviewSlotZodSchema = z.object({
-  body: z.object({
-    cancellationReason: z
-      .string({
-        required_error: 'Cancellation reason is required',
-      })
-      .trim()
-      .min(10, 'Cancellation reason must be at least 10 characters'),
-  }),
+  body: z.object({}).optional(),
 });
 
 // Reschedule interview slot validation (Applicant)

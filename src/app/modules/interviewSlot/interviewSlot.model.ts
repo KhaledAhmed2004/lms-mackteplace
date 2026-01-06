@@ -33,10 +33,7 @@ const interviewSlotSchema = new Schema<IInterviewSlot>(
       enum: Object.values(INTERVIEW_SLOT_STATUS),
       default: INTERVIEW_SLOT_STATUS.AVAILABLE,
     },
-    googleMeetLink: {
-      type: String,
-    },
-    googleCalendarEventId: {
+    agoraChannelName: {
       type: String,
     },
     notes: {

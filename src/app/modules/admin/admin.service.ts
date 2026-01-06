@@ -901,6 +901,92 @@ const getSessionStats = async (): Promise<{
   };
 };
 
+/**
+ * Get application statistics for admin dashboard
+ * Returns counts by status with growth metrics (current month vs last month)
+ */
+const getApplicationStats = async (): Promise<{
+  total: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+  pending: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+  interview: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+  approved: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+  rejected: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+  revision: { count: number; growth: number; growthType: 'increase' | 'decrease' | 'no_change' };
+}> => {
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+  // Get total counts
+  const [total, pending, interview, approved, rejected, revision] = await Promise.all([
+    TutorApplication.countDocuments(),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SUBMITTED }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SELECTED_FOR_INTERVIEW }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.APPROVED }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REJECTED }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REVISION }),
+  ]);
+
+  // Get this month counts
+  const [
+    totalThisMonth,
+    pendingThisMonth,
+    interviewThisMonth,
+    approvedThisMonth,
+    rejectedThisMonth,
+    revisionThisMonth,
+  ] = await Promise.all([
+    TutorApplication.countDocuments({ createdAt: { $gte: firstDayOfMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SUBMITTED, createdAt: { $gte: firstDayOfMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SELECTED_FOR_INTERVIEW, selectedForInterviewAt: { $gte: firstDayOfMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.APPROVED, approvedAt: { $gte: firstDayOfMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REJECTED, rejectedAt: { $gte: firstDayOfMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REVISION, revisionRequestedAt: { $gte: firstDayOfMonth } }),
+  ]);
+
+  // Get last month counts
+  const [
+    totalLastMonth,
+    pendingLastMonth,
+    interviewLastMonth,
+    approvedLastMonth,
+    rejectedLastMonth,
+    revisionLastMonth,
+  ] = await Promise.all([
+    TutorApplication.countDocuments({ createdAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SUBMITTED, createdAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.SELECTED_FOR_INTERVIEW, selectedForInterviewAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.APPROVED, approvedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REJECTED, rejectedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    TutorApplication.countDocuments({ status: APPLICATION_STATUS.REVISION, revisionRequestedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+  ]);
+
+  // Calculate growth helper
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) {
+      return {
+        growth: current > 0 ? 100 : 0,
+        growthType: current > 0 ? 'increase' as const : 'no_change' as const,
+      };
+    }
+    const growth = ((current - previous) / previous) * 100;
+    return {
+      growth: Math.round(growth * 10) / 10,
+      growthType: growth > 0 ? 'increase' as const : growth < 0 ? 'decrease' as const : 'no_change' as const,
+    };
+  };
+
+  return {
+    total: { count: total, ...calculateGrowth(totalThisMonth, totalLastMonth) },
+    pending: { count: pending, ...calculateGrowth(pendingThisMonth, pendingLastMonth) },
+    interview: { count: interview, ...calculateGrowth(interviewThisMonth, interviewLastMonth) },
+    approved: { count: approved, ...calculateGrowth(approvedThisMonth, approvedLastMonth) },
+    rejected: { count: rejected, ...calculateGrowth(rejectedThisMonth, rejectedLastMonth) },
+    revision: { count: revision, ...calculateGrowth(revisionThisMonth, revisionLastMonth) },
+  };
+};
+
 export const AdminService = {
   getDashboardStats,
   getRevenueByMonth,
@@ -913,4 +999,5 @@ export const AdminService = {
   getUserDistribution,
   getUnifiedSessions,
   getSessionStats,
+  getApplicationStats,
 };

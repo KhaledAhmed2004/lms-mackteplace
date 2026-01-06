@@ -15,13 +15,9 @@ router.post(
   AuthController.loginUser
 );
 
-// User Logout
+// User Logout (Public - no auth required so expired tokens can still logout)
 // ✅ FRONTEND: useLogout | Used in: MobileMenuTutor.tsx, TopNavbar.tsx, MobileMenu.tsx
-router.post(
-  '/logout',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.STUDENT, USER_ROLES.TUTOR),
-  AuthController.logoutUser
-);
+router.post('/logout', AuthController.logoutUser);
 
 // Forget Password Request
 // ❌ NOT INTEGRATED IN FRONTEND

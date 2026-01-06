@@ -159,6 +159,19 @@ router.get(
   AdminController.getSessionStats
 );
 
+/**
+ * @route   GET /api/v1/admin/application-stats
+ * @desc    Get application statistics by status
+ * @access  Admin only
+ * @returns { total, pending, interview, approved, rejected, revision }
+ */
+// ✅ FRONTEND: useApplicationStats | Used in: src/app/(admin)/admin/application/page.tsx
+router.get(
+  '/application-stats',
+  auth(USER_ROLES.SUPER_ADMIN),
+  AdminController.getApplicationStats
+);
+
 // ============ ACTIVITY LOG ============
 
 /**

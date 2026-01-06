@@ -14,8 +14,7 @@ export type IInterviewSlot = {
   startTime: Date;
   endTime: Date;
   status: INTERVIEW_SLOT_STATUS;
-  googleMeetLink?: string;
-  googleCalendarEventId?: string;
+  agoraChannelName?: string;
   notes?: string;
   cancellationReason?: string;
   bookedAt?: Date;

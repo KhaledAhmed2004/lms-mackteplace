@@ -239,6 +239,21 @@ const getSessionStats = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get application statistics for admin dashboard
+ * Returns counts by status
+ */
+const getApplicationStats = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getApplicationStats();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Application statistics retrieved successfully',
+    data: result,
+  });
+});
+
 export const AdminController = {
   getDashboardStats,
   getRevenueByMonth,
@@ -251,4 +266,5 @@ export const AdminController = {
   getUserDistribution,
   getUnifiedSessions,
   getSessionStats,
+  getApplicationStats,
 };

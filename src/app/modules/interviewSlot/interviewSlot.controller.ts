@@ -181,6 +181,38 @@ const getMyBookedInterview = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get all scheduled meetings (Admin only)
+ */
+const getScheduledMeetings = catchAsync(async (req: Request, res: Response) => {
+  const result = await InterviewSlotService.getScheduledMeetings(req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Scheduled meetings retrieved successfully',
+    data: result.data,
+    pagination: result.meta,
+  });
+});
+
+/**
+ * Get meeting token for interview video call
+ */
+const getMeetingToken = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?.id as string;
+
+  const result = await InterviewSlotService.getInterviewMeetingToken(id, userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Meeting token generated successfully',
+    data: result,
+  });
+});
+
 export const InterviewSlotController = {
   createInterviewSlot,
   getAllInterviewSlots,
@@ -192,4 +224,6 @@ export const InterviewSlotController = {
   updateInterviewSlot,
   deleteInterviewSlot,
   getMyBookedInterview,
+  getScheduledMeetings,
+  getMeetingToken,
 };

@@ -22,6 +22,29 @@ router.get(
 );
 
 /**
+ * @route   GET /api/v1/interview-slots/scheduled-meetings
+ * @desc    Get all scheduled meetings (BOOKED interview slots)
+ * @access  Admin only
+ * @query   ?page=1&limit=10&sort=-startTime
+ */
+router.get(
+  '/scheduled-meetings',
+  auth(USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.getScheduledMeetings
+);
+
+/**
+ * @route   GET /api/v1/interview-slots/:id/meeting-token
+ * @desc    Get Agora meeting token for interview video call
+ * @access  Applicant or Admin (must be participant of the meeting)
+ */
+router.get(
+  '/:id/meeting-token',
+  auth(USER_ROLES.APPLICANT, USER_ROLES.SUPER_ADMIN),
+  InterviewSlotController.getMeetingToken
+);
+
+/**
  * @route   GET /api/v1/interview-slots
  * @desc    Get available interview slots
  * @access  Applicant (must be SELECTED_FOR_INTERVIEW) or Admin
