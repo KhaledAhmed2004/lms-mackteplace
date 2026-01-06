@@ -80,7 +80,12 @@ const getAllInterviewSlots = async (
     filter = { status: INTERVIEW_SLOT_STATUS.AVAILABLE };
   }
 
-  const slotQuery = new QueryBuilder(InterviewSlot.find(filter), query)
+  const slotQuery = new QueryBuilder(
+    InterviewSlot.find(filter)
+      .populate('adminId', 'name email')
+      .populate('applicantId', 'name email'),
+    query
+  )
     .filter()
     .sort()
     .paginate()

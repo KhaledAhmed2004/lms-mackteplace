@@ -24,8 +24,6 @@ const createInterviewSlotZodSchema = z.object({
       .refine(date => !isNaN(Date.parse(date)), {
         message: 'Invalid end time format',
       }),
-
-    notes: z.string().trim().optional(),
   }).refine(
     data => new Date(data.endTime) > new Date(data.startTime),
     {
@@ -78,8 +76,6 @@ const updateInterviewSlotZodSchema = z.object({
         message: 'Invalid end time format',
       })
       .optional(),
-
-    notes: z.string().trim().optional(),
 
     status: z
       .enum(['AVAILABLE', 'BOOKED', 'COMPLETED', 'CANCELLED'])

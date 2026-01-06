@@ -36,10 +36,6 @@ const interviewSlotSchema = new Schema<IInterviewSlot>(
     agoraChannelName: {
       type: String,
     },
-    notes: {
-      type: String,
-      trim: true,
-    },
     cancellationReason: {
       type: String,
       trim: true,

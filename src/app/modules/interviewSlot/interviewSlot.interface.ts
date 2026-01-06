@@ -15,7 +15,6 @@ export type IInterviewSlot = {
   endTime: Date;
   status: INTERVIEW_SLOT_STATUS;
   agoraChannelName?: string;
-  notes?: string;
   cancellationReason?: string;
   bookedAt?: Date;
   completedAt?: Date;
