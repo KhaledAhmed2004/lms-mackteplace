@@ -718,13 +718,12 @@ const acceptSessionRequest = async (
 };
 
 /**
- * Cancel session request (Student)
+ * Cancel session request (Student) - Permanently deletes the request
  */
 const cancelSessionRequest = async (
   requestId: string,
-  studentId: string,
-  cancellationReason: string
-): Promise<ISessionRequest | null> => {
+  studentId: string
+): Promise<{ deleted: boolean }> => {
   const request = await SessionRequest.findById(requestId);
 
   if (!request) {
@@ -747,18 +746,16 @@ const cancelSessionRequest = async (
     );
   }
 
-  // Update request
-  request.status = SESSION_REQUEST_STATUS.CANCELLED;
-  request.cancellationReason = cancellationReason;
-  request.cancelledAt = new Date();
-  await request.save();
+  // Permanently delete the request
+  await SessionRequest.findByIdAndDelete(requestId);
 
-  return request;
+  return { deleted: true };
 };
 
 /**
  * Extend session request (Student)
  * Adds 7 more days to expiration (max 1 extension)
+ * Can only extend when 1 day or less remaining (6+ days passed)
  */
 const extendSessionRequest = async (
   requestId: string,
@@ -794,7 +791,17 @@ const extendSessionRequest = async (
     );
   }
 
-  // Extend by 7 days
+  // Can only extend when 1 day or less remaining (6+ days passed)
+  const timeRemaining = request.expiresAt.getTime() - Date.now();
+  const oneDayInMs = 24 * 60 * 60 * 1000;
+  if (timeRemaining > oneDayInMs) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'You can only extend when 1 day or less is remaining'
+    );
+  }
+
+  // Extend by 7 days from now
   const newExpiresAt = new Date();
   newExpiresAt.setDate(newExpiresAt.getDate() + 7);
 

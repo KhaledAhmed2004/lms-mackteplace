@@ -115,6 +115,74 @@ const markAsFailed = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// ============ PAYOUT SETTINGS ============
+
+/**
+ * Get tutor's payout settings
+ */
+const getPayoutSettings = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const result = await TutorEarningsService.getPayoutSettings(tutorId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Payout settings retrieved successfully',
+    data: result,
+  });
+});
+
+/**
+ * Update tutor's payout settings
+ */
+const updatePayoutSettings = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const result = await TutorEarningsService.updatePayoutSettings(tutorId, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Payout settings updated successfully',
+    data: result,
+  });
+});
+
+// ============ TUTOR STATS ============
+
+/**
+ * Get tutor's comprehensive stats including level progress
+ */
+const getMyStats = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const result = await TutorEarningsService.getMyStats(tutorId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor stats retrieved successfully',
+    data: result,
+  });
+});
+
+/**
+ * Get formatted earnings history for frontend
+ */
+const getEarningsHistory = catchAsync(async (req: Request, res: Response) => {
+  const tutorId = req.user!.id as string;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const result = await TutorEarningsService.getEarningsHistory(tutorId, page, limit);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Earnings history retrieved successfully',
+    data: result.data,
+    pagination: result.meta,
+  });
+});
+
 export const TutorEarningsController = {
   generateTutorEarnings,
   getMyEarnings,
@@ -123,4 +191,9 @@ export const TutorEarningsController = {
   initiatePayout,
   markAsPaid,
   markAsFailed,
+  // New methods
+  getPayoutSettings,
+  updatePayoutSettings,
+  getMyStats,
+  getEarningsHistory,
 };

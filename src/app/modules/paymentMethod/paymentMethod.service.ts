@@ -63,10 +63,19 @@ const createSetupIntent = async (studentId: string) => {
     });
     stripeCustomerId = customer.id;
 
-    // Save customer ID to user
-    await User.findByIdAndUpdate(studentId, {
-      'studentProfile.stripeCustomerId': stripeCustomerId,
-    });
+    // Save customer ID to user - ensure studentProfile exists
+    if (student.studentProfile) {
+      await User.findByIdAndUpdate(studentId, {
+        'studentProfile.stripeCustomerId': stripeCustomerId,
+      });
+    } else {
+      // Create studentProfile if it doesn't exist
+      await User.findByIdAndUpdate(studentId, {
+        studentProfile: {
+          stripeCustomerId: stripeCustomerId,
+        },
+      });
+    }
   }
 
   // Create SetupIntent

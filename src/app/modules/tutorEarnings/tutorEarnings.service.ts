@@ -7,7 +7,34 @@ import { Session } from '../session/session.model';
 import { SESSION_STATUS } from '../session/session.interface';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
+import { TUTOR_LEVEL } from '../user/user.interface';
 import QueryBuilder from '../../builder/QueryBuilder';
+
+// Level configuration
+const LEVEL_CONFIG = {
+  [TUTOR_LEVEL.STARTER]: { minSessions: 0, maxSessions: 20, hourlyRate: 15, levelNumber: 1 },
+  [TUTOR_LEVEL.INTERMEDIATE]: { minSessions: 21, maxSessions: 50, hourlyRate: 17, levelNumber: 2 },
+  [TUTOR_LEVEL.EXPERT]: { minSessions: 51, maxSessions: Infinity, hourlyRate: 20, levelNumber: 3 },
+};
+
+// Get next level info
+const getNextLevel = (currentLevel: TUTOR_LEVEL): { level: TUTOR_LEVEL; hourlyRate: number; levelNumber: number } | null => {
+  if (currentLevel === TUTOR_LEVEL.STARTER) {
+    return {
+      level: TUTOR_LEVEL.INTERMEDIATE,
+      hourlyRate: LEVEL_CONFIG[TUTOR_LEVEL.INTERMEDIATE].hourlyRate,
+      levelNumber: LEVEL_CONFIG[TUTOR_LEVEL.INTERMEDIATE].levelNumber,
+    };
+  }
+  if (currentLevel === TUTOR_LEVEL.INTERMEDIATE) {
+    return {
+      level: TUTOR_LEVEL.EXPERT,
+      hourlyRate: LEVEL_CONFIG[TUTOR_LEVEL.EXPERT].hourlyRate,
+      levelNumber: LEVEL_CONFIG[TUTOR_LEVEL.EXPERT].levelNumber,
+    };
+  }
+  return null; // Already at max level
+};
 
 /**
  * Generate tutor earnings for all tutors (called at month-end after billing)
@@ -252,6 +279,250 @@ const markAsFailed = async (
   return earning;
 };
 
+// ============ PAYOUT SETTINGS ============
+
+/**
+ * Get tutor's payout settings
+ */
+const getPayoutSettings = async (tutorId: string) => {
+  const tutor = await User.findById(tutorId);
+
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can access payout settings');
+  }
+
+  return {
+    recipient: tutor.tutorProfile?.payoutRecipient || '',
+    iban: tutor.tutorProfile?.payoutIban || '',
+  };
+};
+
+/**
+ * Update tutor's payout settings
+ */
+const updatePayoutSettings = async (
+  tutorId: string,
+  payload: { recipient: string; iban: string }
+) => {
+  const tutor = await User.findById(tutorId);
+
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can update payout settings');
+  }
+
+  const updatedTutor = await User.findByIdAndUpdate(
+    tutorId,
+    {
+      'tutorProfile.payoutRecipient': payload.recipient,
+      'tutorProfile.payoutIban': payload.iban,
+    },
+    { new: true }
+  );
+
+  return {
+    recipient: updatedTutor?.tutorProfile?.payoutRecipient || '',
+    iban: updatedTutor?.tutorProfile?.payoutIban || '',
+  };
+};
+
+// ============ TUTOR STATS & LEVEL PROGRESS ============
+
+/**
+ * Response type for tutor stats
+ */
+type TutorStatsResponse = {
+  // Level Progress
+  level: {
+    current: number; // 1, 2, 3
+    name: string; // STARTER, INTERMEDIATE, EXPERT
+    hourlyRate: number;
+  };
+  nextLevel: {
+    level: number;
+    name: string;
+    hourlyRate: number;
+    sessionsNeeded: number;
+    progressPercent: number;
+  } | null;
+
+  // Stats
+  stats: {
+    totalSessions: number;
+    completedSessions: number;
+    totalHours: number;
+    totalStudents: number;
+  };
+
+  // Earnings
+  earnings: {
+    currentMonth: number;
+    totalEarnings: number;
+    pendingPayout: number;
+  };
+
+  // Trial Sessions
+  trialStats: {
+    totalTrials: number;
+    convertedTrials: number;
+    conversionRate: number;
+  };
+};
+
+/**
+ * Get tutor's comprehensive stats including level progress
+ */
+const getMyStats = async (tutorId: string): Promise<TutorStatsResponse> => {
+  const tutor = await User.findById(tutorId);
+
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can access stats');
+  }
+
+  const tutorProfile = tutor.tutorProfile;
+  const currentLevel = tutorProfile?.level || TUTOR_LEVEL.STARTER;
+  const completedSessions = tutorProfile?.completedSessions || 0;
+
+  // Calculate level progress
+  const currentLevelConfig = LEVEL_CONFIG[currentLevel];
+  const nextLevelInfo = getNextLevel(currentLevel);
+
+  let nextLevelData = null;
+  if (nextLevelInfo) {
+    const sessionsForNextLevel = LEVEL_CONFIG[nextLevelInfo.level].minSessions;
+    const sessionsNeeded = Math.max(0, sessionsForNextLevel - completedSessions);
+    const progressPercent = Math.min(
+      100,
+      Math.round(((completedSessions - currentLevelConfig.minSessions) /
+        (currentLevelConfig.maxSessions - currentLevelConfig.minSessions + 1)) * 100)
+    );
+
+    nextLevelData = {
+      level: nextLevelInfo.levelNumber,
+      name: nextLevelInfo.level,
+      hourlyRate: nextLevelInfo.hourlyRate,
+      sessionsNeeded,
+      progressPercent,
+    };
+  }
+
+  // Get current month dates
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  // Get current month earnings
+  const currentMonthEarnings = await TutorEarnings.findOne({
+    tutorId: new Types.ObjectId(tutorId),
+    payoutMonth: now.getMonth() + 1,
+    payoutYear: now.getFullYear(),
+  });
+
+  // Get pending payouts total
+  const pendingPayouts = await TutorEarnings.aggregate([
+    {
+      $match: {
+        tutorId: new Types.ObjectId(tutorId),
+        status: PAYOUT_STATUS.PENDING,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$netEarnings' },
+      },
+    },
+  ]);
+
+  // Get trial session stats
+  const trialStats = await Session.aggregate([
+    {
+      $match: {
+        tutorId: new Types.ObjectId(tutorId),
+        isTrial: true,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalTrials: { $sum: 1 },
+        convertedTrials: {
+          $sum: {
+            $cond: [{ $eq: ['$status', SESSION_STATUS.COMPLETED] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  const trialData = trialStats[0] || { totalTrials: 0, convertedTrials: 0 };
+  const conversionRate = trialData.totalTrials > 0
+    ? Math.round((trialData.convertedTrials / trialData.totalTrials) * 100)
+    : 0;
+
+  return {
+    level: {
+      current: currentLevelConfig.levelNumber,
+      name: currentLevel,
+      hourlyRate: currentLevelConfig.hourlyRate,
+    },
+    nextLevel: nextLevelData,
+    stats: {
+      totalSessions: tutorProfile?.totalSessions || 0,
+      completedSessions: tutorProfile?.completedSessions || 0,
+      totalHours: tutorProfile?.totalHoursTaught || 0,
+      totalStudents: tutorProfile?.totalStudents || 0,
+    },
+    earnings: {
+      currentMonth: currentMonthEarnings?.netEarnings || 0,
+      totalEarnings: tutorProfile?.totalEarnings || 0,
+      pendingPayout: pendingPayouts[0]?.total || 0,
+    },
+    trialStats: {
+      totalTrials: trialData.totalTrials,
+      convertedTrials: trialData.convertedTrials,
+      conversionRate,
+    },
+  };
+};
+
+/**
+ * Get earnings history formatted for frontend display
+ */
+const getEarningsHistory = async (tutorId: string, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
+
+  const earnings = await TutorEarnings.find({ tutorId: new Types.ObjectId(tutorId) })
+    .sort({ payoutYear: -1, payoutMonth: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const total = await TutorEarnings.countDocuments({ tutorId: new Types.ObjectId(tutorId) });
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const formattedEarnings = earnings.map((earning) => ({
+    id: earning._id,
+    period: `${monthNames[earning.payoutMonth - 1]} ${String(earning.payoutYear).slice(-2)}`,
+    sessions: earning.totalSessions,
+    hours: earning.totalHours,
+    grossEarnings: earning.grossEarnings,
+    netEarnings: earning.netEarnings,
+    status: earning.status,
+    payoutReference: earning.payoutReference,
+    paidAt: earning.paidAt,
+  }));
+
+  return {
+    data: formattedEarnings,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
 export const TutorEarningsService = {
   generateTutorEarnings,
   getMyEarnings,
@@ -260,4 +531,9 @@ export const TutorEarningsService = {
   initiatePayout,
   markAsPaid,
   markAsFailed,
+  // New methods
+  getPayoutSettings,
+  updatePayoutSettings,
+  getMyStats,
+  getEarningsHistory,
 };

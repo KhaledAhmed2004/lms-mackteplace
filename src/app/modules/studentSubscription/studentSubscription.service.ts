@@ -604,15 +604,40 @@ const getPaymentHistory = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
   }
 
-  const stripeCustomerId = student.studentProfile?.stripeCustomerId;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedPayments: PaymentHistoryItem[] = [];
 
-  // Get completed sessions grouped by month
+  // 1. Get paid subscriptions from our database
+  const paidSubscriptions = await StudentSubscription.find({
+    studentId: new Types.ObjectId(studentId),
+    status: { $in: [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.EXPIRED, SUBSCRIPTION_STATUS.CANCELLED] },
+    paidAt: { $exists: true, $ne: null },
+  }).sort({ paidAt: -1 });
+
+  // Add subscription payments
+  paidSubscriptions.forEach((sub) => {
+    if (sub.paidAt) {
+      const paidDate = new Date(sub.paidAt);
+      const amount = sub.pricePerHour * sub.minimumHours;
+      formattedPayments.push({
+        id: sub._id.toString(),
+        period: `${monthNames[paidDate.getMonth()]} ${paidDate.getFullYear().toString().slice(-2)}`,
+        sessions: 0, // Subscription payment
+        amount: amount,
+        currency: 'EUR',
+        date: paidDate,
+        type: 'subscription',
+      });
+    }
+  });
+
+  // 2. Get completed sessions grouped by month
   const sessionPayments = await Session.aggregate([
     {
       $match: {
         studentId: new Types.ObjectId(studentId),
         status: SESSION_STATUS.COMPLETED,
-        completedAt: { $ne: null, $exists: true }, // Only sessions with valid completedAt
+        completedAt: { $ne: null, $exists: true },
       },
     },
     {
@@ -635,50 +660,20 @@ const getPaymentHistory = async (
     { $sort: { '_id.year': -1, '_id.month': -1 } },
   ]);
 
-  // Format session payments
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const formattedPayments: PaymentHistoryItem[] = sessionPayments
-    .filter((payment) => payment._id.year && payment._id.month) // Extra safety filter
-    .map((payment) => ({
-      id: `session-${payment._id.year}-${payment._id.month}`,
-      period: `${monthNames[payment._id.month - 1]} ${String(payment._id.year).slice(-2)}`,
-      sessions: payment.sessions || 0,
-      amount: payment.totalAmount || 0,
-      currency: 'EUR',
-      date: new Date(payment._id.year, payment._id.month - 1, 1),
-      type: 'session' as const,
-    }));
-
-  // If student has Stripe customer, also fetch Stripe invoices
-  if (stripeCustomerId) {
-    try {
-      const invoices = await stripe.invoices.list({
-        customer: stripeCustomerId,
-        limit: 100,
-        status: 'paid',
+  // Add session payments
+  sessionPayments
+    .filter((payment) => payment._id.year && payment._id.month)
+    .forEach((payment) => {
+      formattedPayments.push({
+        id: `session-${payment._id.year}-${payment._id.month}`,
+        period: `${monthNames[payment._id.month - 1]} ${String(payment._id.year).slice(-2)}`,
+        sessions: payment.sessions || 0,
+        amount: payment.totalAmount || 0,
+        currency: 'EUR',
+        date: new Date(payment._id.year, payment._id.month - 1, 1),
+        type: 'session' as const,
       });
-
-      // Add subscription payments
-      invoices.data.forEach((invoice) => {
-        if (invoice.metadata?.type === 'subscription_payment' && invoice.id) {
-          const invoiceDate = new Date(invoice.created * 1000);
-          formattedPayments.push({
-            id: invoice.id,
-            period: `${monthNames[invoiceDate.getMonth()]} ${invoiceDate.getFullYear().toString().slice(-2)}`,
-            sessions: 0, // Subscription payment, not session-based
-            amount: (invoice.amount_paid || 0) / 100, // Convert from cents
-            currency: (invoice.currency || 'eur').toUpperCase(),
-            date: invoiceDate,
-            type: 'subscription',
-            stripeInvoiceId: invoice.id,
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching Stripe invoices:', error);
-      // Continue without Stripe data
-    }
-  }
+    });
 
   // Sort by date (newest first)
   formattedPayments.sort((a, b) => b.date.getTime() - a.date.getTime());

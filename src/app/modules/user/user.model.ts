@@ -115,6 +115,14 @@ const userSchema = new Schema<IUser, UserModal>(
           type: Number,
           default: 0,
         },
+        stripeCustomerId: {
+          type: String,
+        },
+        subscriptionTier: {
+          type: String,
+          enum: ['FLEXIBLE', 'REGULAR', 'LONG_TERM', null],
+          default: null,
+        },
       },
       default: undefined, // Only set for STUDENT role
     },
@@ -170,6 +178,13 @@ const userSchema = new Schema<IUser, UserModal>(
         pendingFeedbackCount: {
           type: Number,
           default: 0,
+        },
+        // Payout Settings
+        payoutRecipient: {
+          type: String,
+        },
+        payoutIban: {
+          type: String,
         },
         isVerified: {
           type: Boolean,

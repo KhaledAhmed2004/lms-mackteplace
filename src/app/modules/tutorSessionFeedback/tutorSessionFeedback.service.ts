@@ -78,6 +78,22 @@ const submitFeedback = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
   }
 
+  // Auto-complete session if endTime has passed (handles cron delay)
+  const now = new Date();
+  const eligibleStatuses = [
+    SESSION_STATUS.SCHEDULED,
+    SESSION_STATUS.STARTING_SOON,
+    SESSION_STATUS.IN_PROGRESS,
+  ];
+  if (eligibleStatuses.includes(session.status) && session.endTime <= now) {
+    session.status = SESSION_STATUS.COMPLETED;
+    session.completedAt = now;
+    if (!session.startedAt) {
+      session.startedAt = session.startTime; // Mark as started if wasn't
+    }
+    await session.save();
+  }
+
   if (session.status !== SESSION_STATUS.COMPLETED) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -96,7 +112,6 @@ const submitFeedback = async (
   // Check if feedback already exists
   let feedback = await TutorSessionFeedback.findOne({ sessionId });
 
-  const now = new Date();
   const dueDate = feedback?.dueDate || calculateDueDate(session.completedAt || now);
   const isLate = now > dueDate;
 

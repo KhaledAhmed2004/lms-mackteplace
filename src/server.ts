@@ -6,6 +6,7 @@ import { seedSuperAdmin } from './DB/seedAdmin';
 import { socketHelper } from './helpers/socketHelper';
 import { errorLogger, logger, notifyCritical } from './shared/logger';
 import { CacheHelper } from './app/shared/CacheHelper';
+import { CronService } from './app/services/cron.service';
 
 // uncaught exception — ensure server closes before exit to avoid EADDRINUSE on respawn
 process.on('uncaughtException', error => {
@@ -84,6 +85,9 @@ async function main() {
     //@ts-ignore
     global.io = io;
 
+    // Initialize Cron Jobs (session auto-transition, reminders, etc.)
+    CronService.initializeCronJobs();
+
     // Startup Summary
     const summary = [
       `📝 Startup Summary:`,
@@ -92,6 +96,7 @@ async function main() {
       }`,
       `      - CacheHelper initialized ${cache ? '✅' : '❌'}`,
       `      - RateLimit active ✅`,
+      `      - Cron Jobs initialized ✅`,
       `      - Debug Mode ${
         config.node_env === 'development' ? 'ON ✅' : 'OFF ❌'
       }`,

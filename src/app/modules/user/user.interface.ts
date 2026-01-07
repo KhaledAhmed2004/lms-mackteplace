@@ -86,6 +86,10 @@ export type TutorProfile = {
   totalEarnings: number; // Net earnings after commission
   pendingFeedbackCount: number; // Number of pending session feedbacks
 
+  // Payout Settings
+  payoutRecipient?: string; // Bank account holder name
+  payoutIban?: string; // IBAN for payouts
+
   // Verification
   isVerified: boolean;
   verificationStatus: VERIFICATION_STATUS;

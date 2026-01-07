@@ -10,6 +10,17 @@ const router = express.Router();
 // ============ TUTOR ROUTES ============
 
 /**
+ * @route   GET /api/v1/earnings/my-stats
+ * @desc    Get tutor's comprehensive stats including level progress
+ * @access  Tutor only
+ */
+router.get(
+  '/my-stats',
+  auth(USER_ROLES.TUTOR),
+  TutorEarningsController.getMyStats
+);
+
+/**
  * @route   GET /api/v1/earnings/my-earnings
  * @desc    Get tutor's earnings history
  * @access  Tutor only
@@ -19,6 +30,42 @@ router.get(
   '/my-earnings',
   auth(USER_ROLES.TUTOR),
   TutorEarningsController.getMyEarnings
+);
+
+/**
+ * @route   GET /api/v1/earnings/history
+ * @desc    Get tutor's formatted earnings history for frontend
+ * @access  Tutor only
+ * @query   ?page=1&limit=10
+ */
+router.get(
+  '/history',
+  auth(USER_ROLES.TUTOR),
+  TutorEarningsController.getEarningsHistory
+);
+
+/**
+ * @route   GET /api/v1/earnings/payout-settings
+ * @desc    Get tutor's payout settings (IBAN, recipient)
+ * @access  Tutor only
+ */
+router.get(
+  '/payout-settings',
+  auth(USER_ROLES.TUTOR),
+  TutorEarningsController.getPayoutSettings
+);
+
+/**
+ * @route   PATCH /api/v1/earnings/payout-settings
+ * @desc    Update tutor's payout settings
+ * @access  Tutor only
+ * @body    { recipient: string, iban: string }
+ */
+router.patch(
+  '/payout-settings',
+  auth(USER_ROLES.TUTOR),
+  validateRequest(TutorEarningsValidation.updatePayoutSettingsZodSchema),
+  TutorEarningsController.updatePayoutSettings
 );
 
 /**

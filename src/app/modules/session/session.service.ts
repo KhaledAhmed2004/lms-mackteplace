@@ -6,12 +6,26 @@ import { User } from '../user/user.model';
 import { Chat } from '../chat/chat.model';
 import { Message } from '../message/message.model';
 import { USER_ROLES } from '../../../enums/user';
-import { ISession, SESSION_STATUS, RESCHEDULE_STATUS } from './session.interface';
+import { ISession, ISessionAttendance, SESSION_STATUS, RESCHEDULE_STATUS } from './session.interface';
 import { Session } from './session.model';
+import { Call } from '../call/call.model';
 import { TutorSessionFeedbackService } from '../tutorSessionFeedback/tutorSessionFeedback.service';
 import { UserService } from '../user/user.service';
 import { ActivityLogService } from '../activityLog/activityLog.service';
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
+
+// ============================================
+// 🧪 TEST MODE CONFIGURATION
+// ============================================
+// Set to true for testing with 5 minute sessions
+// Set to false for production (60 minute sessions)
+const TEST_MODE = true;
+
+// Test mode: 5 min session, 80% = 4 min (240 seconds)
+// Production: 60 min session, 80% = 48 min (2880 seconds)
+const TEST_SESSION_DURATION_MINUTES = 5;
+const MINIMUM_ATTENDANCE_PERCENTAGE = 80;
+// ============================================
 
 /**
  * Propose session (Tutor sends proposal in chat)
@@ -503,6 +517,13 @@ const cancelSession = async (
   session.cancelledAt = new Date();
   await session.save();
 
+  // Update the related message's sessionProposal status to reflect cancellation
+  if (session.messageId) {
+    await Message.findByIdAndUpdate(session.messageId, {
+      'sessionProposal.status': 'CANCELLED',
+    });
+  }
+
   // Log activity - Session cancelled
   const cancellingUser = await User.findById(userId);
   ActivityLogService.logActivity({
@@ -548,22 +569,58 @@ const markAsCompleted = async (sessionId: string): Promise<ISession | null> => {
 /**
  * Auto-complete sessions (Cron job)
  * Marks sessions as COMPLETED after endTime passes
+ * Includes SCHEDULED, STARTING_SOON, and IN_PROGRESS sessions
  */
 const autoCompleteSessions = async (): Promise<number> => {
-  const result = await Session.updateMany(
-    {
-      status: SESSION_STATUS.SCHEDULED,
-      endTime: { $lt: new Date() },
-    },
-    {
-      $set: {
-        status: SESSION_STATUS.COMPLETED,
-        completedAt: new Date(),
-      },
-    }
-  );
+  const now = new Date();
 
-  return result.modifiedCount;
+  // Find all sessions that should be completed
+  const sessionsToComplete = await Session.find({
+    status: {
+      $in: [
+        SESSION_STATUS.SCHEDULED,
+        SESSION_STATUS.STARTING_SOON,
+        SESSION_STATUS.IN_PROGRESS,
+      ],
+    },
+    endTime: { $lt: now },
+  });
+
+  let completedCount = 0;
+
+  // Complete each session with proper feedback creation
+  for (const session of sessionsToComplete) {
+    try {
+      session.status = SESSION_STATUS.COMPLETED;
+      session.completedAt = now;
+      await session.save();
+
+      // Create pending tutor feedback record
+      try {
+        await TutorSessionFeedbackService.createPendingFeedback(
+          session._id.toString(),
+          session.tutorId.toString(),
+          session.studentId.toString(),
+          now
+        );
+      } catch {
+        // Feedback creation failed, but session is still completed
+      }
+
+      // Update tutor level after session completion
+      try {
+        await UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+      } catch {
+        // Level update failed, but session is still completed
+      }
+
+      completedCount++;
+    } catch {
+      // Continue with next session if one fails
+    }
+  }
+
+  return completedCount;
 };
 
 /**
@@ -878,11 +935,13 @@ const rejectReschedule = async (
  * Session status auto-transitions (Cron job)
  * SCHEDULED -> STARTING_SOON (10 min before)
  * STARTING_SOON -> IN_PROGRESS (at start time)
- * IN_PROGRESS -> EXPIRED (at end time if not completed)
+ * IN_PROGRESS -> COMPLETED (at end time - with feedback creation)
  */
 const autoTransitionSessionStatuses = async (): Promise<{
   startingSoon: number;
   inProgress: number;
+  completed: number;
+  noShow: number;
   expired: number;
 }> => {
   const now = new Date();
@@ -912,24 +971,40 @@ const autoTransitionSessionStatuses = async (): Promise<{
     }
   );
 
-  // IN_PROGRESS -> EXPIRED (at end time if not manually completed)
-  const expiredResult = await Session.updateMany(
-    {
-      status: SESSION_STATUS.IN_PROGRESS,
-      endTime: { $lte: now },
-    },
-    {
-      $set: {
-        status: SESSION_STATUS.EXPIRED,
-        expiredAt: now,
-      },
+  // IN_PROGRESS -> COMPLETED/NO_SHOW/EXPIRED (at end time)
+  // Find sessions to complete and process them with attendance check
+  const sessionsToComplete = await Session.find({
+    status: SESSION_STATUS.IN_PROGRESS,
+    endTime: { $lte: now },
+  });
+
+  let completedCount = 0;
+  let noShowCount = 0;
+  let expiredCount = 0;
+
+  for (const session of sessionsToComplete) {
+    try {
+      // Use attendance-based completion
+      const result = await completeSessionWithAttendanceCheck(session._id.toString());
+
+      if (result.session.status === SESSION_STATUS.COMPLETED) {
+        completedCount++;
+      } else if (result.session.status === SESSION_STATUS.NO_SHOW) {
+        noShowCount++;
+      } else if (result.session.status === SESSION_STATUS.EXPIRED) {
+        expiredCount++;
+      }
+    } catch {
+      // Continue with next session
     }
-  );
+  }
 
   return {
     startingSoon: startingSoonResult.modifiedCount,
     inProgress: inProgressResult.modifiedCount,
-    expired: expiredResult.modifiedCount,
+    completed: completedCount,
+    noShow: noShowCount,
+    expired: expiredCount,
   };
 };
 
@@ -992,6 +1067,252 @@ const markAsCompletedEnhanced = async (sessionId: string): Promise<ISession | nu
   return session;
 };
 
+/**
+ * Calculate attendance percentage
+ */
+const calculateAttendancePercentage = (
+  totalDurationSeconds: number,
+  sessionDurationMinutes: number
+): number => {
+  const sessionDurationSeconds = sessionDurationMinutes * 60;
+  if (sessionDurationSeconds <= 0) return 0;
+  const percentage = (totalDurationSeconds / sessionDurationSeconds) * 100;
+  return Math.min(100, Math.round(percentage * 100) / 100); // Cap at 100%, round to 2 decimals
+};
+
+/**
+ * Sync attendance data from Call module to Session
+ * Called when session is about to complete or when participant leaves
+ */
+const syncAttendanceFromCall = async (sessionId: string): Promise<ISession | null> => {
+  const session = await Session.findById(sessionId);
+  if (!session) return null;
+
+  // Find call for this session
+  const call = await Call.findOne({ sessionId: new Types.ObjectId(sessionId) });
+  if (!call) {
+    // No call record - set attendance to 0%
+    session.tutorAttendance = {
+      odId: session.tutorId,
+      totalDurationSeconds: 0,
+      attendancePercentage: 0,
+      joinCount: 0,
+    };
+    session.studentAttendance = {
+      odId: session.studentId,
+      totalDurationSeconds: 0,
+      attendancePercentage: 0,
+      joinCount: 0,
+    };
+    await session.save();
+    return session;
+  }
+
+  // Link call to session if not already linked
+  if (!session.callId) {
+    session.callId = call._id;
+  }
+
+  const now = new Date();
+  const sessionEndTime = session.endTime;
+
+  // Calculate tutor attendance
+  const tutorSessions = call.participantSessions.filter(
+    p => p.userId.toString() === session.tutorId.toString()
+  );
+
+  let tutorTotalSeconds = 0;
+  let tutorFirstJoined: Date | undefined;
+  let tutorLastLeft: Date | undefined;
+
+  tutorSessions.forEach(ps => {
+    // If session is still open (no leftAt), calculate duration up to session end or now
+    if (ps.joinedAt && !ps.leftAt) {
+      const endPoint = sessionEndTime < now ? sessionEndTime : now;
+      const duration = Math.floor((endPoint.getTime() - ps.joinedAt.getTime()) / 1000);
+      tutorTotalSeconds += Math.max(0, duration);
+    } else if (ps.duration) {
+      tutorTotalSeconds += ps.duration;
+    }
+
+    if (!tutorFirstJoined || (ps.joinedAt && ps.joinedAt < tutorFirstJoined)) {
+      tutorFirstJoined = ps.joinedAt;
+    }
+    if (!tutorLastLeft || (ps.leftAt && ps.leftAt > tutorLastLeft)) {
+      tutorLastLeft = ps.leftAt;
+    }
+  });
+
+  // Calculate student attendance
+  const studentSessions = call.participantSessions.filter(
+    p => p.userId.toString() === session.studentId.toString()
+  );
+
+  let studentTotalSeconds = 0;
+  let studentFirstJoined: Date | undefined;
+  let studentLastLeft: Date | undefined;
+
+  studentSessions.forEach(ps => {
+    if (ps.joinedAt && !ps.leftAt) {
+      const endPoint = sessionEndTime < now ? sessionEndTime : now;
+      const duration = Math.floor((endPoint.getTime() - ps.joinedAt.getTime()) / 1000);
+      studentTotalSeconds += Math.max(0, duration);
+    } else if (ps.duration) {
+      studentTotalSeconds += ps.duration;
+    }
+
+    if (!studentFirstJoined || (ps.joinedAt && ps.joinedAt < studentFirstJoined)) {
+      studentFirstJoined = ps.joinedAt;
+    }
+    if (!studentLastLeft || (ps.leftAt && ps.leftAt > studentLastLeft)) {
+      studentLastLeft = ps.leftAt;
+    }
+  });
+
+  // In TEST_MODE, use 5 min duration for attendance calculation
+  // In production, use actual session duration (usually 60 min)
+  const effectiveDuration = TEST_MODE ? TEST_SESSION_DURATION_MINUTES : session.duration;
+
+  // Update session with attendance data
+  session.tutorAttendance = {
+    odId: session.tutorId,
+    firstJoinedAt: tutorFirstJoined,
+    lastLeftAt: tutorLastLeft,
+    totalDurationSeconds: tutorTotalSeconds,
+    attendancePercentage: calculateAttendancePercentage(tutorTotalSeconds, effectiveDuration),
+    joinCount: tutorSessions.length,
+  };
+
+  session.studentAttendance = {
+    odId: session.studentId,
+    firstJoinedAt: studentFirstJoined,
+    lastLeftAt: studentLastLeft,
+    totalDurationSeconds: studentTotalSeconds,
+    attendancePercentage: calculateAttendancePercentage(studentTotalSeconds, effectiveDuration),
+    joinCount: studentSessions.length,
+  };
+
+  await session.save();
+  return session;
+};
+
+/**
+ * Check if attendance meets requirement (80%) for completion
+ */
+const checkAttendanceRequirement = (session: ISession): {
+  canComplete: boolean;
+  tutorPercentage: number;
+  studentPercentage: number;
+  noShowBy?: 'tutor' | 'student';
+  reason?: string;
+} => {
+  // Use global constant for minimum attendance percentage
+  const MINIMUM_ATTENDANCE = MINIMUM_ATTENDANCE_PERCENTAGE;
+
+  const tutorPercentage = session.tutorAttendance?.attendancePercentage || 0;
+  const studentPercentage = session.studentAttendance?.attendancePercentage || 0;
+
+  // Both have good attendance
+  if (tutorPercentage >= MINIMUM_ATTENDANCE && studentPercentage >= MINIMUM_ATTENDANCE) {
+    return {
+      canComplete: true,
+      tutorPercentage,
+      studentPercentage,
+    };
+  }
+
+  // Tutor didn't show
+  if (tutorPercentage < MINIMUM_ATTENDANCE && studentPercentage >= MINIMUM_ATTENDANCE) {
+    return {
+      canComplete: false,
+      tutorPercentage,
+      studentPercentage,
+      noShowBy: 'tutor',
+      reason: `Tutor attendance (${tutorPercentage.toFixed(1)}%) is below minimum ${MINIMUM_ATTENDANCE}%`,
+    };
+  }
+
+  // Student didn't show
+  if (studentPercentage < MINIMUM_ATTENDANCE && tutorPercentage >= MINIMUM_ATTENDANCE) {
+    return {
+      canComplete: false,
+      tutorPercentage,
+      studentPercentage,
+      noShowBy: 'student',
+      reason: `Student attendance (${studentPercentage.toFixed(1)}%) is below minimum ${MINIMUM_ATTENDANCE}%`,
+    };
+  }
+
+  // Neither showed up properly
+  return {
+    canComplete: false,
+    tutorPercentage,
+    studentPercentage,
+    reason: `Both participants have low attendance - Tutor: ${tutorPercentage.toFixed(1)}%, Student: ${studentPercentage.toFixed(1)}%`,
+  };
+};
+
+/**
+ * Complete session with attendance check
+ */
+const completeSessionWithAttendanceCheck = async (
+  sessionId: string
+): Promise<{
+  session: ISession;
+  attendanceCheck: ReturnType<typeof checkAttendanceRequirement>;
+}> => {
+  // First sync attendance from call
+  await syncAttendanceFromCall(sessionId);
+
+  // Fetch fresh session document
+  const session = await Session.findById(sessionId);
+  if (!session) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  // Check attendance requirement
+  const attendanceCheck = checkAttendanceRequirement(session);
+
+  if (attendanceCheck.canComplete) {
+    // Mark as completed
+    session.status = SESSION_STATUS.COMPLETED;
+    session.completedAt = new Date();
+  } else if (attendanceCheck.noShowBy) {
+    // Mark as no show
+    session.status = SESSION_STATUS.NO_SHOW;
+    session.noShowBy = attendanceCheck.noShowBy;
+    session.completedAt = new Date();
+  } else {
+    // Both have low attendance - mark as expired
+    session.status = SESSION_STATUS.EXPIRED;
+    session.expiredAt = new Date();
+  }
+
+  await session.save();
+
+  // If completed successfully, create feedback and update tutor level
+  if (session.status === SESSION_STATUS.COMPLETED) {
+    try {
+      await TutorSessionFeedbackService.createPendingFeedback(
+        sessionId,
+        session.tutorId.toString(),
+        session.studentId.toString(),
+        session.completedAt!
+      );
+    } catch {
+      // Feedback creation failed, but session is still completed
+    }
+
+    try {
+      await UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+    } catch {
+      // Level update failed, but session is still completed
+    }
+  }
+
+  return { session: session.toObject() as ISession, attendanceCheck };
+};
+
 export const SessionService = {
   proposeSession,
   acceptSessionProposal,
@@ -1009,4 +1330,8 @@ export const SessionService = {
   rejectReschedule,
   autoTransitionSessionStatuses,
   markAsCompletedEnhanced,
+  // Attendance tracking
+  syncAttendanceFromCall,
+  checkAttendanceRequirement,
+  completeSessionWithAttendanceCheck,
 };

@@ -386,11 +386,8 @@ const joinSessionCall = async (
   const channelName = generateSessionChannelName(sessionId);
   const uid = userIdToAgoraUid(userId);
 
-  // Check if a call already exists for this session
-  let call = await Call.findOne({
-    channelName,
-    status: { $in: ['pending', 'active'] },
-  });
+  // Check if a call already exists for this session (any status)
+  let call = await Call.findOne({ channelName });
 
   let isNew = false;
 
@@ -407,13 +404,26 @@ const joinSessionCall = async (
       sessionId: new Types.ObjectId(sessionId),
     });
     isNew = true;
-  } else {
+  } else if (call.status === 'ended' || call.status === 'cancelled' || call.status === 'missed' || call.status === 'rejected') {
+    // Re-activate ended/cancelled call for this session (user rejoining)
+    call.status = 'active';
+    call.startTime = new Date();
+    call.endTime = undefined;
+    call.duration = undefined;
     // Make sure this user is a participant
     const isParticipant = call.participants.some(
       p => p.toString() === userId
     );
     if (!isParticipant) {
-      // Add user to participants if not already there
+      call.participants.push(new Types.ObjectId(userId));
+    }
+    await call.save();
+  } else {
+    // Call is pending or active - just make sure user is participant
+    const isParticipant = call.participants.some(
+      p => p.toString() === userId
+    );
+    if (!isParticipant) {
       call.participants.push(new Types.ObjectId(userId));
       await call.save();
     }

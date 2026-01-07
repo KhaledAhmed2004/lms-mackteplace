@@ -23,10 +23,9 @@ export type ISessionRequest = {
   gradeLevel: string; // Using string to match GRADE_LEVEL enum values
   schoolType: string; // Using string to match SCHOOL_TYPE enum values
 
-  // Learning Details
-  description: string; // What student needs help with
+  // Learning Details (simplified - no description or preferredDateTime for session requests)
+  description?: string; // Optional: What student needs help with
   learningGoals?: string; // Optional: Specific learning goals
-  preferredDateTime?: Date; // Optional: When student wants session
 
   // Documents (Optional)
   documents?: string[]; // Array of document URLs (uploaded files)

@@ -8,6 +8,7 @@ import { Chat } from '../app/modules/chat/chat.model';
 import NodeCache from 'node-cache';
 import { CallService } from '../app/modules/call/call.service';
 import { WhiteboardService } from '../app/modules/whiteboard/whiteboard.service';
+import { SessionService } from '../app/modules/session/session.service';
 import { CallType } from '../app/modules/call/call.interface';
 import { User } from '../app/modules/user/user.model';
 import {
@@ -585,6 +586,21 @@ const socket = (io: Server) => {
               callId,
               userId
             );
+
+            // Sync attendance to session if this is a session call
+            if (call.sessionId) {
+              try {
+                await SessionService.syncAttendanceFromCall(call.sessionId.toString());
+                logger.info(
+                  colors.cyan(`Session attendance synced for session: ${call.sessionId}`)
+                );
+              } catch (syncErr) {
+                // Don't fail the main operation if sync fails
+                logger.warn(
+                  colors.yellow(`Failed to sync session attendance: ${String(syncErr)}`)
+                );
+              }
+            }
 
             // Notify remaining participants
             call.participants.forEach(participantId => {

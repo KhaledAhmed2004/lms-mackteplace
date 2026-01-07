@@ -7,6 +7,38 @@ import {
   PAYMENT_STATUS,
 } from './session.interface';
 
+// Attendance tracking sub-schema
+const attendanceSchema = new Schema(
+  {
+    odId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    firstJoinedAt: {
+      type: Date,
+    },
+    lastLeftAt: {
+      type: Date,
+    },
+    totalDurationSeconds: {
+      type: Number,
+      default: 0,
+    },
+    attendancePercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    joinCount: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false }
+);
+
 // Reschedule request sub-schema
 const rescheduleRequestSchema = new Schema(
   {
@@ -167,6 +199,17 @@ const sessionSchema = new Schema<ISession>(
     expiredAt: {
       type: Date,
     },
+    // Attendance tracking fields
+    callId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Call',
+    },
+    tutorAttendance: attendanceSchema,
+    studentAttendance: attendanceSchema,
+    noShowBy: {
+      type: String,
+      enum: ['tutor', 'student'],
+    },
   },
   { timestamps: true }
 );
@@ -184,6 +227,9 @@ sessionSchema.index({ status: 1, startTime: 1 });
 
 // Index for status transitions (cron jobs)
 sessionSchema.index({ status: 1, endTime: 1 });
+
+// Index for call-based lookups
+sessionSchema.index({ callId: 1 });
 
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {

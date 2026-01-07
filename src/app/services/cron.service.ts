@@ -6,21 +6,24 @@
  * - Trial request auto-expiration (24 hours)
  * - Month-end billing generation
  * - Month-end tutor earnings generation
- * - Session auto-completion (after endTime)
- *
- * Prerequisites:
- * 1. Install node-cron: npm install node-cron
- * 2. Install @types/node-cron: npm install -D @types/node-cron
+ * - Session auto-completion with attendance tracking (after endTime)
  */
 
 import { logger, errorLogger } from '../../shared/logger';
+import cron from 'node-cron';
 
-// TODO: Install node-cron package
-// import cron from 'node-cron';
+// ============================================
+// 🧪 TEST MODE CONFIGURATION
+// ============================================
+// Set to true for testing - runs session transition every 1 minute
+// Set to false for production - runs every 5 minutes
+const TEST_MODE = true;
+// ============================================
 
 // Import services
 import { MonthlyBillingService } from '../modules/monthlyBilling/monthlyBilling.service';
 import { TutorEarningsService } from '../modules/tutorEarnings/tutorEarnings.service';
+import { SessionService } from '../modules/session/session.service';
 import { TrialRequest } from '../modules/trialRequest/trialRequest.model';
 import { TRIAL_REQUEST_STATUS } from '../modules/trialRequest/trialRequest.interface';
 import { Session } from '../modules/session/session.model';
@@ -53,32 +56,35 @@ export const expireTrialRequests = async () => {
 };
 
 /**
- * Auto-complete sessions after endTime
- * Runs every 30 minutes
+ * Auto-transition session statuses with attendance tracking
+ * TEST_MODE: Runs every 1 minute
+ * PRODUCTION: Runs every 5 minutes
+ *
+ * Handles:
+ * - SCHEDULED → STARTING_SOON (10 min before)
+ * - STARTING_SOON → IN_PROGRESS (at start time)
+ * - IN_PROGRESS → COMPLETED/NO_SHOW/EXPIRED (at end time, with 80% attendance check)
  */
-export const autoCompleteSessions = async () => {
+export const autoTransitionSessions = async () => {
   try {
-    const now = new Date();
+    const result = await SessionService.autoTransitionSessionStatuses();
 
-    const completedSessions = await Session.updateMany(
-      {
-        status: SESSION_STATUS.SCHEDULED,
-        endTime: { $lte: now },
-      },
-      {
-        $set: {
-          status: SESSION_STATUS.COMPLETED,
-          completedAt: new Date(),
-        },
-      }
-    );
+    const totalChanges = result.startingSoon + result.inProgress + result.completed + result.noShow + result.expired;
 
-    if (completedSessions.modifiedCount > 0) {
-      logger.info(`Auto-completed ${completedSessions.modifiedCount} sessions`);
+    if (totalChanges > 0) {
+      logger.info(`Session auto-transition: ${result.startingSoon} starting soon, ${result.inProgress} in progress, ${result.completed} completed, ${result.noShow} no-show, ${result.expired} expired`);
     }
   } catch (error) {
-    errorLogger.error('Failed to auto-complete sessions', { error });
+    errorLogger.error('Failed to auto-transition sessions', { error });
   }
+};
+
+/**
+ * @deprecated Use autoTransitionSessions instead
+ * Keeping for backward compatibility
+ */
+export const autoCompleteSessions = async () => {
+  await autoTransitionSessions();
 };
 
 /**
@@ -184,45 +190,50 @@ export const generateTutorEarnings = async () => {
  * Initialize all cron jobs
  */
 export const initializeCronJobs = () => {
-  // TODO: Uncomment when node-cron is installed
+  // Expire trial requests - Every hour
+  cron.schedule('0 * * * *', () => {
+    logger.info('Running cron: Expire trial requests');
+    expireTrialRequests();
+  });
 
-  // // Expire trial requests - Every hour
-  // cron.schedule('0 * * * *', () => {
-  //   logger.info('Running cron: Expire trial requests');
-  //   expireTrialRequests();
-  // });
+  // Auto-transition sessions with attendance tracking
+  // TEST_MODE: Every 1 minute (for testing 5 min sessions)
+  // PRODUCTION: Every 5 minutes
+  const sessionTransitionSchedule = TEST_MODE ? '* * * * *' : '*/5 * * * *';
+  cron.schedule(sessionTransitionSchedule, () => {
+    logger.info(`Running cron: Auto-transition sessions (TEST_MODE: ${TEST_MODE})`);
+    autoTransitionSessions();
+  });
 
-  // // Auto-complete sessions - Every 30 minutes
-  // cron.schedule('*/30 * * * *', () => {
-  //   logger.info('Running cron: Auto-complete sessions');
-  //   autoCompleteSessions();
-  // });
+  // Send session reminders - Every hour
+  cron.schedule('0 * * * *', () => {
+    logger.info('Running cron: Send session reminders');
+    sendSessionReminders();
+  });
 
-  // // Send session reminders - Every hour
-  // cron.schedule('0 * * * *', () => {
-  //   logger.info('Running cron: Send session reminders');
-  //   sendSessionReminders();
-  // });
+  // Generate monthly billings - 1st of month at 2:00 AM
+  cron.schedule('0 2 1 * *', () => {
+    logger.info('Running cron: Generate monthly billings');
+    generateMonthlyBillings();
+  });
 
-  // // Generate monthly billings - 1st of month at 2:00 AM
-  // cron.schedule('0 2 1 * *', () => {
-  //   logger.info('Running cron: Generate monthly billings');
-  //   generateMonthlyBillings();
-  // });
+  // Generate tutor earnings - 1st of month at 3:00 AM
+  cron.schedule('0 3 1 * *', () => {
+    logger.info('Running cron: Generate tutor earnings');
+    generateTutorEarnings();
+  });
 
-  // // Generate tutor earnings - 1st of month at 3:00 AM
-  // cron.schedule('0 3 1 * *', () => {
-  //   logger.info('Running cron: Generate tutor earnings');
-  //   generateTutorEarnings();
-  // });
-
-  logger.info('Cron jobs initialized (placeholders - install node-cron to activate)');
+  logger.info(`✅ Cron jobs initialized (TEST_MODE: ${TEST_MODE})`);
+  if (TEST_MODE) {
+    logger.info('🧪 TEST MODE: Session auto-transition runs every 1 minute');
+  }
 };
 
 export const CronService = {
   initializeCronJobs,
   expireTrialRequests,
   autoCompleteSessions,
+  autoTransitionSessions,
   sendSessionReminders,
   generateMonthlyBillings,
   generateTutorEarnings,

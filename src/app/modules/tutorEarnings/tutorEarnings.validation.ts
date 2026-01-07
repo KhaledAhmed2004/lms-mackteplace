@@ -41,8 +41,25 @@ const markAsFailedZodSchema = z.object({
   }),
 });
 
+const updatePayoutSettingsZodSchema = z.object({
+  body: z.object({
+    recipient: z
+      .string({
+        required_error: 'Recipient name is required',
+      })
+      .min(2, 'Recipient name must be at least 2 characters'),
+    iban: z
+      .string({
+        required_error: 'IBAN is required',
+      })
+      .min(15, 'IBAN must be at least 15 characters')
+      .max(34, 'IBAN must be at most 34 characters'),
+  }),
+});
+
 export const TutorEarningsValidation = {
   generateTutorEarningsZodSchema,
   initiatePayoutZodSchema,
   markAsFailedZodSchema,
+  updatePayoutSettingsZodSchema,
 };

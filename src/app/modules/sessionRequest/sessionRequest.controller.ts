@@ -130,7 +130,6 @@ const acceptSessionRequest = catchAsync(async (req: Request, res: Response) => {
 const cancelSessionRequest = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const studentId = req.user?.id;
-  const { cancellationReason } = req.body;
 
   if (!studentId) {
     return sendResponse(res, {
@@ -140,11 +139,7 @@ const cancelSessionRequest = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const result = await SessionRequestService.cancelSessionRequest(
-    id,
-    studentId,
-    cancellationReason
-  );
+  const result = await SessionRequestService.cancelSessionRequest(id, studentId);
 
   sendResponse(res, {
     success: true,

@@ -36,6 +36,16 @@ export type IRescheduleRequest = {
   respondedBy?: Types.ObjectId;
 };
 
+// Attendance tracking for session participants
+export type ISessionAttendance = {
+  odId: Types.ObjectId;              // User ID (tutor or student)
+  firstJoinedAt?: Date;               // First time joined the call
+  lastLeftAt?: Date;                  // Last time left the call
+  totalDurationSeconds: number;       // Total time in call (seconds)
+  attendancePercentage: number;       // 0-100 percentage
+  joinCount: number;                  // How many times joined (for tracking reconnects)
+};
+
 export type ISession = {
   studentId: Types.ObjectId;
   tutorId: Types.ObjectId;
@@ -85,6 +95,12 @@ export type ISession = {
   completedAt?: Date;
   cancelledAt?: Date;
   expiredAt?: Date;
+
+  // Attendance tracking (linked to Call module)
+  callId?: Types.ObjectId;            // Reference to the Agora call
+  tutorAttendance?: ISessionAttendance;
+  studentAttendance?: ISessionAttendance;
+  noShowBy?: 'tutor' | 'student';     // Who didn't show up (if NO_SHOW status)
 };
 
 export type SessionModel = Model<ISession>;
