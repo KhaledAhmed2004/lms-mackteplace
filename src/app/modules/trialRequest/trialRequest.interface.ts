@@ -13,39 +13,11 @@ export enum REQUEST_TYPE {
   SESSION = 'SESSION',
 }
 
-// School types in Germany
-export enum SCHOOL_TYPE {
-  GRUNDSCHULE = 'GRUNDSCHULE', // Primary school (grades 1-4)
-  HAUPTSCHULE = 'HAUPTSCHULE', // Secondary general school
-  REALSCHULE = 'REALSCHULE', // Intermediate school
-  GYMNASIUM = 'GYMNASIUM', // Grammar school (academic track)
-  GESAMTSCHULE = 'GESAMTSCHULE', // Comprehensive school
-  BERUFSSCHULE = 'BERUFSSCHULE', // Vocational school
-  UNIVERSITY = 'UNIVERSITY', // University/Higher education
-  OTHER = 'OTHER',
-}
+// School types - now dynamic, managed from admin dashboard
+// Values come from SchoolType collection
 
-// Grade levels
-export enum GRADE_LEVEL {
-  GRADE_1 = '1',
-  GRADE_2 = '2',
-  GRADE_3 = '3',
-  GRADE_4 = '4',
-  GRADE_5 = '5',
-  GRADE_6 = '6',
-  GRADE_7 = '7',
-  GRADE_8 = '8',
-  GRADE_9 = '9',
-  GRADE_10 = '10',
-  GRADE_11 = '11',
-  GRADE_12 = '12',
-  GRADE_13 = '13',
-  UNIVERSITY_SEMESTER_1 = 'SEMESTER_1',
-  UNIVERSITY_SEMESTER_2 = 'SEMESTER_2',
-  UNIVERSITY_SEMESTER_3 = 'SEMESTER_3',
-  UNIVERSITY_SEMESTER_4 = 'SEMESTER_4',
-  UNIVERSITY_SEMESTER_5_PLUS = 'SEMESTER_5_PLUS',
-}
+// Grade levels - now dynamic, managed from admin dashboard
+// Values come from Grade collection
 
 // Guardian info for students under 18 (nested inside studentInfo)
 export type IGuardianInfo = {
@@ -80,8 +52,8 @@ export type ITrialRequest = {
 
   // Academic Information (Required)
   subject: Types.ObjectId; // Reference to Subject collection
-  gradeLevel: GRADE_LEVEL;
-  schoolType: SCHOOL_TYPE;
+  gradeLevel: string; // Dynamic - from Grade collection
+  schoolType: string; // Dynamic - from SchoolType collection
 
   // Learning Details
   description: string; // What student needs help with

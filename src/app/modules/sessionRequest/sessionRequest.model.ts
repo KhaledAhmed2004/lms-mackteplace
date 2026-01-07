@@ -1,9 +1,7 @@
 import { model, Schema } from 'mongoose';
 import {
-  GRADE_LEVEL,
   ISessionRequest,
   REQUEST_TYPE,
-  SCHOOL_TYPE,
   SessionRequestModel,
   SESSION_REQUEST_STATUS,
 } from './sessionRequest.interface';
@@ -32,13 +30,13 @@ const sessionRequestSchema = new Schema<ISessionRequest>(
     },
     gradeLevel: {
       type: String,
-      enum: Object.values(GRADE_LEVEL),
       required: [true, 'Grade level is required'],
+      trim: true,
     },
     schoolType: {
       type: String,
-      enum: Object.values(SCHOOL_TYPE),
       required: [true, 'School type is required'],
+      trim: true,
     },
 
     // Learning Details

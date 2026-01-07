@@ -7,6 +7,8 @@ import { PaymentRoutes } from '../app/modules/payment/payment.routes';
 import { BookmarkRoutes } from '../app/modules/bookmark/bookmark.route';
 import { NotificationRoutes } from '../app/modules/notification/notification.routes';
 import { SubjectRoutes } from '../app/modules/subject/subject.route';
+import { GradeRoutes } from '../app/modules/grade/grade.route';
+import { SchoolTypeRoutes } from '../app/modules/schoolType/schoolType.route';
 import { TutorApplicationRoutes } from '../app/modules/tutorApplication/tutorApplication.route';
 import { InterviewSlotRoutes } from '../app/modules/interviewSlot/interviewSlot.route';
 import { TrialRequestRoutes } from '../app/modules/trialRequest/trialRequest.route';
@@ -56,6 +58,14 @@ const apiRoutes = [
   {
     path: '/subjects',
     route: SubjectRoutes,
+  },
+  {
+    path: '/grades',
+    route: GradeRoutes,
+  },
+  {
+    path: '/school-types',
+    route: SchoolTypeRoutes,
   },
   {
     path: '/applications',

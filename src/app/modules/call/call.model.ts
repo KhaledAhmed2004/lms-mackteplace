@@ -67,6 +67,10 @@ const callSchema = new Schema<ICall, CallModel>(
       type: Schema.Types.ObjectId,
       ref: 'Chat',
     },
+    sessionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Session',
+    },
     whiteboardRoomUuid: String,
     hasWhiteboard: {
       type: Boolean,

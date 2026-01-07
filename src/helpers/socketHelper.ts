@@ -472,6 +472,60 @@ const socket = (io: Server) => {
         }
       });
 
+      // Join a session-based call (for tutoring sessions)
+      // Both participants join the SAME channel based on sessionId
+      socket.on(
+        'CALL_JOIN_SESSION',
+        async ({
+          sessionId,
+          otherUserId,
+          callType = 'video',
+        }: {
+          sessionId: string;
+          otherUserId: string;
+          callType?: CallType;
+        }) => {
+          try {
+            const { call, token, channelName, uid, isNew } =
+              await CallService.joinSessionCall(userId, sessionId, otherUserId, callType);
+
+            // Send token and channel info to this user
+            socket.emit('SESSION_CALL_JOINED', {
+              callId: call._id,
+              channelName,
+              token,
+              uid,
+              callType,
+              isNew,
+            });
+
+            // If this is a new call, notify the other user
+            if (isNew) {
+              const caller = await User.findById(userId).select('name profilePicture');
+              io.to(USER_ROOM(otherUserId)).emit('SESSION_CALL_READY', {
+                callId: call._id,
+                channelName,
+                sessionId,
+                callType,
+                caller: {
+                  id: userId,
+                  name: caller?.name,
+                  profilePicture: caller?.profilePicture,
+                },
+              });
+            }
+
+            handleEventProcessed(
+              'CALL_JOIN_SESSION',
+              `sessionId: ${sessionId}, channelName: ${channelName}, isNew: ${isNew}`
+            );
+          } catch (err) {
+            socket.emit('CALL_ERROR', { message: String(err) });
+            logger.error(colors.red(`CALL_JOIN_SESSION error: ${String(err)}`));
+          }
+        }
+      );
+
       // User joined Agora channel
       socket.on(
         'CALL_USER_JOINED_CHANNEL',

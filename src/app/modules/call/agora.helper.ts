@@ -36,9 +36,17 @@ export const generateRtcToken = (
 };
 
 // Unique Channel Name Generate করে
- 
+
 export const generateChannelName = (): string => {
   return `call_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+};
+
+/**
+ * Session ID থেকে Channel Name তৈরি করে
+ * Same session এর জন্য সবসময় same channel name return করবে
+ */
+export const generateSessionChannelName = (sessionId: string): string => {
+  return `session_${sessionId}`;
 };
 
 /**

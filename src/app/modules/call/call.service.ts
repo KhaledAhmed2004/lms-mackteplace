@@ -5,6 +5,7 @@ import { ICall, CallType } from './call.interface';
 import {
   generateRtcToken,
   generateChannelName,
+  generateSessionChannelName,
   userIdToAgoraUid,
 } from './agora.helper';
 import ApiError from '../../../errors/ApiError';
@@ -366,6 +367,63 @@ const recordParticipantLeave = async (
   return { call: call.toObject() as ICall, activeCount };
 };
 
+/**
+ * Session-based Call Join করে
+ * Session এর জন্য call থাকলে join করবে, না থাকলে নতুন তৈরি করবে
+ * Both participants will join the SAME channel based on sessionId
+ */
+const joinSessionCall = async (
+  userId: string | null | undefined,
+  sessionId: string,
+  otherUserId: string,
+  callType: CallType = 'video'
+): Promise<{ call: ICall; token: string; channelName: string; uid: number; isNew: boolean }> => {
+  if (!userId) {
+    throw new ApiError(StatusCodes.UNAUTHORIZED, 'User not authenticated');
+  }
+
+  // Generate deterministic channel name from sessionId
+  const channelName = generateSessionChannelName(sessionId);
+  const uid = userIdToAgoraUid(userId);
+
+  // Check if a call already exists for this session
+  let call = await Call.findOne({
+    channelName,
+    status: { $in: ['pending', 'active'] },
+  });
+
+  let isNew = false;
+
+  if (!call) {
+    // Create new call for this session
+    call = await Call.create({
+      channelName,
+      callType,
+      participants: [userId, otherUserId],
+      initiator: userId,
+      receiver: otherUserId,
+      status: 'active', // Session calls start as active immediately
+      startTime: new Date(),
+      sessionId: new Types.ObjectId(sessionId),
+    });
+    isNew = true;
+  } else {
+    // Make sure this user is a participant
+    const isParticipant = call.participants.some(
+      p => p.toString() === userId
+    );
+    if (!isParticipant) {
+      // Add user to participants if not already there
+      call.participants.push(new Types.ObjectId(userId));
+      await call.save();
+    }
+  }
+
+  const token = generateRtcToken(channelName, uid);
+
+  return { call: call.toObject() as ICall, token, channelName, uid, isNew };
+};
+
 export const CallService = {
   initiateCall,
   acceptCall,
@@ -378,4 +436,5 @@ export const CallService = {
   getActiveParticipants,
   recordParticipantJoin,
   recordParticipantLeave,
+  joinSessionCall,
 };

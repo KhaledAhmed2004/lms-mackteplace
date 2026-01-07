@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { GRADE_LEVEL, SCHOOL_TYPE } from './sessionRequest.interface';
 
 // Create session request validation (Student only - must be logged in)
 const createSessionRequestZodSchema = z.object({
@@ -12,15 +11,19 @@ const createSessionRequestZodSchema = z.object({
       .trim()
       .min(1, 'Subject is required'),
 
-    gradeLevel: z.nativeEnum(GRADE_LEVEL, {
-      required_error: 'Grade level is required',
-      invalid_type_error: 'Invalid grade level',
-    }),
+    gradeLevel: z
+      .string({
+        required_error: 'Grade level is required',
+      })
+      .trim()
+      .min(1, 'Grade level is required'),
 
-    schoolType: z.nativeEnum(SCHOOL_TYPE, {
-      required_error: 'School type is required',
-      invalid_type_error: 'Invalid school type',
-    }),
+    schoolType: z
+      .string({
+        required_error: 'School type is required',
+      })
+      .trim()
+      .min(1, 'School type is required'),
 
     // Learning Details
     description: z

@@ -74,10 +74,17 @@ const createStripeAccount = async (
     });
     await stripeAccount.save();
 
+    // Create onboarding link for the newly created account
+    const onboardingUrl = await stripeCreateOnboardingLink(
+      account.id,
+      `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=refresh`,
+      `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=success`
+    );
+
     return {
-      account_id: account.id,
+      accountId: account.id,
+      onboardingUrl,
       onboarding_required: !account.charges_enabled,
-      database_record: stripeAccount,
     };
   } catch (error) {
     if (error instanceof ApiError) throw error;
@@ -130,8 +137,13 @@ const createOnboardingLink = async (userId: string): Promise<string> => {
 const checkOnboardingStatus = async (
   userId: string
 ): Promise<{
-  completed: boolean;
-  account_id?: string;
+  hasStripeAccount: boolean;
+  isOnboardingComplete: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  accountId?: string;
+  stripeAccountId?: string;
   missing_fields?: string[];
 }> => {
   try {
@@ -141,7 +153,13 @@ const checkOnboardingStatus = async (
     );
 
     if (!stripeAccount) {
-      return { completed: false };
+      return {
+        hasStripeAccount: false,
+        isOnboardingComplete: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false,
+      };
     }
 
     const account = await stripeRetrieveAccount(stripeAccount.stripeAccountId);
@@ -158,8 +176,13 @@ const checkOnboardingStatus = async (
     }
 
     return {
-      completed,
-      account_id: stripeAccount.stripeAccountId,
+      hasStripeAccount: true,
+      isOnboardingComplete: completed,
+      chargesEnabled: account.charges_enabled ?? false,
+      payoutsEnabled: account.payouts_enabled ?? false,
+      detailsSubmitted: account.details_submitted ?? false,
+      accountId: stripeAccount.stripeAccountId,
+      stripeAccountId: stripeAccount.stripeAccountId,
       missing_fields: currentlyDue ?? undefined,
     };
   } catch (error) {

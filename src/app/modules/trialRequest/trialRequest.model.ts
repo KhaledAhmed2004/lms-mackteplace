@@ -1,9 +1,7 @@
 import { model, Schema } from 'mongoose';
 import {
-  GRADE_LEVEL,
   ITrialRequest,
   REQUEST_TYPE,
-  SCHOOL_TYPE,
   TrialRequestModel,
   TRIAL_REQUEST_STATUS,
 } from './trialRequest.interface';
@@ -100,13 +98,13 @@ const trialRequestSchema = new Schema<ITrialRequest>(
     },
     gradeLevel: {
       type: String,
-      enum: Object.values(GRADE_LEVEL),
       required: [true, 'Grade level is required'],
+      trim: true,
     },
     schoolType: {
       type: String,
-      enum: Object.values(SCHOOL_TYPE),
       required: [true, 'School type is required'],
+      trim: true,
     },
 
     // Learning Details

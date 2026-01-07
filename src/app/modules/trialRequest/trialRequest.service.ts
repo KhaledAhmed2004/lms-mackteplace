@@ -240,7 +240,31 @@ const createTrialRequest = async (
     });
   }
 
-  // TODO: Send real-time notification to matching tutors
+  // Send real-time notification to matching tutors via socket
+  const io = global.io;
+  if (io) {
+    // Get all verified tutors who teach this subject
+    const matchingTutors = await User.find({
+      role: USER_ROLES.TUTOR,
+      'tutorProfile.isVerified': true,
+      'tutorProfile.subjects': payload.subject,
+    }).select('_id');
+
+    // Populate the trial request for sending
+    const populatedRequest = await TrialRequest.findById(trialRequest._id)
+      .populate('subject', 'name icon description')
+      .select('-studentInfo.password -studentInfo.guardianInfo.password');
+
+    // Emit to each matching tutor's personal room
+    matchingTutors.forEach(tutor => {
+      io.to(`user::${tutor._id.toString()}`).emit('TRIAL_REQUEST_CREATED', {
+        trialRequest: populatedRequest,
+      });
+    });
+
+    console.log(`Trial request notification sent to ${matchingTutors.length} tutors`);
+  }
+
   // TODO: Send email notification to admin
   // TODO: Send confirmation email to student
 
@@ -464,7 +488,44 @@ const acceptTrialRequest = async (
     });
   }
 
-  // TODO: Send real-time notification to student
+  // Send real-time notification to student via socket
+  const io = global.io;
+  if (io) {
+    // Populate the request with tutor info for the notification
+    const populatedRequest = await TrialRequest.findById(request._id)
+      .populate('acceptedTutorId', 'name email profilePicture')
+      .populate('subject', 'name icon description')
+      .populate('chatId');
+
+    // Emit to student's personal room
+    if (request.studentId) {
+      io.to(`user::${request.studentId.toString()}`).emit('TRIAL_REQUEST_ACCEPTED', {
+        trialRequest: populatedRequest,
+        tutor: {
+          _id: tutor._id,
+          name: tutor.name,
+          profilePicture: tutor.profilePicture,
+        },
+        chatId: chat._id,
+      });
+      console.log(`Trial acceptance notification sent to student ${request.studentId}`);
+    }
+
+    // Also notify other tutors that this request is no longer available
+    const otherTutors = await User.find({
+      role: USER_ROLES.TUTOR,
+      'tutorProfile.isVerified': true,
+      'tutorProfile.subjects': request.subject,
+      _id: { $ne: tutorId }, // Exclude the accepting tutor
+    }).select('_id');
+
+    otherTutors.forEach(otherTutor => {
+      io.to(`user::${otherTutor._id.toString()}`).emit('TRIAL_REQUEST_TAKEN', {
+        trialRequestId: request._id,
+      });
+    });
+  }
+
   // TODO: Send email to student
 
   return request;

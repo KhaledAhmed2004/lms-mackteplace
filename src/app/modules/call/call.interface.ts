@@ -33,6 +33,7 @@ export type ICall = {
   endTime?: Date;
   duration?: number;
   chatId?: Types.ObjectId;
+  sessionId?: Types.ObjectId;
   whiteboardRoomUuid?: string;
   hasWhiteboard: boolean;
   participantSessions: ICallParticipant[];

@@ -7,8 +7,9 @@ export enum SESSION_REQUEST_STATUS {
   CANCELLED = 'CANCELLED', // Student cancelled before acceptance
 }
 
-// Reuse enums from trialRequest for consistency
-export { SCHOOL_TYPE, GRADE_LEVEL, REQUEST_TYPE } from '../trialRequest/trialRequest.interface';
+// Reuse REQUEST_TYPE from trialRequest for consistency
+// Note: SCHOOL_TYPE and GRADE_LEVEL are now dynamic strings (no longer enums)
+export { REQUEST_TYPE } from '../trialRequest/trialRequest.interface';
 
 export type ISessionRequest = {
   // Request type (for unified view)
