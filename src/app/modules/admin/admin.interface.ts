@@ -192,3 +192,43 @@ export type IUnifiedSessionsQuery = {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 };
+
+// ============ TRANSACTIONS ============
+
+export type ITransaction = {
+  _id: string;
+  transactionId: string; // Invoice number or Payout reference
+  type: 'STUDENT_PAYMENT' | 'TUTOR_PAYOUT';
+  amount: number;
+  userName: string;
+  userEmail: string;
+  userType: 'student' | 'tutor';
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'PROCESSING';
+  date: Date;
+  description: string;
+  sessions?: number;
+  hours?: number;
+};
+
+export type ITransactionsQuery = {
+  page?: number;
+  limit?: number;
+  type?: 'STUDENT_PAYMENT' | 'TUTOR_PAYOUT' | 'all';
+  status?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+};
+
+export type ITransactionStats = {
+  totalTransactions: number;
+  totalAmount: number;
+  studentPayments: {
+    count: number;
+    total: number;
+  };
+  tutorPayouts: {
+    count: number;
+    total: number;
+  };
+};

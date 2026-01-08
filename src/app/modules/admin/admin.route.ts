@@ -172,6 +172,33 @@ router.get(
   AdminController.getApplicationStats
 );
 
+// ============ TRANSACTIONS ============
+
+/**
+ * @route   GET /api/v1/admin/transactions
+ * @desc    Get all transactions (Student Payments + Tutor Payouts)
+ * @access  Admin only
+ * @query   ?page=1&limit=10&type=all&status=PAID&search=john&sortBy=date&sortOrder=desc
+ */
+// ✅ FRONTEND: useTransactions | Used in: src/app/(admin)/admin/transaction/page.tsx
+router.get(
+  '/transactions',
+  auth(USER_ROLES.SUPER_ADMIN),
+  AdminController.getTransactions
+);
+
+/**
+ * @route   GET /api/v1/admin/transaction-stats
+ * @desc    Get transaction statistics (totals for student payments and tutor payouts)
+ * @access  Admin only
+ */
+// ✅ FRONTEND: useTransactionStats | Used in: src/app/(admin)/admin/transaction/page.tsx
+router.get(
+  '/transaction-stats',
+  auth(USER_ROLES.SUPER_ADMIN),
+  AdminController.getTransactionStats
+);
+
 // ============ ACTIVITY LOG ============
 
 /**

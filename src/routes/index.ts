@@ -23,6 +23,7 @@ import { TutorSessionFeedbackRoutes } from '../app/modules/tutorSessionFeedback/
 import { CallRoutes } from '../app/modules/call/call.route';
 import { WhiteboardRoutes } from '../app/modules/whiteboard/whiteboard.route';
 import { PaymentMethodRoutes } from '../app/modules/paymentMethod/paymentMethod.route';
+import { LegalPolicyRoutes } from '../app/modules/legalPolicy/legalPolicy.route';
 
 const router = express.Router();
 
@@ -122,6 +123,10 @@ const apiRoutes = [
   {
     path: '/payment-methods',
     route: PaymentMethodRoutes,
+  },
+  {
+    path: '/legal-policies',
+    route: LegalPolicyRoutes,
   },
 ];
 

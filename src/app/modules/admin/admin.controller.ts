@@ -254,6 +254,56 @@ const getApplicationStats = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Get all transactions (Student Payments + Tutor Payouts)
+ * Query: ?page=1&limit=10&type=all&status=PAID&search=john&sortBy=date&sortOrder=desc
+ */
+const getTransactions = catchAsync(async (req: Request, res: Response) => {
+  const {
+    page,
+    limit,
+    type,
+    status,
+    search,
+    sortBy,
+    sortOrder,
+  } = req.query;
+
+  const query = {
+    page: page ? parseInt(page as string) : undefined,
+    limit: limit ? parseInt(limit as string) : undefined,
+    type: type as 'STUDENT_PAYMENT' | 'TUTOR_PAYOUT' | 'all' | undefined,
+    status: status as string | undefined,
+    search: search as string | undefined,
+    sortBy: sortBy as string | undefined,
+    sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+  };
+
+  const result = await AdminService.getTransactions(query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Transactions retrieved successfully',
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/**
+ * Get transaction statistics
+ */
+const getTransactionStats = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getTransactionStats();
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Transaction statistics retrieved successfully',
+    data: result,
+  });
+});
+
 export const AdminController = {
   getDashboardStats,
   getRevenueByMonth,
@@ -267,4 +317,6 @@ export const AdminController = {
   getUnifiedSessions,
   getSessionStats,
   getApplicationStats,
+  getTransactions,
+  getTransactionStats,
 };

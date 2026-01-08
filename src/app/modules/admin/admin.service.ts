@@ -25,7 +25,11 @@ import {
   IUserDistribution,
   IUnifiedSession,
   IUnifiedSessionsQuery,
+  ITransaction,
+  ITransactionsQuery,
+  ITransactionStats,
 } from './admin.interface';
+import { PAYOUT_STATUS } from '../tutorEarnings/tutorEarnings.interface';
 
 /**
  * Get comprehensive dashboard statistics
@@ -987,6 +991,215 @@ const getApplicationStats = async (): Promise<{
   };
 };
 
+/**
+ * Get all transactions (Student Payments + Tutor Payouts + Subscription Purchases)
+ * Combines MonthlyBilling (student payments), TutorEarnings (tutor payouts), and StudentSubscription (subscription purchases)
+ */
+const getTransactions = async (
+  query: ITransactionsQuery
+): Promise<{
+  data: ITransaction[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPage: number;
+  };
+}> => {
+  const {
+    page = 1,
+    limit = 10,
+    type = 'all',
+    status,
+    search,
+    sortBy = 'date',
+    sortOrder = 'desc',
+  } = query;
+
+  const transactions: ITransaction[] = [];
+
+  // Get Student Payments (MonthlyBilling)
+  if (type === 'all' || type === 'STUDENT_PAYMENT') {
+    const billings = await MonthlyBilling.find()
+      .populate('studentId', 'name email')
+      .lean();
+
+    billings.forEach((billing: any) => {
+      transactions.push({
+        _id: billing._id.toString(),
+        transactionId: billing.invoiceNumber,
+        type: 'STUDENT_PAYMENT',
+        amount: billing.total,
+        userName: billing.studentId?.name || 'Unknown',
+        userEmail: billing.studentId?.email || '',
+        userType: 'student',
+        status: billing.status as any,
+        date: billing.paidAt || billing.createdAt,
+        description: `Invoice for ${billing.billingMonth}/${billing.billingYear}`,
+        sessions: billing.totalSessions,
+        hours: billing.totalHours,
+      });
+    });
+
+    // Get All Subscription Purchases
+    const subscriptions = await StudentSubscription.find()
+      .populate('studentId', 'name email')
+      .lean();
+
+    subscriptions.forEach((sub: any) => {
+      // Calculate subscription value based on tier
+      let subscriptionAmount = 0;
+      let tierName = '';
+      let description = '';
+
+      if (sub.tier === 'FLEXIBLE') {
+        tierName = 'Flexible';
+        subscriptionAmount = 0; // Pay as you go - no upfront
+        description = 'Flexible Plan Activation (Pay per session)';
+      } else if (sub.tier === 'REGULAR') {
+        tierName = 'Regular';
+        subscriptionAmount = sub.pricePerHour * sub.minimumHours; // €28 * 4 = €112
+        description = `${tierName} Subscription (${sub.minimumHours}hrs @ €${sub.pricePerHour}/hr)`;
+      } else if (sub.tier === 'LONG_TERM') {
+        tierName = 'Long-term';
+        subscriptionAmount = sub.pricePerHour * sub.minimumHours * sub.commitmentMonths; // €25 * 4 * 3 = €300
+        description = `${tierName} Subscription (${sub.commitmentMonths} months)`;
+      }
+
+      // Generate a subscription reference
+      const subDate = new Date(sub.createdAt);
+      const subRef = `SUB-${subDate.getFullYear().toString().slice(-2)}${(subDate.getMonth() + 1).toString().padStart(2, '0')}-${sub._id.toString().slice(-6).toUpperCase()}`;
+
+      transactions.push({
+        _id: sub._id.toString(),
+        transactionId: subRef,
+        type: 'STUDENT_PAYMENT',
+        amount: subscriptionAmount,
+        userName: sub.studentId?.name || 'Unknown',
+        userEmail: sub.studentId?.email || '',
+        userType: 'student',
+        status: sub.status === 'ACTIVE' ? 'PAID' : sub.status === 'PENDING' ? 'PENDING' : 'PAID',
+        date: sub.paidAt || sub.createdAt,
+        description,
+      });
+    });
+  }
+
+  // Get Tutor Payouts (TutorEarnings)
+  if (type === 'all' || type === 'TUTOR_PAYOUT') {
+    const earnings = await TutorEarnings.find()
+      .populate('tutorId', 'name email')
+      .lean();
+
+    earnings.forEach((earning: any) => {
+      transactions.push({
+        _id: earning._id.toString(),
+        transactionId: earning.payoutReference,
+        type: 'TUTOR_PAYOUT',
+        amount: earning.netEarnings,
+        userName: earning.tutorId?.name || 'Unknown',
+        userEmail: earning.tutorId?.email || '',
+        userType: 'tutor',
+        status: earning.status as any,
+        date: earning.paidAt || earning.createdAt,
+        description: `Payout for ${earning.payoutMonth}/${earning.payoutYear}`,
+        sessions: earning.totalSessions,
+        hours: earning.totalHours,
+      });
+    });
+  }
+
+  // Apply filters
+  let filtered = transactions;
+
+  if (status) {
+    filtered = filtered.filter(t => t.status === status);
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filtered = filtered.filter(
+      t =>
+        t.transactionId?.toLowerCase().includes(searchLower) ||
+        t.userName?.toLowerCase().includes(searchLower) ||
+        t.userEmail?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    const aValue = sortBy === 'date' ? new Date(a.date).getTime() : a.amount;
+    const bValue = sortBy === 'date' ? new Date(b.date).getTime() : b.amount;
+
+    return sortOrder === 'desc' ? bValue - aValue : aValue - bValue;
+  });
+
+  // Pagination
+  const total = filtered.length;
+  const totalPage = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const paginatedData = filtered.slice(startIndex, startIndex + limit);
+
+  return {
+    data: paginatedData,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage,
+    },
+  };
+};
+
+/**
+ * Get transaction statistics
+ */
+const getTransactionStats = async (): Promise<ITransactionStats> => {
+  // Student payments (paid billings)
+  const paidBillings = await MonthlyBilling.find({ status: BILLING_STATUS.PAID });
+  const billingPaymentsTotal = paidBillings.reduce((sum, b) => sum + b.total, 0);
+
+  // All subscription purchases
+  const allSubscriptions = await StudentSubscription.find({
+    status: SUBSCRIPTION_STATUS.ACTIVE,
+  });
+
+  let subscriptionPaymentsTotal = 0;
+  allSubscriptions.forEach((sub: any) => {
+    if (sub.tier === 'REGULAR') {
+      subscriptionPaymentsTotal += sub.pricePerHour * sub.minimumHours;
+    } else if (sub.tier === 'LONG_TERM') {
+      subscriptionPaymentsTotal += sub.pricePerHour * sub.minimumHours * sub.commitmentMonths;
+    }
+    // FLEXIBLE = 0, no upfront payment
+  });
+
+  const studentPaymentsTotal = billingPaymentsTotal + subscriptionPaymentsTotal;
+  const studentPaymentsCount = paidBillings.length + allSubscriptions.length;
+
+  // Tutor payouts (paid earnings)
+  const paidEarnings = await TutorEarnings.find({ status: PAYOUT_STATUS.PAID });
+  const tutorPayoutsTotal = paidEarnings.reduce((sum, e) => sum + e.netEarnings, 0);
+
+  // All billings, subscriptions and earnings count
+  const allBillingsCount = await MonthlyBilling.countDocuments();
+  const allSubscriptionsCount = await StudentSubscription.countDocuments();
+  const allEarningsCount = await TutorEarnings.countDocuments();
+
+  return {
+    totalTransactions: allBillingsCount + allSubscriptionsCount + allEarningsCount,
+    totalAmount: studentPaymentsTotal + tutorPayoutsTotal,
+    studentPayments: {
+      count: studentPaymentsCount,
+      total: studentPaymentsTotal,
+    },
+    tutorPayouts: {
+      count: paidEarnings.length,
+      total: tutorPayoutsTotal,
+    },
+  };
+};
+
 export const AdminService = {
   getDashboardStats,
   getRevenueByMonth,
@@ -1000,4 +1213,6 @@ export const AdminService = {
   getUnifiedSessions,
   getSessionStats,
   getApplicationStats,
+  getTransactions,
+  getTransactionStats,
 };

@@ -42,7 +42,7 @@ const getNextLevel = (currentLevel: TUTOR_LEVEL): { level: TUTOR_LEVEL; hourlyRa
 const generateTutorEarnings = async (
   month: number,
   year: number,
-  commissionRate: number = 0.2
+  commissionRate: number = 0 // No commission - tutor gets 100%
 ): Promise<ITutorEarnings[]> => {
   const periodStart = new Date(year, month - 1, 1);
   const periodEnd = new Date(year, month, 0, 23, 59, 59);
