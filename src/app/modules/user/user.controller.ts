@@ -149,6 +149,21 @@ const unblockStudent = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Admin: Update student profile (without password)
+ */
+const adminUpdateStudentProfile = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.adminUpdateStudentProfile(id, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Student profile updated successfully',
+    data: result,
+  });
+});
+
 // ============ ADMIN: TUTOR MANAGEMENT ============
 
 const getAllTutors = catchAsync(async (req: Request, res: Response) => {
@@ -200,6 +215,21 @@ const updateTutorSubjects = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Admin: Update tutor profile (without password)
+ */
+const adminUpdateTutorProfile = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.adminUpdateTutorProfile(id, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Tutor profile updated successfully',
+    data: result,
+  });
+});
+
 // ============ TUTOR: STATISTICS ============
 
 const getTutorStatistics = catchAsync(async (req: Request, res: Response) => {
@@ -227,11 +257,13 @@ export const UserController = {
   getAllStudents,
   blockStudent,
   unblockStudent,
+  adminUpdateStudentProfile,
   // Admin: Tutor Management
   getAllTutors,
   blockTutor,
   unblockTutor,
   updateTutorSubjects,
+  adminUpdateTutorProfile,
   // Tutor: Statistics
   getTutorStatistics,
 };

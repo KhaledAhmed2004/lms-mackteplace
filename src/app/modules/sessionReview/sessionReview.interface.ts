@@ -1,8 +1,8 @@
 import { Model, Types } from 'mongoose';
 
 export type ISessionReview = {
-  sessionId: Types.ObjectId;
-  studentId: Types.ObjectId;
+  sessionId?: Types.ObjectId | null;  // Optional for admin-created reviews
+  studentId?: Types.ObjectId | null;  // Optional for admin-created reviews
   tutorId: Types.ObjectId;
 
   // Ratings (1-5 scale)
@@ -20,6 +20,10 @@ export type ISessionReview = {
   isPublic: boolean;            // Show publicly on tutor profile
   isEdited: boolean;            // Has been edited after submission
   editedAt?: Date;
+
+  // Admin-created review fields
+  isAdminCreated?: boolean;     // True if created by admin without session
+  reviewerName?: string;        // Custom reviewer name for admin-created reviews
 };
 
 export type SessionReviewModel = Model<ISessionReview>;

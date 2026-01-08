@@ -148,6 +148,50 @@ const linkOrphanedReviews = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/**
+ * Admin: Create a review for a tutor (without session requirement)
+ */
+const adminCreateReview = catchAsync(async (req: Request, res: Response) => {
+  const result = await SessionReviewService.adminCreateReview(req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.CREATED,
+    message: 'Review created successfully',
+    data: result,
+  });
+});
+
+/**
+ * Admin: Update any review
+ */
+const adminUpdateReview = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await SessionReviewService.adminUpdateReview(id, req.body);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Review updated successfully',
+    data: result,
+  });
+});
+
+/**
+ * Admin: Delete any review
+ */
+const adminDeleteReview = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  await SessionReviewService.adminDeleteReview(id);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Review deleted successfully',
+    data: null,
+  });
+});
+
 export const SessionReviewController = {
   createReview,
   getMyReviews,
@@ -158,4 +202,8 @@ export const SessionReviewController = {
   getTutorStats,
   toggleVisibility,
   linkOrphanedReviews,
+  // Admin functions
+  adminCreateReview,
+  adminUpdateReview,
+  adminDeleteReview,
 };

@@ -293,6 +293,98 @@ const linkOrphanedReviews = async (): Promise<{ linked: number; alreadyLinked: n
   return { linked, alreadyLinked };
 };
 
+/**
+ * Admin: Create a review for a tutor (without session requirement)
+ * This allows admin to add reviews directly for tutors
+ */
+interface AdminCreateReviewPayload {
+  tutorId: string;
+  overallRating: number;
+  teachingQuality: number;
+  communication: number;
+  punctuality: number;
+  preparedness: number;
+  comment?: string;
+  wouldRecommend: boolean;
+  isPublic?: boolean;
+  reviewerName?: string; // Optional name for the review
+}
+
+const adminCreateReview = async (
+  payload: AdminCreateReviewPayload
+): Promise<ISessionReview> => {
+  // Validate tutor exists
+  const { User } = await import('../user/user.model');
+  const tutor = await User.findById(payload.tutorId);
+  if (!tutor) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Tutor not found');
+  }
+
+  // Create review without session (admin-created)
+  const review = await SessionReview.create({
+    tutorId: new Types.ObjectId(payload.tutorId),
+    studentId: null, // Admin created, no student
+    sessionId: null, // No session for admin-created reviews
+    overallRating: payload.overallRating,
+    teachingQuality: payload.teachingQuality,
+    communication: payload.communication,
+    punctuality: payload.punctuality,
+    preparedness: payload.preparedness,
+    comment: payload.comment,
+    wouldRecommend: payload.wouldRecommend,
+    isPublic: payload.isPublic ?? true,
+    isAdminCreated: true,
+    reviewerName: payload.reviewerName,
+  });
+
+  return review;
+};
+
+/**
+ * Admin: Update any review
+ */
+const adminUpdateReview = async (
+  id: string,
+  payload: Partial<ISessionReview>
+): Promise<ISessionReview | null> => {
+  const review = await SessionReview.findById(id);
+
+  if (!review) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
+  }
+
+  // Update fields
+  Object.assign(review, payload);
+  review.isEdited = true;
+  review.editedAt = new Date();
+
+  await review.save();
+
+  return review;
+};
+
+/**
+ * Admin: Delete any review
+ */
+const adminDeleteReview = async (id: string): Promise<ISessionReview | null> => {
+  const review = await SessionReview.findById(id);
+
+  if (!review) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found');
+  }
+
+  // If review has a session, remove reviewId from session
+  if (review.sessionId) {
+    await Session.findByIdAndUpdate(review.sessionId, {
+      $unset: { reviewId: 1 },
+    });
+  }
+
+  await SessionReview.findByIdAndDelete(id);
+
+  return review;
+};
+
 export const SessionReviewService = {
   createReview,
   getMyReviews,
@@ -303,4 +395,8 @@ export const SessionReviewService = {
   getTutorStats,
   toggleVisibility,
   linkOrphanedReviews,
+  // Admin functions
+  adminCreateReview,
+  adminUpdateReview,
+  adminDeleteReview,
 };

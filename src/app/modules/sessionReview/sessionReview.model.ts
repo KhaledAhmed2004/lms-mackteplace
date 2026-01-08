@@ -6,13 +6,13 @@ const sessionReviewSchema = new Schema<ISessionReview>(
     sessionId: {
       type: Schema.Types.ObjectId,
       ref: 'Session',
-      required: [true, 'Session ID is required'],
-      unique: true, // One review per session
+      required: false, // Optional for admin-created reviews
+      sparse: true, // Allow multiple null values
     },
     studentId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Student ID is required'],
+      required: false, // Optional for admin-created reviews
     },
     tutorId: {
       type: Schema.Types.ObjectId,
@@ -70,6 +70,16 @@ const sessionReviewSchema = new Schema<ISessionReview>(
     editedAt: {
       type: Date,
     },
+    // Admin-created review fields
+    isAdminCreated: {
+      type: Boolean,
+      default: false,
+    },
+    reviewerName: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Reviewer name cannot exceed 100 characters'],
+    },
   },
   { timestamps: true }
 );
@@ -77,11 +87,13 @@ const sessionReviewSchema = new Schema<ISessionReview>(
 // Indexes
 sessionReviewSchema.index({ tutorId: 1, createdAt: -1 });
 sessionReviewSchema.index({ studentId: 1, createdAt: -1 });
-sessionReviewSchema.index({ sessionId: 1 }, { unique: true });
+sessionReviewSchema.index({ sessionId: 1 }, { unique: true, sparse: true }); // sparse allows multiple null values
 sessionReviewSchema.index({ overallRating: 1 });
 
 // Compound index for public reviews
 sessionReviewSchema.index({ tutorId: 1, isPublic: 1 });
+// Index for admin-created reviews
+sessionReviewSchema.index({ isAdminCreated: 1 });
 
 export const SessionReview = model<ISessionReview, SessionReviewModel>(
   'SessionReview',

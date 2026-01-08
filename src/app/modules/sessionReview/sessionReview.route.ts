@@ -119,4 +119,41 @@ router.post(
   SessionReviewController.linkOrphanedReviews
 );
 
+/**
+ * @route   POST /api/v1/reviews/admin
+ * @desc    Admin: Create a review for a tutor (without session requirement)
+ * @access  Admin only
+ * @body    { tutorId, overallRating, teachingQuality, communication, punctuality, preparedness, comment?, wouldRecommend, isPublic?, reviewerName? }
+ */
+router.post(
+  '/admin',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(SessionReviewValidation.adminCreateReviewZodSchema),
+  SessionReviewController.adminCreateReview
+);
+
+/**
+ * @route   PATCH /api/v1/reviews/admin/:id
+ * @desc    Admin: Update any review
+ * @access  Admin only
+ * @body    Partial review fields
+ */
+router.patch(
+  '/admin/:id',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(SessionReviewValidation.adminUpdateReviewZodSchema),
+  SessionReviewController.adminUpdateReview
+);
+
+/**
+ * @route   DELETE /api/v1/reviews/admin/:id
+ * @desc    Admin: Delete any review
+ * @access  Admin only
+ */
+router.delete(
+  '/admin/:id',
+  auth(USER_ROLES.SUPER_ADMIN),
+  SessionReviewController.adminDeleteReview
+);
+
 export const SessionReviewRoutes = router;

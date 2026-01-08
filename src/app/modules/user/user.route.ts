@@ -71,6 +71,19 @@ router.patch(
   UserController.unblockStudent
 );
 
+/**
+ * @route   PATCH /api/v1/user/students/:id/profile
+ * @desc    Admin: Update student profile (all fields except password)
+ * @access  Admin only
+ * @body    { name?, email?, phone?, dateOfBirth?, location? }
+ */
+router.patch(
+  '/students/:id/profile',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(UserValidation.adminUpdateStudentProfileZodSchema),
+  UserController.adminUpdateStudentProfile
+);
+
 // ============ ADMIN: TUTOR MANAGEMENT ============
 
 // Get all tutors (admin only)
@@ -100,6 +113,19 @@ router.patch(
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(UserValidation.updateTutorSubjectsZodSchema),
   UserController.updateTutorSubjects
+);
+
+/**
+ * @route   PATCH /api/v1/user/tutors/:id/profile
+ * @desc    Admin: Update tutor profile (all fields except password)
+ * @access  Admin only
+ * @body    { name?, email?, phone?, dateOfBirth?, location?, tutorProfile?: { address?, birthDate?, bio?, subjects? } }
+ */
+router.patch(
+  '/tutors/:id/profile',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(UserValidation.adminUpdateTutorProfileZodSchema),
+  UserController.adminUpdateTutorProfile
 );
 
 // ============ GENERAL ADMIN ROUTES ============

@@ -62,8 +62,42 @@ const updateTutorSubjectsZodSchema = z.object({
   }),
 });
 
+// Admin: Update tutor profile (without password)
+const adminUpdateTutorProfileZodSchema = z.object({
+  body: z.object({
+    name: z.string().min(1, 'Name cannot be empty').optional(),
+    email: z.string().email('Invalid email address').optional(),
+    phone: z.string().regex(phoneRegex, 'Phone must be 7-15 digits, optional +').optional().or(z.literal('')),
+    dateOfBirth: z.string().optional(),
+    location: z.string().optional(),
+    // Tutor profile fields
+    tutorProfile: z.object({
+      address: z.string().optional(),
+      birthDate: z.string().optional(),
+      bio: z.string().optional(),
+      languages: z.array(z.string()).optional(),
+      teachingExperience: z.string().optional(),
+      education: z.string().optional(),
+      subjects: z.array(z.string()).optional(),
+    }).optional(),
+  }),
+});
+
+// Admin: Update student profile (without password)
+const adminUpdateStudentProfileZodSchema = z.object({
+  body: z.object({
+    name: z.string().min(1, 'Name cannot be empty').optional(),
+    email: z.string().email('Invalid email address').optional(),
+    phone: z.string().regex(phoneRegex, 'Phone must be 7-15 digits, optional +').optional().or(z.literal('')),
+    dateOfBirth: z.string().optional(),
+    location: z.string().optional(),
+  }),
+});
+
 export const UserValidation = {
   createUserZodSchema,
   updateUserZodSchema,
   updateTutorSubjectsZodSchema,
+  adminUpdateTutorProfileZodSchema,
+  adminUpdateStudentProfileZodSchema,
 };

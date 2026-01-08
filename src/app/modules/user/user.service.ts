@@ -347,6 +347,118 @@ const updateTutorSubjects = async (id: string, subjects: string[]) => {
   return updatedUser;
 };
 
+/**
+ * Admin: Update tutor profile (without password)
+ * Admin can update all tutor fields except password
+ */
+interface AdminUpdateTutorPayload {
+  name?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  location?: string;
+  tutorProfile?: {
+    address?: string;
+    birthDate?: string;
+    bio?: string;
+    languages?: string[];
+    teachingExperience?: string;
+    education?: string;
+    subjects?: string[];
+  };
+}
+
+const adminUpdateTutorProfile = async (
+  id: string,
+  payload: AdminUpdateTutorPayload
+) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a tutor');
+  }
+
+  // Build update object
+  const updateData: Record<string, unknown> = {};
+
+  // Update basic fields
+  if (payload.name) updateData.name = payload.name;
+  if (payload.email) updateData.email = payload.email;
+  if (payload.phone !== undefined) updateData.phone = payload.phone;
+  if (payload.dateOfBirth) updateData.dateOfBirth = payload.dateOfBirth;
+  if (payload.location) updateData.location = payload.location;
+
+  // Update tutor profile fields
+  if (payload.tutorProfile) {
+    const tp = payload.tutorProfile;
+    if (tp.address !== undefined) updateData['tutorProfile.address'] = tp.address;
+    if (tp.birthDate !== undefined) updateData['tutorProfile.birthDate'] = tp.birthDate;
+    if (tp.bio !== undefined) updateData['tutorProfile.bio'] = tp.bio;
+    if (tp.languages !== undefined) updateData['tutorProfile.languages'] = tp.languages;
+    if (tp.teachingExperience !== undefined) updateData['tutorProfile.teachingExperience'] = tp.teachingExperience;
+    if (tp.education !== undefined) updateData['tutorProfile.education'] = tp.education;
+    if (tp.subjects !== undefined) updateData['tutorProfile.subjects'] = tp.subjects;
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { $set: updateData },
+    { new: true }
+  )
+    .select('-password -authentication')
+    .populate({
+      path: 'tutorProfile.subjects',
+      select: 'name _id',
+    });
+
+  return updatedUser;
+};
+
+/**
+ * Admin: Update student profile (without password)
+ * Admin can update all student fields except password
+ */
+interface AdminUpdateStudentPayload {
+  name?: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  location?: string;
+}
+
+const adminUpdateStudentProfile = async (
+  id: string,
+  payload: AdminUpdateStudentPayload
+) => {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  if (user.role !== USER_ROLES.STUDENT) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is not a student');
+  }
+
+  // Build update object
+  const updateData: Record<string, unknown> = {};
+
+  // Update basic fields
+  if (payload.name) updateData.name = payload.name;
+  if (payload.email) updateData.email = payload.email;
+  if (payload.phone !== undefined) updateData.phone = payload.phone;
+  if (payload.dateOfBirth) updateData.dateOfBirth = payload.dateOfBirth;
+  if (payload.location) updateData.location = payload.location;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    { $set: updateData },
+    { new: true }
+  ).select('-password -authentication');
+
+  return updatedUser;
+};
+
 // ============ TUTOR STATISTICS ============
 
 /**
@@ -574,11 +686,13 @@ export const UserService = {
   getAllStudents,
   blockStudent,
   unblockStudent,
+  adminUpdateStudentProfile,
   // Admin: Tutor Management
   getAllTutors,
   blockTutor,
   unblockTutor,
   updateTutorSubjects,
+  adminUpdateTutorProfile,
   // Tutor Statistics
   getTutorStatistics,
   updateTutorLevelAfterSession,
