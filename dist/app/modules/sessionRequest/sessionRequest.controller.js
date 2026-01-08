@@ -103,6 +103,7 @@ const acceptSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
     var _a;
     const { id } = req.params;
     const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const { introductoryMessage } = req.body;
     if (!tutorId) {
         return (0, sendResponse_1.default)(res, {
             success: false,
@@ -110,7 +111,7 @@ const acceptSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
             message: 'Unauthorized',
         });
     }
-    const result = yield sessionRequest_service_1.SessionRequestService.acceptSessionRequest(id, tutorId);
+    const result = yield sessionRequest_service_1.SessionRequestService.acceptSessionRequest(id, tutorId, introductoryMessage);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -123,7 +124,6 @@ const cancelSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
     var _a;
     const { id } = req.params;
     const studentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-    const { cancellationReason } = req.body;
     if (!studentId) {
         return (0, sendResponse_1.default)(res, {
             success: false,
@@ -131,7 +131,7 @@ const cancelSessionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(v
             message: 'Unauthorized',
         });
     }
-    const result = yield sessionRequest_service_1.SessionRequestService.cancelSessionRequest(id, studentId, cancellationReason);
+    const result = yield sessionRequest_service_1.SessionRequestService.cancelSessionRequest(id, studentId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,

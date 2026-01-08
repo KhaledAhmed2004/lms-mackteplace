@@ -19,6 +19,7 @@ const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
 const chat_model_1 = require("../chat/chat.model");
+const message_model_1 = require("../message/message.model");
 const subject_model_1 = require("../subject/subject.model");
 const trialRequest_model_1 = require("../trialRequest/trialRequest.model");
 const trialRequest_interface_1 = require("../trialRequest/trialRequest.interface");
@@ -526,8 +527,9 @@ const getSingleSessionRequest = (id) => __awaiter(void 0, void 0, void 0, functi
 /**
  * Accept session request (Tutor)
  * Creates chat and connects student with tutor
+ * Sends introductory message to chat
  */
-const acceptSessionRequest = (requestId, tutorId) => __awaiter(void 0, void 0, void 0, function* () {
+const acceptSessionRequest = (requestId, tutorId, introductoryMessage) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     // Verify request exists and is pending
     const request = yield sessionRequest_model_1.SessionRequest.findById(requestId).populate('subject', 'name');
@@ -552,8 +554,12 @@ const acceptSessionRequest = (requestId, tutorId) => __awaiter(void 0, void 0, v
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only verified tutors can accept requests');
     }
     // Verify tutor teaches this subject (compare ObjectId)
+    // Handle both populated and non-populated subject field
     const tutorSubjectIds = ((_c = (_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.subjects) === null || _c === void 0 ? void 0 : _c.map(s => s.toString())) || [];
-    if (!tutorSubjectIds.includes(request.subject.toString())) {
+    const requestSubjectId = typeof request.subject === 'object' && request.subject._id
+        ? request.subject._id.toString()
+        : request.subject.toString();
+    if (!tutorSubjectIds.includes(requestSubjectId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You do not teach this subject');
     }
     // Create chat between student and tutor
@@ -561,6 +567,15 @@ const acceptSessionRequest = (requestId, tutorId) => __awaiter(void 0, void 0, v
         participants: [request.studentId, new mongoose_1.Types.ObjectId(tutorId)],
         sessionRequestId: request._id, // Link chat to session request
     });
+    // Send introductory message if provided
+    if (introductoryMessage && introductoryMessage.trim()) {
+        yield message_model_1.Message.create({
+            chatId: chat._id,
+            sender: new mongoose_1.Types.ObjectId(tutorId),
+            text: introductoryMessage.trim(),
+            type: 'text',
+        });
+    }
     // Update session request
     request.status = sessionRequest_interface_1.SESSION_REQUEST_STATUS.ACCEPTED;
     request.acceptedTutorId = new mongoose_1.Types.ObjectId(tutorId);
@@ -572,9 +587,9 @@ const acceptSessionRequest = (requestId, tutorId) => __awaiter(void 0, void 0, v
     return request;
 });
 /**
- * Cancel session request (Student)
+ * Cancel session request (Student) - Permanently deletes the request
  */
-const cancelSessionRequest = (requestId, studentId, cancellationReason) => __awaiter(void 0, void 0, void 0, function* () {
+const cancelSessionRequest = (requestId, studentId) => __awaiter(void 0, void 0, void 0, function* () {
     const request = yield sessionRequest_model_1.SessionRequest.findById(requestId);
     if (!request) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session request not found');
@@ -587,16 +602,14 @@ const cancelSessionRequest = (requestId, studentId, cancellationReason) => __awa
     if (request.status !== sessionRequest_interface_1.SESSION_REQUEST_STATUS.PENDING) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only pending session requests can be cancelled');
     }
-    // Update request
-    request.status = sessionRequest_interface_1.SESSION_REQUEST_STATUS.CANCELLED;
-    request.cancellationReason = cancellationReason;
-    request.cancelledAt = new Date();
-    yield request.save();
-    return request;
+    // Permanently delete the request
+    yield sessionRequest_model_1.SessionRequest.findByIdAndDelete(requestId);
+    return { deleted: true };
 });
 /**
  * Extend session request (Student)
  * Adds 7 more days to expiration (max 1 extension)
+ * Can only extend when 1 day or less remaining (6+ days passed)
  */
 const extendSessionRequest = (requestId, studentId) => __awaiter(void 0, void 0, void 0, function* () {
     const request = yield sessionRequest_model_1.SessionRequest.findById(requestId);
@@ -615,7 +628,13 @@ const extendSessionRequest = (requestId, studentId) => __awaiter(void 0, void 0,
     if (request.extensionCount && request.extensionCount >= 1) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session request can only be extended once');
     }
-    // Extend by 7 days
+    // Can only extend when 1 day or less remaining (6+ days passed)
+    const timeRemaining = request.expiresAt.getTime() - Date.now();
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+    if (timeRemaining > oneDayInMs) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You can only extend when 1 day or less is remaining');
+    }
+    // Extend by 7 days from now
     const newExpiresAt = new Date();
     newExpiresAt.setDate(newExpiresAt.getDate() + 7);
     request.expiresAt = newExpiresAt;

@@ -67,4 +67,10 @@ router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_RO
  * @body    { isPublic: boolean }
  */
 router.patch('/:id/visibility', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.toggleVisibility);
+/**
+ * @route   POST /api/v1/reviews/link-orphaned
+ * @desc    Link orphaned reviews to sessions (migration helper)
+ * @access  Admin only
+ */
+router.post('/link-orphaned', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.linkOrphanedReviews);
 exports.SessionReviewRoutes = router;

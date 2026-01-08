@@ -13,12 +13,38 @@ const tutorEarnings_validation_1 = require("./tutorEarnings.validation");
 const router = express_1.default.Router();
 // ============ TUTOR ROUTES ============
 /**
+ * @route   GET /api/v1/earnings/my-stats
+ * @desc    Get tutor's comprehensive stats including level progress
+ * @access  Tutor only
+ */
+router.get('/my-stats', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorEarnings_controller_1.TutorEarningsController.getMyStats);
+/**
  * @route   GET /api/v1/earnings/my-earnings
  * @desc    Get tutor's earnings history
  * @access  Tutor only
  * @query   ?status=PAID&page=1&limit=10&sort=-payoutYear,-payoutMonth
  */
 router.get('/my-earnings', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorEarnings_controller_1.TutorEarningsController.getMyEarnings);
+/**
+ * @route   GET /api/v1/earnings/history
+ * @desc    Get tutor's formatted earnings history for frontend
+ * @access  Tutor only
+ * @query   ?page=1&limit=10
+ */
+router.get('/history', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorEarnings_controller_1.TutorEarningsController.getEarningsHistory);
+/**
+ * @route   GET /api/v1/earnings/payout-settings
+ * @desc    Get tutor's payout settings (IBAN, recipient)
+ * @access  Tutor only
+ */
+router.get('/payout-settings', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorEarnings_controller_1.TutorEarningsController.getPayoutSettings);
+/**
+ * @route   PATCH /api/v1/earnings/payout-settings
+ * @desc    Update tutor's payout settings
+ * @access  Tutor only
+ * @body    { recipient: string, iban: string }
+ */
+router.patch('/payout-settings', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(tutorEarnings_validation_1.TutorEarningsValidation.updatePayoutSettingsZodSchema), tutorEarnings_controller_1.TutorEarningsController.updatePayoutSettings);
 /**
  * @route   GET /api/v1/earnings/:id
  * @desc    Get single earnings record

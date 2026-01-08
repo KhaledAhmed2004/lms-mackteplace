@@ -49,6 +49,7 @@ const loginUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
             httpOnly: true,
             secure: config_1.default.node_env === 'production',
             sameSite: 'lax',
+            path: '/',
         });
     }
     (0, sendResponse_1.default)(res, {
@@ -61,14 +62,29 @@ const loginUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
 const logoutUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { deviceToken } = req.body;
     console.log('deviceToken', deviceToken);
+    // User is optional now since logout route is public (allows logout even with expired token)
     const user = req.user;
-    yield auth_service_1.AuthService.logoutUserFromDB(user, deviceToken);
+    // Only call service if user is authenticated (for device token removal)
+    if (user) {
+        yield auth_service_1.AuthService.logoutUserFromDB(user, deviceToken);
+    }
     // Clear refresh token cookie on logout
+    // Method 1: clearCookie with maxAge: 0
     res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: config_1.default.node_env === 'production',
         sameSite: 'lax',
         path: '/',
+        maxAge: 0,
+    });
+    // Method 2: Set expired cookie as fallback (ensures cookie is removed)
+    res.cookie('refreshToken', '', {
+        httpOnly: true,
+        secure: config_1.default.node_env === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+        expires: new Date(0),
     });
     (0, sendResponse_1.default)(res, {
         success: true,

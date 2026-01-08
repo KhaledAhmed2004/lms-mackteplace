@@ -63,6 +63,10 @@ const callSchema = new mongoose_1.Schema({
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Chat',
     },
+    sessionId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Session',
+    },
     whiteboardRoomUuid: String,
     hasWhiteboard: {
         type: Boolean,

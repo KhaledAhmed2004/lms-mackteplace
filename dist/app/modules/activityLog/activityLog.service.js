@@ -11,9 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActivityLogService = void 0;
 const activityLog_model_1 = require("./activityLog.model");
-/**
- * Log a new activity
- */
+// Log a new activity
 const logActivity = (data) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield activityLog_model_1.ActivityLog.create({
@@ -32,9 +30,7 @@ const logActivity = (data) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Failed to log activity:', error);
     }
 });
-/**
- * Get recent activities with pagination and filters
- */
+// Get recent activities with pagination and filters
 const getRecentActivities = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const page = query.page || 1;
     const limit = Math.min(query.limit || 10, 100); // Max 100
@@ -71,7 +67,7 @@ const getRecentActivities = (query) => __awaiter(void 0, void 0, void 0, functio
         .populate('userId', 'name email profilePicture')
         .lean();
     // Transform response
-    const data = activities.map((activity) => {
+    const data = activities.map(activity => {
         var _a;
         const user = activity.userId;
         return {
@@ -98,9 +94,7 @@ const getRecentActivities = (query) => __awaiter(void 0, void 0, void 0, functio
         },
     };
 });
-/**
- * Get activity statistics
- */
+// Get activity statistics
 const getActivityStats = () => __awaiter(void 0, void 0, void 0, function* () {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -112,7 +106,7 @@ const getActivityStats = () => __awaiter(void 0, void 0, void 0, function* () {
         ]),
     ]);
     const activitiesByType = {};
-    byType.forEach((item) => {
+    byType.forEach(item => {
         activitiesByType[item._id] = item.count;
     });
     return {

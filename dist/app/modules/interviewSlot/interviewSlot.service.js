@@ -22,7 +22,8 @@ const tutorApplication_model_1 = require("../tutorApplication/tutorApplication.m
 const tutorApplication_interface_1 = require("../tutorApplication/tutorApplication.interface");
 const interviewSlot_interface_1 = require("./interviewSlot.interface");
 const interviewSlot_model_1 = require("./interviewSlot.model");
-// import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Will implement later
+const agora_helper_1 = require("../call/agora.helper");
+const config_1 = __importDefault(require("../../../config"));
 /**
  * Create interview slot (Admin only)
  */
@@ -63,7 +64,9 @@ const getAllInterviewSlots = (query, userId, userRole) => __awaiter(void 0, void
         // Only show available slots
         filter = { status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE };
     }
-    const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find(filter), query)
+    const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find(filter)
+        .populate('adminId', 'name email')
+        .populate('applicantId', 'name email'), query)
         .filter()
         .sort()
         .paginate()
@@ -127,14 +130,8 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     slot.applicantId = new mongoose_1.Types.ObjectId(applicantId);
     slot.applicationId = new mongoose_1.Types.ObjectId(applicationId);
     slot.bookedAt = new Date();
-    // TODO: Generate Google Meet link
-    // slot.googleMeetLink = await generateGoogleMeetLink({
-    //   summary: 'Tutor Application Interview',
-    //   description: `Interview for ${application.name}`,
-    //   startTime: slot.startTime,
-    //   endTime: slot.endTime,
-    //   attendees: [application.email, admin.email]
-    // });
+    // Generate Agora channel name for video call
+    slot.agoraChannelName = (0, agora_helper_1.generateChannelName)();
     yield slot.save();
     // TODO: Send email notification to applicant with meeting details
     // await sendEmail({
@@ -185,10 +182,11 @@ const cancelInterviewSlot = (slotId, userId, cancellationReason) => __awaiter(vo
     slot.applicationId = undefined;
     slot.bookedAt = undefined;
     yield slot.save();
-    // Update application status back to SUBMITTED (so they can book again)
+    // Keep application status as SELECTED_FOR_INTERVIEW (so they can book again)
+    // The applicant should still be able to book a new interview slot
     if (savedApplicationId) {
         yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(savedApplicationId, {
-            status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED,
+            status: tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW,
         });
     }
     // TODO: Send cancellation email
@@ -323,6 +321,86 @@ const getMyBookedInterview = (applicantId) => __awaiter(void 0, void 0, void 0, 
         .populate('applicationId');
     return slot;
 });
+/**
+ * Get all scheduled meetings (BOOKED interview slots) - Admin only
+ * Returns slots with full applicant and application details
+ */
+const getScheduledMeetings = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const slotQuery = new QueryBuilder_1.default(interviewSlot_model_1.InterviewSlot.find({ status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED })
+        .populate('adminId', 'name email')
+        .populate('applicantId', 'name email')
+        .populate({
+        path: 'applicationId',
+        select: 'name email phone subjects status',
+        populate: {
+            path: 'subjects',
+            select: 'name',
+        },
+    }), query)
+        .sort()
+        .paginate();
+    const result = yield slotQuery.modelQuery;
+    const meta = yield slotQuery.getPaginationInfo();
+    // Transform data to include application details
+    const meetings = result.map((slot) => {
+        var _a, _b, _c;
+        const application = slot.applicationId;
+        // Extract subject names from populated subjects
+        const subjectNames = ((_a = application === null || application === void 0 ? void 0 : application.subjects) === null || _a === void 0 ? void 0 : _a.map((subject) => typeof subject === 'object' ? subject.name : subject)) || [];
+        return {
+            _id: slot._id,
+            applicantName: (application === null || application === void 0 ? void 0 : application.name) || ((_b = slot.applicantId) === null || _b === void 0 ? void 0 : _b.name) || 'N/A',
+            applicantEmail: (application === null || application === void 0 ? void 0 : application.email) || ((_c = slot.applicantId) === null || _c === void 0 ? void 0 : _c.email) || 'N/A',
+            applicantPhone: (application === null || application === void 0 ? void 0 : application.phone) || 'N/A',
+            subjects: subjectNames,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            agoraChannelName: slot.agoraChannelName || null,
+            bookedAt: slot.bookedAt,
+            adminId: slot.adminId,
+        };
+    });
+    return {
+        meta,
+        data: meetings,
+    };
+});
+/**
+ * Get meeting token for interview video call
+ * Both Admin and Applicant can get token if they are part of the meeting
+ */
+const getInterviewMeetingToken = (slotId, userId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const slot = yield interviewSlot_model_1.InterviewSlot.findById(slotId);
+    if (!slot) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Interview slot not found');
+    }
+    if (slot.status !== interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Interview slot is not booked');
+    }
+    if (!slot.agoraChannelName) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'No meeting channel available for this interview');
+    }
+    // Verify user is either admin or applicant of this slot
+    const user = yield user_model_1.User.findById(userId);
+    if (!user) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'User not found');
+    }
+    const isAdmin = user.role === 'SUPER_ADMIN';
+    const isApplicant = ((_a = slot.applicantId) === null || _a === void 0 ? void 0 : _a.toString()) === userId;
+    if (!isAdmin && !isApplicant) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not authorized to join this meeting');
+    }
+    // Generate Agora token
+    const uid = (0, agora_helper_1.userIdToAgoraUid)(userId);
+    const token = (0, agora_helper_1.generateRtcToken)(slot.agoraChannelName, uid);
+    return {
+        token,
+        channelName: slot.agoraChannelName,
+        uid,
+        appId: config_1.default.agora.appId,
+    };
+});
 exports.InterviewSlotService = {
     createInterviewSlot,
     getAllInterviewSlots,
@@ -334,4 +412,6 @@ exports.InterviewSlotService = {
     updateInterviewSlot,
     deleteInterviewSlot,
     getMyBookedInterview,
+    getScheduledMeetings,
+    getInterviewMeetingToken,
 };

@@ -13,6 +13,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TutorEarningsService = void 0;
+const mongoose_1 = require("mongoose");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const http_status_codes_1 = require("http-status-codes");
 const tutorEarnings_model_1 = require("./tutorEarnings.model");
@@ -21,11 +22,37 @@ const session_model_1 = require("../session/session.model");
 const session_interface_1 = require("../session/session.interface");
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
+const user_interface_1 = require("../user/user.interface");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
+// Level configuration
+const LEVEL_CONFIG = {
+    [user_interface_1.TUTOR_LEVEL.STARTER]: { minSessions: 0, maxSessions: 20, hourlyRate: 15, levelNumber: 1 },
+    [user_interface_1.TUTOR_LEVEL.INTERMEDIATE]: { minSessions: 21, maxSessions: 50, hourlyRate: 17, levelNumber: 2 },
+    [user_interface_1.TUTOR_LEVEL.EXPERT]: { minSessions: 51, maxSessions: Infinity, hourlyRate: 20, levelNumber: 3 },
+};
+// Get next level info
+const getNextLevel = (currentLevel) => {
+    if (currentLevel === user_interface_1.TUTOR_LEVEL.STARTER) {
+        return {
+            level: user_interface_1.TUTOR_LEVEL.INTERMEDIATE,
+            hourlyRate: LEVEL_CONFIG[user_interface_1.TUTOR_LEVEL.INTERMEDIATE].hourlyRate,
+            levelNumber: LEVEL_CONFIG[user_interface_1.TUTOR_LEVEL.INTERMEDIATE].levelNumber,
+        };
+    }
+    if (currentLevel === user_interface_1.TUTOR_LEVEL.INTERMEDIATE) {
+        return {
+            level: user_interface_1.TUTOR_LEVEL.EXPERT,
+            hourlyRate: LEVEL_CONFIG[user_interface_1.TUTOR_LEVEL.EXPERT].hourlyRate,
+            levelNumber: LEVEL_CONFIG[user_interface_1.TUTOR_LEVEL.EXPERT].levelNumber,
+        };
+    }
+    return null; // Already at max level
+};
 /**
  * Generate tutor earnings for all tutors (called at month-end after billing)
  */
-const generateTutorEarnings = (month_1, year_1, ...args_1) => __awaiter(void 0, [month_1, year_1, ...args_1], void 0, function* (month, year, commissionRate = 0.2) {
+const generateTutorEarnings = (month_1, year_1, ...args_1) => __awaiter(void 0, [month_1, year_1, ...args_1], void 0, function* (month, year, commissionRate = 0 // No commission - tutor gets 100%
+) {
     const periodStart = new Date(year, month - 1, 1);
     const periodEnd = new Date(year, month, 0, 23, 59, 59);
     // Get all active tutors
@@ -195,6 +222,174 @@ const markAsFailed = (id, failureReason) => __awaiter(void 0, void 0, void 0, fu
     // });
     return earning;
 });
+// ============ PAYOUT SETTINGS ============
+/**
+ * Get tutor's payout settings
+ */
+const getPayoutSettings = (tutorId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can access payout settings');
+    }
+    return {
+        recipient: ((_a = tutor.tutorProfile) === null || _a === void 0 ? void 0 : _a.payoutRecipient) || '',
+        iban: ((_b = tutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.payoutIban) || '',
+    };
+});
+/**
+ * Update tutor's payout settings
+ */
+const updatePayoutSettings = (tutorId, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can update payout settings');
+    }
+    const updatedTutor = yield user_model_1.User.findByIdAndUpdate(tutorId, {
+        'tutorProfile.payoutRecipient': payload.recipient,
+        'tutorProfile.payoutIban': payload.iban,
+    }, { new: true });
+    return {
+        recipient: ((_a = updatedTutor === null || updatedTutor === void 0 ? void 0 : updatedTutor.tutorProfile) === null || _a === void 0 ? void 0 : _a.payoutRecipient) || '',
+        iban: ((_b = updatedTutor === null || updatedTutor === void 0 ? void 0 : updatedTutor.tutorProfile) === null || _b === void 0 ? void 0 : _b.payoutIban) || '',
+    };
+});
+/**
+ * Get tutor's comprehensive stats including level progress
+ */
+const getMyStats = (tutorId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can access stats');
+    }
+    const tutorProfile = tutor.tutorProfile;
+    const currentLevel = (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.level) || user_interface_1.TUTOR_LEVEL.STARTER;
+    const completedSessions = (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.completedSessions) || 0;
+    // Calculate level progress
+    const currentLevelConfig = LEVEL_CONFIG[currentLevel];
+    const nextLevelInfo = getNextLevel(currentLevel);
+    let nextLevelData = null;
+    if (nextLevelInfo) {
+        const sessionsForNextLevel = LEVEL_CONFIG[nextLevelInfo.level].minSessions;
+        const sessionsNeeded = Math.max(0, sessionsForNextLevel - completedSessions);
+        const progressPercent = Math.min(100, Math.round(((completedSessions - currentLevelConfig.minSessions) /
+            (currentLevelConfig.maxSessions - currentLevelConfig.minSessions + 1)) * 100));
+        nextLevelData = {
+            level: nextLevelInfo.levelNumber,
+            name: nextLevelInfo.level,
+            hourlyRate: nextLevelInfo.hourlyRate,
+            sessionsNeeded,
+            progressPercent,
+        };
+    }
+    // Get current month dates
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Get current month earnings
+    const currentMonthEarnings = yield tutorEarnings_model_1.TutorEarnings.findOne({
+        tutorId: new mongoose_1.Types.ObjectId(tutorId),
+        payoutMonth: now.getMonth() + 1,
+        payoutYear: now.getFullYear(),
+    });
+    // Get pending payouts total
+    const pendingPayouts = yield tutorEarnings_model_1.TutorEarnings.aggregate([
+        {
+            $match: {
+                tutorId: new mongoose_1.Types.ObjectId(tutorId),
+                status: tutorEarnings_interface_1.PAYOUT_STATUS.PENDING,
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: '$netEarnings' },
+            },
+        },
+    ]);
+    // Get trial session stats
+    const trialStats = yield session_model_1.Session.aggregate([
+        {
+            $match: {
+                tutorId: new mongoose_1.Types.ObjectId(tutorId),
+                isTrial: true,
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                totalTrials: { $sum: 1 },
+                convertedTrials: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', session_interface_1.SESSION_STATUS.COMPLETED] }, 1, 0],
+                    },
+                },
+            },
+        },
+    ]);
+    const trialData = trialStats[0] || { totalTrials: 0, convertedTrials: 0 };
+    const conversionRate = trialData.totalTrials > 0
+        ? Math.round((trialData.convertedTrials / trialData.totalTrials) * 100)
+        : 0;
+    return {
+        level: {
+            current: currentLevelConfig.levelNumber,
+            name: currentLevel,
+            hourlyRate: currentLevelConfig.hourlyRate,
+        },
+        nextLevel: nextLevelData,
+        stats: {
+            totalSessions: (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.totalSessions) || 0,
+            completedSessions: (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.completedSessions) || 0,
+            totalHours: (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.totalHoursTaught) || 0,
+            totalStudents: (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.totalStudents) || 0,
+        },
+        earnings: {
+            currentMonth: (currentMonthEarnings === null || currentMonthEarnings === void 0 ? void 0 : currentMonthEarnings.netEarnings) || 0,
+            totalEarnings: (tutorProfile === null || tutorProfile === void 0 ? void 0 : tutorProfile.totalEarnings) || 0,
+            pendingPayout: ((_a = pendingPayouts[0]) === null || _a === void 0 ? void 0 : _a.total) || 0,
+        },
+        trialStats: {
+            totalTrials: trialData.totalTrials,
+            convertedTrials: trialData.convertedTrials,
+            conversionRate,
+        },
+    };
+});
+/**
+ * Get earnings history formatted for frontend display
+ */
+const getEarningsHistory = (tutorId_1, ...args_1) => __awaiter(void 0, [tutorId_1, ...args_1], void 0, function* (tutorId, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const earnings = yield tutorEarnings_model_1.TutorEarnings.find({ tutorId: new mongoose_1.Types.ObjectId(tutorId) })
+        .sort({ payoutYear: -1, payoutMonth: -1 })
+        .skip(skip)
+        .limit(limit);
+    const total = yield tutorEarnings_model_1.TutorEarnings.countDocuments({ tutorId: new mongoose_1.Types.ObjectId(tutorId) });
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedEarnings = earnings.map((earning) => ({
+        id: earning._id,
+        period: `${monthNames[earning.payoutMonth - 1]} ${String(earning.payoutYear).slice(-2)}`,
+        sessions: earning.totalSessions,
+        hours: earning.totalHours,
+        grossEarnings: earning.grossEarnings,
+        netEarnings: earning.netEarnings,
+        status: earning.status,
+        payoutReference: earning.payoutReference,
+        paidAt: earning.paidAt,
+    }));
+    return {
+        data: formattedEarnings,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+});
 exports.TutorEarningsService = {
     generateTutorEarnings,
     getMyEarnings,
@@ -203,4 +398,9 @@ exports.TutorEarningsService = {
     initiatePayout,
     markAsPaid,
     markAsFailed,
+    // New methods
+    getPayoutSettings,
+    updatePayoutSettings,
+    getMyStats,
+    getEarningsHistory,
 };

@@ -20,6 +20,7 @@ const seedAdmin_1 = require("./DB/seedAdmin");
 const socketHelper_1 = require("./helpers/socketHelper");
 const logger_1 = require("./shared/logger");
 const CacheHelper_1 = require("./app/shared/CacheHelper");
+const cron_service_1 = require("./app/services/cron.service");
 // uncaught exception — ensure server closes before exit to avoid EADDRINUSE on respawn
 process.on('uncaughtException', error => {
     logger_1.errorLogger.error('UncaughtException Detected', error);
@@ -90,12 +91,15 @@ function main() {
             socketHelper_1.socketHelper.socket(io);
             //@ts-ignore
             global.io = io;
+            // Initialize Cron Jobs (session auto-transition, reminders, etc.)
+            cron_service_1.CronService.initializeCronJobs();
             // Startup Summary
             const summary = [
                 `📝 Startup Summary:`,
                 `      - DB connected ${mongoose_1.default.connection.readyState === 1 ? '✅' : '❌'}`,
                 `      - CacheHelper initialized ${cache ? '✅' : '❌'}`,
                 `      - RateLimit active ✅`,
+                `      - Cron Jobs initialized ✅`,
                 `      - Debug Mode ${config_1.default.node_env === 'development' ? 'ON ✅' : 'OFF ❌'}`,
             ].join('\n');
             logger_1.logger.info(summary);

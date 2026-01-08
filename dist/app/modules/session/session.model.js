@@ -3,6 +3,34 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Session = void 0;
 const mongoose_1 = require("mongoose");
 const session_interface_1 = require("./session.interface");
+// Attendance tracking sub-schema
+const attendanceSchema = new mongoose_1.Schema({
+    odId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
+    firstJoinedAt: {
+        type: Date,
+    },
+    lastLeftAt: {
+        type: Date,
+    },
+    totalDurationSeconds: {
+        type: Number,
+        default: 0,
+    },
+    attendancePercentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100,
+    },
+    joinCount: {
+        type: Number,
+        default: 0,
+    },
+}, { _id: false });
 // Reschedule request sub-schema
 const rescheduleRequestSchema = new mongoose_1.Schema({
     requestedBy: {
@@ -158,6 +186,17 @@ const sessionSchema = new mongoose_1.Schema({
     expiredAt: {
         type: Date,
     },
+    // Attendance tracking fields
+    callId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Call',
+    },
+    tutorAttendance: attendanceSchema,
+    studentAttendance: attendanceSchema,
+    noShowBy: {
+        type: String,
+        enum: ['tutor', 'student'],
+    },
 }, { timestamps: true });
 // Indexes for performance
 sessionSchema.index({ studentId: 1, createdAt: -1 });
@@ -170,6 +209,8 @@ sessionSchema.index({ trialRequestId: 1 });
 sessionSchema.index({ status: 1, startTime: 1 });
 // Index for status transitions (cron jobs)
 sessionSchema.index({ status: 1, endTime: 1 });
+// Index for call-based lookups
+sessionSchema.index({ callId: 1 });
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {
     if (this.endTime <= this.startTime) {

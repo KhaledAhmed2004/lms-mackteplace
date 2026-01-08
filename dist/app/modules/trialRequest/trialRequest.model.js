@@ -83,13 +83,13 @@ const trialRequestSchema = new mongoose_1.Schema({
     },
     gradeLevel: {
         type: String,
-        enum: Object.values(trialRequest_interface_1.GRADE_LEVEL),
         required: [true, 'Grade level is required'],
+        trim: true,
     },
     schoolType: {
         type: String,
-        enum: Object.values(trialRequest_interface_1.SCHOOL_TYPE),
         required: [true, 'School type is required'],
+        trim: true,
     },
     // Learning Details
     description: {

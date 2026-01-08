@@ -31,12 +31,13 @@ const proposeSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
     });
 }));
 /**
- * Accept session proposal (Student accepts)
+ * Accept session proposal (Student or Tutor accepts)
+ * Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
  */
 const acceptSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { messageId } = req.params;
-    const studentId = req.user.id;
-    const result = yield session_service_1.SessionService.acceptSessionProposal(messageId, studentId);
+    const userId = req.user.id;
+    const result = yield session_service_1.SessionService.acceptSessionProposal(messageId, userId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.CREATED,
@@ -45,13 +46,28 @@ const acceptSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(
     });
 }));
 /**
- * Reject session proposal (Student rejects)
+ * Counter-propose session (Student suggests alternative time)
+ */
+const counterProposeSession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { messageId } = req.params;
+    const studentId = req.user.id;
+    const result = yield session_service_1.SessionService.counterProposeSession(messageId, studentId, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.CREATED,
+        message: 'Counter-proposal sent successfully',
+        data: result,
+    });
+}));
+/**
+ * Reject session proposal (Student or Tutor rejects)
+ * Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
  */
 const rejectSessionProposal = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { messageId } = req.params;
-    const studentId = req.user.id;
+    const userId = req.user.id;
     const { rejectionReason } = req.body;
-    const result = yield session_service_1.SessionService.rejectSessionProposal(messageId, studentId, rejectionReason);
+    const result = yield session_service_1.SessionService.rejectSessionProposal(messageId, userId, rejectionReason);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -218,6 +234,7 @@ const autoTransitionStatuses = (0, catchAsync_1.default)((req, res) => __awaiter
 exports.SessionController = {
     proposeSession,
     acceptSessionProposal,
+    counterProposeSession,
     rejectSessionProposal,
     getAllSessions,
     getSingleSession,

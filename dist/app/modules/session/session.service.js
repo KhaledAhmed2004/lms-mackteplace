@@ -23,10 +23,22 @@ const message_model_1 = require("../message/message.model");
 const user_1 = require("../../../enums/user");
 const session_interface_1 = require("./session.interface");
 const session_model_1 = require("./session.model");
+const call_model_1 = require("../call/call.model");
 const tutorSessionFeedback_service_1 = require("../tutorSessionFeedback/tutorSessionFeedback.service");
 const user_service_1 = require("../user/user.service");
 const activityLog_service_1 = require("../activityLog/activityLog.service");
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
+// ============================================
+// 🧪 TEST MODE CONFIGURATION
+// ============================================
+// Set to true for testing with 5 minute sessions
+// Set to false for production (60 minute sessions)
+const TEST_MODE = true;
+// Test mode: 5 min session, 80% = 4 min (240 seconds)
+// Production: 60 min session, 80% = 48 min (2880 seconds)
+const TEST_SESSION_DURATION_MINUTES = 5;
+const MINIMUM_ATTENDANCE_PERCENTAGE = 80;
+// ============================================
 /**
  * Propose session (Tutor sends proposal in chat)
  * Creates a message with type: 'session_proposal'
@@ -101,10 +113,11 @@ const proposeSession = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     return message;
 });
 /**
- * Accept session proposal (Student accepts)
+ * Accept session proposal (Student or Tutor accepts)
+ * Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
  * Creates actual session and Google Meet link
  */
-const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0, void 0, function* () {
+const acceptSessionProposal = (messageId, userId) => __awaiter(void 0, void 0, void 0, function* () {
     // Get proposal message
     const message = yield message_model_1.Message.findById(messageId).populate('chatId');
     if (!message) {
@@ -113,11 +126,15 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
     if (message.type !== 'session_proposal' || !message.sessionProposal) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This is not a session proposal');
     }
-    // Verify student is participant
+    // Verify user is participant
     const chat = message.chatId;
-    const isStudentParticipant = chat.participants.some((p) => p.toString() === studentId);
-    if (!isStudentParticipant) {
+    const isParticipant = chat.participants.some((p) => p.toString() === userId);
+    if (!isParticipant) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+    }
+    // User cannot accept their own proposal
+    if (message.sender.toString() === userId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You cannot accept your own proposal');
     }
     // Check if proposal is still valid
     if (message.sessionProposal.status !== 'PROPOSED') {
@@ -129,14 +146,35 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
         yield message.save();
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session proposal has expired');
     }
-    // Get tutor ID (sender of proposal)
-    const tutorId = message.sender;
+    // Determine student and tutor IDs based on who sent the proposal
+    // If proposal sender is the tutor, then accepter is the student (normal flow)
+    // If proposal sender is the student (counter-proposal), then accepter is the tutor
+    const proposalSender = yield user_model_1.User.findById(message.sender);
+    const accepter = yield user_model_1.User.findById(userId);
+    if (!proposalSender || !accepter) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'User not found');
+    }
+    let studentId;
+    let tutorId;
+    if (proposalSender.role === user_1.USER_ROLES.TUTOR) {
+        // Normal flow: Tutor proposed, Student accepts
+        tutorId = message.sender;
+        studentId = new mongoose_1.Types.ObjectId(userId);
+    }
+    else if (proposalSender.role === user_1.USER_ROLES.STUDENT) {
+        // Counter-proposal flow: Student counter-proposed, Tutor accepts
+        studentId = message.sender;
+        tutorId = new mongoose_1.Types.ObjectId(userId);
+    }
+    else {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid proposal sender role');
+    }
     // Check if this is a trial session (chat linked to a trial request)
     const trialRequestId = chat.trialRequestId;
     const isTrial = !!trialRequestId;
     // Create session
     const session = yield session_model_1.Session.create({
-        studentId: new mongoose_1.Types.ObjectId(studentId),
+        studentId,
         tutorId,
         subject: message.sessionProposal.subject,
         description: message.sessionProposal.description,
@@ -167,7 +205,7 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
     // Log activity - Session scheduled
     const student = yield user_model_1.User.findById(studentId);
     activityLog_service_1.ActivityLogService.logActivity({
-        userId: new mongoose_1.Types.ObjectId(studentId),
+        userId: studentId,
         actionType: 'SESSION_SCHEDULED',
         title: 'Session Scheduled',
         description: `${(student === null || student === void 0 ? void 0 : student.name) || 'Student'} scheduled a ${session.subject} session`,
@@ -176,17 +214,104 @@ const acceptSessionProposal = (messageId, studentId) => __awaiter(void 0, void 0
         status: 'success',
     });
     // TODO: Send notifications
-    // io.to(tutorId.toString()).emit('sessionAccepted', {
-    //   studentName: student.name,
+    // const otherPartyId = userId === studentId.toString() ? tutorId : studentId;
+    // io.to(otherPartyId.toString()).emit('sessionAccepted', {
+    //   accepterName: accepter.name,
     //   sessionId: session._id,
     //   meetLink: session.googleMeetLink
     // });
     return session;
 });
 /**
- * Reject session proposal (Student rejects)
+ * Student counter-proposes alternative time for a session proposal
+ * Creates new session_proposal message with the student's preferred time
  */
-const rejectSessionProposal = (messageId, studentId, rejectionReason) => __awaiter(void 0, void 0, void 0, function* () {
+const counterProposeSession = (originalMessageId, studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    // Get original proposal message
+    const originalMessage = yield message_model_1.Message.findById(originalMessageId).populate('chatId');
+    if (!originalMessage) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session proposal not found');
+    }
+    if (originalMessage.type !== 'session_proposal' || !originalMessage.sessionProposal) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This is not a session proposal');
+    }
+    // Verify student is participant
+    const chat = originalMessage.chatId;
+    const isStudentParticipant = chat.participants.some((p) => p.toString() === studentId);
+    if (!isStudentParticipant) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+    }
+    // Check if proposal is still valid
+    if (originalMessage.sessionProposal.status !== 'PROPOSED') {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Session proposal is already ${originalMessage.sessionProposal.status.toLowerCase()}`);
+    }
+    // Check if expired
+    if (new Date() > originalMessage.sessionProposal.expiresAt) {
+        originalMessage.sessionProposal.status = 'EXPIRED';
+        yield originalMessage.save();
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session proposal has expired');
+    }
+    // Validate new times
+    const newStartTime = new Date(payload.newStartTime);
+    const newEndTime = new Date(payload.newEndTime);
+    if (newStartTime <= new Date()) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'New start time must be in the future');
+    }
+    if (newEndTime <= newStartTime) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'End time must be after start time');
+    }
+    // Calculate duration
+    const duration = (newEndTime.getTime() - newStartTime.getTime()) / (1000 * 60); // minutes
+    // Get student for price calculation
+    const student = yield user_model_1.User.findById(studentId);
+    if (!student) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Student not found');
+    }
+    // Get price based on student's subscription tier
+    let pricePerHour = 30; // Default: Flexible
+    if (((_a = student.studentProfile) === null || _a === void 0 ? void 0 : _a.currentPlan) === 'REGULAR') {
+        pricePerHour = 28;
+    }
+    else if (((_b = student.studentProfile) === null || _b === void 0 ? void 0 : _b.currentPlan) === 'LONG_TERM') {
+        pricePerHour = 25;
+    }
+    const totalPrice = (pricePerHour * duration) / 60;
+    // Mark original proposal as COUNTER_PROPOSED
+    originalMessage.sessionProposal.status = 'COUNTER_PROPOSED';
+    yield originalMessage.save();
+    // Create new counter-proposal message (sent by student)
+    const counterProposalMessage = yield message_model_1.Message.create({
+        chatId: chat._id,
+        sender: new mongoose_1.Types.ObjectId(studentId),
+        type: 'session_proposal',
+        text: `Counter-proposal: ${originalMessage.sessionProposal.subject}`,
+        sessionProposal: {
+            subject: originalMessage.sessionProposal.subject,
+            startTime: newStartTime,
+            endTime: newEndTime,
+            duration,
+            price: totalPrice,
+            description: originalMessage.sessionProposal.description,
+            status: 'PROPOSED', // Counter-proposal is also a proposal that tutor can accept
+            expiresAt: newStartTime, // Expires when the proposed start time passes
+            originalProposalId: originalMessage._id,
+            counterProposalReason: payload.reason,
+        },
+    });
+    // TODO: Send real-time notification to tutor
+    // io.to(originalMessage.sender.toString()).emit('counterProposal', {
+    //   studentName: student.name,
+    //   newStartTime,
+    //   messageId: counterProposalMessage._id
+    // });
+    return counterProposalMessage;
+});
+/**
+ * Reject session proposal (Student or Tutor rejects)
+ * Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
+ */
+const rejectSessionProposal = (messageId, userId, rejectionReason) => __awaiter(void 0, void 0, void 0, function* () {
     const message = yield message_model_1.Message.findById(messageId).populate('chatId');
     if (!message) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session proposal not found');
@@ -194,11 +319,15 @@ const rejectSessionProposal = (messageId, studentId, rejectionReason) => __await
     if (message.type !== 'session_proposal' || !message.sessionProposal) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This is not a session proposal');
     }
-    // Verify student is participant
+    // Verify user is participant
     const chat = message.chatId;
-    const isStudentParticipant = chat.participants.some((p) => p.toString() === studentId);
-    if (!isStudentParticipant) {
+    const isParticipant = chat.participants.some((p) => p.toString() === userId);
+    if (!isParticipant) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
+    }
+    // User cannot reject their own proposal
+    if (message.sender.toString() === userId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You cannot reject your own proposal');
     }
     // Check if proposal can be rejected
     if (message.sessionProposal.status !== 'PROPOSED') {
@@ -208,7 +337,7 @@ const rejectSessionProposal = (messageId, studentId, rejectionReason) => __await
     message.sessionProposal.status = 'REJECTED';
     message.sessionProposal.rejectionReason = rejectionReason;
     yield message.save();
-    // TODO: Notify tutor
+    // TODO: Notify the proposal sender
     // io.to(message.sender.toString()).emit('sessionRejected', {
     //   rejectionReason
     // });
@@ -279,6 +408,12 @@ const cancelSession = (sessionId, userId, cancellationReason) => __awaiter(void 
     session.cancelledBy = new mongoose_1.Types.ObjectId(userId);
     session.cancelledAt = new Date();
     yield session.save();
+    // Update the related message's sessionProposal status to reflect cancellation
+    if (session.messageId) {
+        yield message_model_1.Message.findByIdAndUpdate(session.messageId, {
+            'sessionProposal.status': 'CANCELLED',
+        });
+    }
     // Log activity - Session cancelled
     const cancellingUser = yield user_model_1.User.findById(userId);
     activityLog_service_1.ActivityLogService.logActivity({
@@ -315,18 +450,49 @@ const markAsCompleted = (sessionId) => __awaiter(void 0, void 0, void 0, functio
 /**
  * Auto-complete sessions (Cron job)
  * Marks sessions as COMPLETED after endTime passes
+ * Includes SCHEDULED, STARTING_SOON, and IN_PROGRESS sessions
  */
 const autoCompleteSessions = () => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield session_model_1.Session.updateMany({
-        status: session_interface_1.SESSION_STATUS.SCHEDULED,
-        endTime: { $lt: new Date() },
-    }, {
-        $set: {
-            status: session_interface_1.SESSION_STATUS.COMPLETED,
-            completedAt: new Date(),
+    const now = new Date();
+    // Find all sessions that should be completed
+    const sessionsToComplete = yield session_model_1.Session.find({
+        status: {
+            $in: [
+                session_interface_1.SESSION_STATUS.SCHEDULED,
+                session_interface_1.SESSION_STATUS.STARTING_SOON,
+                session_interface_1.SESSION_STATUS.IN_PROGRESS,
+            ],
         },
+        endTime: { $lt: now },
     });
-    return result.modifiedCount;
+    let completedCount = 0;
+    // Complete each session with proper feedback creation
+    for (const session of sessionsToComplete) {
+        try {
+            session.status = session_interface_1.SESSION_STATUS.COMPLETED;
+            session.completedAt = now;
+            yield session.save();
+            // Create pending tutor feedback record
+            try {
+                yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.createPendingFeedback(session._id.toString(), session.tutorId.toString(), session.studentId.toString(), now);
+            }
+            catch (_a) {
+                // Feedback creation failed, but session is still completed
+            }
+            // Update tutor level after session completion
+            try {
+                yield user_service_1.UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+            }
+            catch (_b) {
+                // Level update failed, but session is still completed
+            }
+            completedCount++;
+        }
+        catch (_c) {
+            // Continue with next session if one fails
+        }
+    }
+    return completedCount;
 });
 /**
  * Get upcoming sessions for user
@@ -526,7 +692,7 @@ const rejectReschedule = (sessionId, userId) => __awaiter(void 0, void 0, void 0
  * Session status auto-transitions (Cron job)
  * SCHEDULED -> STARTING_SOON (10 min before)
  * STARTING_SOON -> IN_PROGRESS (at start time)
- * IN_PROGRESS -> EXPIRED (at end time if not completed)
+ * IN_PROGRESS -> COMPLETED (at end time - with feedback creation)
  */
 const autoTransitionSessionStatuses = () => __awaiter(void 0, void 0, void 0, function* () {
     const now = new Date();
@@ -547,20 +713,39 @@ const autoTransitionSessionStatuses = () => __awaiter(void 0, void 0, void 0, fu
             startedAt: now,
         },
     });
-    // IN_PROGRESS -> EXPIRED (at end time if not manually completed)
-    const expiredResult = yield session_model_1.Session.updateMany({
+    // IN_PROGRESS -> COMPLETED/NO_SHOW/EXPIRED (at end time)
+    // Find sessions to complete and process them with attendance check
+    const sessionsToComplete = yield session_model_1.Session.find({
         status: session_interface_1.SESSION_STATUS.IN_PROGRESS,
         endTime: { $lte: now },
-    }, {
-        $set: {
-            status: session_interface_1.SESSION_STATUS.EXPIRED,
-            expiredAt: now,
-        },
     });
+    let completedCount = 0;
+    let noShowCount = 0;
+    let expiredCount = 0;
+    for (const session of sessionsToComplete) {
+        try {
+            // Use attendance-based completion
+            const result = yield completeSessionWithAttendanceCheck(session._id.toString());
+            if (result.session.status === session_interface_1.SESSION_STATUS.COMPLETED) {
+                completedCount++;
+            }
+            else if (result.session.status === session_interface_1.SESSION_STATUS.NO_SHOW) {
+                noShowCount++;
+            }
+            else if (result.session.status === session_interface_1.SESSION_STATUS.EXPIRED) {
+                expiredCount++;
+            }
+        }
+        catch (_a) {
+            // Continue with next session
+        }
+    }
     return {
         startingSoon: startingSoonResult.modifiedCount,
         inProgress: inProgressResult.modifiedCount,
-        expired: expiredResult.modifiedCount,
+        completed: completedCount,
+        noShow: noShowCount,
+        expired: expiredCount,
     };
 });
 /**
@@ -610,9 +795,211 @@ const markAsCompletedEnhanced = (sessionId) => __awaiter(void 0, void 0, void 0,
     // TODO: Send feedback reminder to tutor
     return session;
 });
+/**
+ * Calculate attendance percentage
+ */
+const calculateAttendancePercentage = (totalDurationSeconds, sessionDurationMinutes) => {
+    const sessionDurationSeconds = sessionDurationMinutes * 60;
+    if (sessionDurationSeconds <= 0)
+        return 0;
+    const percentage = (totalDurationSeconds / sessionDurationSeconds) * 100;
+    return Math.min(100, Math.round(percentage * 100) / 100); // Cap at 100%, round to 2 decimals
+};
+/**
+ * Sync attendance data from Call module to Session
+ * Called when session is about to complete or when participant leaves
+ */
+const syncAttendanceFromCall = (sessionId) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session)
+        return null;
+    // Find call for this session
+    const call = yield call_model_1.Call.findOne({ sessionId: new mongoose_1.Types.ObjectId(sessionId) });
+    if (!call) {
+        // No call record - set attendance to 0%
+        session.tutorAttendance = {
+            odId: session.tutorId,
+            totalDurationSeconds: 0,
+            attendancePercentage: 0,
+            joinCount: 0,
+        };
+        session.studentAttendance = {
+            odId: session.studentId,
+            totalDurationSeconds: 0,
+            attendancePercentage: 0,
+            joinCount: 0,
+        };
+        yield session.save();
+        return session;
+    }
+    // Link call to session if not already linked
+    if (!session.callId) {
+        session.callId = call._id;
+    }
+    const now = new Date();
+    const sessionEndTime = session.endTime;
+    // Calculate tutor attendance
+    const tutorSessions = call.participantSessions.filter(p => p.userId.toString() === session.tutorId.toString());
+    let tutorTotalSeconds = 0;
+    let tutorFirstJoined;
+    let tutorLastLeft;
+    tutorSessions.forEach(ps => {
+        // If session is still open (no leftAt), calculate duration up to session end or now
+        if (ps.joinedAt && !ps.leftAt) {
+            const endPoint = sessionEndTime < now ? sessionEndTime : now;
+            const duration = Math.floor((endPoint.getTime() - ps.joinedAt.getTime()) / 1000);
+            tutorTotalSeconds += Math.max(0, duration);
+        }
+        else if (ps.duration) {
+            tutorTotalSeconds += ps.duration;
+        }
+        if (!tutorFirstJoined || (ps.joinedAt && ps.joinedAt < tutorFirstJoined)) {
+            tutorFirstJoined = ps.joinedAt;
+        }
+        if (!tutorLastLeft || (ps.leftAt && ps.leftAt > tutorLastLeft)) {
+            tutorLastLeft = ps.leftAt;
+        }
+    });
+    // Calculate student attendance
+    const studentSessions = call.participantSessions.filter(p => p.userId.toString() === session.studentId.toString());
+    let studentTotalSeconds = 0;
+    let studentFirstJoined;
+    let studentLastLeft;
+    studentSessions.forEach(ps => {
+        if (ps.joinedAt && !ps.leftAt) {
+            const endPoint = sessionEndTime < now ? sessionEndTime : now;
+            const duration = Math.floor((endPoint.getTime() - ps.joinedAt.getTime()) / 1000);
+            studentTotalSeconds += Math.max(0, duration);
+        }
+        else if (ps.duration) {
+            studentTotalSeconds += ps.duration;
+        }
+        if (!studentFirstJoined || (ps.joinedAt && ps.joinedAt < studentFirstJoined)) {
+            studentFirstJoined = ps.joinedAt;
+        }
+        if (!studentLastLeft || (ps.leftAt && ps.leftAt > studentLastLeft)) {
+            studentLastLeft = ps.leftAt;
+        }
+    });
+    // In TEST_MODE, use 5 min duration for attendance calculation
+    // In production, use actual session duration (usually 60 min)
+    const effectiveDuration = TEST_MODE ? TEST_SESSION_DURATION_MINUTES : session.duration;
+    // Update session with attendance data
+    session.tutorAttendance = {
+        odId: session.tutorId,
+        firstJoinedAt: tutorFirstJoined,
+        lastLeftAt: tutorLastLeft,
+        totalDurationSeconds: tutorTotalSeconds,
+        attendancePercentage: calculateAttendancePercentage(tutorTotalSeconds, effectiveDuration),
+        joinCount: tutorSessions.length,
+    };
+    session.studentAttendance = {
+        odId: session.studentId,
+        firstJoinedAt: studentFirstJoined,
+        lastLeftAt: studentLastLeft,
+        totalDurationSeconds: studentTotalSeconds,
+        attendancePercentage: calculateAttendancePercentage(studentTotalSeconds, effectiveDuration),
+        joinCount: studentSessions.length,
+    };
+    yield session.save();
+    return session;
+});
+/**
+ * Check if attendance meets requirement (80%) for completion
+ */
+const checkAttendanceRequirement = (session) => {
+    var _a, _b;
+    // Use global constant for minimum attendance percentage
+    const MINIMUM_ATTENDANCE = MINIMUM_ATTENDANCE_PERCENTAGE;
+    const tutorPercentage = ((_a = session.tutorAttendance) === null || _a === void 0 ? void 0 : _a.attendancePercentage) || 0;
+    const studentPercentage = ((_b = session.studentAttendance) === null || _b === void 0 ? void 0 : _b.attendancePercentage) || 0;
+    // Both have good attendance
+    if (tutorPercentage >= MINIMUM_ATTENDANCE && studentPercentage >= MINIMUM_ATTENDANCE) {
+        return {
+            canComplete: true,
+            tutorPercentage,
+            studentPercentage,
+        };
+    }
+    // Tutor didn't show
+    if (tutorPercentage < MINIMUM_ATTENDANCE && studentPercentage >= MINIMUM_ATTENDANCE) {
+        return {
+            canComplete: false,
+            tutorPercentage,
+            studentPercentage,
+            noShowBy: 'tutor',
+            reason: `Tutor attendance (${tutorPercentage.toFixed(1)}%) is below minimum ${MINIMUM_ATTENDANCE}%`,
+        };
+    }
+    // Student didn't show
+    if (studentPercentage < MINIMUM_ATTENDANCE && tutorPercentage >= MINIMUM_ATTENDANCE) {
+        return {
+            canComplete: false,
+            tutorPercentage,
+            studentPercentage,
+            noShowBy: 'student',
+            reason: `Student attendance (${studentPercentage.toFixed(1)}%) is below minimum ${MINIMUM_ATTENDANCE}%`,
+        };
+    }
+    // Neither showed up properly
+    return {
+        canComplete: false,
+        tutorPercentage,
+        studentPercentage,
+        reason: `Both participants have low attendance - Tutor: ${tutorPercentage.toFixed(1)}%, Student: ${studentPercentage.toFixed(1)}%`,
+    };
+};
+/**
+ * Complete session with attendance check
+ */
+const completeSessionWithAttendanceCheck = (sessionId) => __awaiter(void 0, void 0, void 0, function* () {
+    // First sync attendance from call
+    yield syncAttendanceFromCall(sessionId);
+    // Fetch fresh session document
+    const session = yield session_model_1.Session.findById(sessionId);
+    if (!session) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    // Check attendance requirement
+    const attendanceCheck = checkAttendanceRequirement(session);
+    if (attendanceCheck.canComplete) {
+        // Mark as completed
+        session.status = session_interface_1.SESSION_STATUS.COMPLETED;
+        session.completedAt = new Date();
+    }
+    else if (attendanceCheck.noShowBy) {
+        // Mark as no show
+        session.status = session_interface_1.SESSION_STATUS.NO_SHOW;
+        session.noShowBy = attendanceCheck.noShowBy;
+        session.completedAt = new Date();
+    }
+    else {
+        // Both have low attendance - mark as expired
+        session.status = session_interface_1.SESSION_STATUS.EXPIRED;
+        session.expiredAt = new Date();
+    }
+    yield session.save();
+    // If completed successfully, create feedback and update tutor level
+    if (session.status === session_interface_1.SESSION_STATUS.COMPLETED) {
+        try {
+            yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.createPendingFeedback(sessionId, session.tutorId.toString(), session.studentId.toString(), session.completedAt);
+        }
+        catch (_a) {
+            // Feedback creation failed, but session is still completed
+        }
+        try {
+            yield user_service_1.UserService.updateTutorLevelAfterSession(session.tutorId.toString());
+        }
+        catch (_b) {
+            // Level update failed, but session is still completed
+        }
+    }
+    return { session: session.toObject(), attendanceCheck };
+});
 exports.SessionService = {
     proposeSession,
     acceptSessionProposal,
+    counterProposeSession,
     rejectSessionProposal,
     getAllSessions,
     getSingleSession,
@@ -626,4 +1013,8 @@ exports.SessionService = {
     rejectReschedule,
     autoTransitionSessionStatuses,
     markAsCompletedEnhanced,
+    // Attendance tracking
+    syncAttendanceFromCall,
+    checkAttendanceRequirement,
+    completeSessionWithAttendanceCheck,
 };

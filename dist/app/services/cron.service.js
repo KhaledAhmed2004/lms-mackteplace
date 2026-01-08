@@ -7,11 +7,7 @@
  * - Trial request auto-expiration (24 hours)
  * - Month-end billing generation
  * - Month-end tutor earnings generation
- * - Session auto-completion (after endTime)
- *
- * Prerequisites:
- * 1. Install node-cron: npm install node-cron
- * 2. Install @types/node-cron: npm install -D @types/node-cron
+ * - Session auto-completion with attendance tracking (after endTime)
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -22,14 +18,24 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CronService = exports.initializeCronJobs = exports.generateTutorEarnings = exports.generateMonthlyBillings = exports.sendSessionReminders = exports.autoCompleteSessions = exports.expireTrialRequests = void 0;
+exports.CronService = exports.initializeCronJobs = exports.generateTutorEarnings = exports.generateMonthlyBillings = exports.sendSessionReminders = exports.autoCompleteSessions = exports.autoTransitionSessions = exports.expireTrialRequests = void 0;
 const logger_1 = require("../../shared/logger");
-// TODO: Install node-cron package
-// import cron from 'node-cron';
+const node_cron_1 = __importDefault(require("node-cron"));
+// ============================================
+// 🧪 TEST MODE CONFIGURATION
+// ============================================
+// Set to true for testing - runs session transition every 1 minute
+// Set to false for production - runs every 5 minutes
+const TEST_MODE = true;
+// ============================================
 // Import services
 const monthlyBilling_service_1 = require("../modules/monthlyBilling/monthlyBilling.service");
 const tutorEarnings_service_1 = require("../modules/tutorEarnings/tutorEarnings.service");
+const session_service_1 = require("../modules/session/session.service");
 const trialRequest_model_1 = require("../modules/trialRequest/trialRequest.model");
 const trialRequest_interface_1 = require("../modules/trialRequest/trialRequest.interface");
 const session_model_1 = require("../modules/session/session.model");
@@ -57,28 +63,34 @@ const expireTrialRequests = () => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.expireTrialRequests = expireTrialRequests;
 /**
- * Auto-complete sessions after endTime
- * Runs every 30 minutes
+ * Auto-transition session statuses with attendance tracking
+ * TEST_MODE: Runs every 1 minute
+ * PRODUCTION: Runs every 5 minutes
+ *
+ * Handles:
+ * - SCHEDULED → STARTING_SOON (10 min before)
+ * - STARTING_SOON → IN_PROGRESS (at start time)
+ * - IN_PROGRESS → COMPLETED/NO_SHOW/EXPIRED (at end time, with 80% attendance check)
  */
-const autoCompleteSessions = () => __awaiter(void 0, void 0, void 0, function* () {
+const autoTransitionSessions = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const now = new Date();
-        const completedSessions = yield session_model_1.Session.updateMany({
-            status: session_interface_1.SESSION_STATUS.SCHEDULED,
-            endTime: { $lte: now },
-        }, {
-            $set: {
-                status: session_interface_1.SESSION_STATUS.COMPLETED,
-                completedAt: new Date(),
-            },
-        });
-        if (completedSessions.modifiedCount > 0) {
-            logger_1.logger.info(`Auto-completed ${completedSessions.modifiedCount} sessions`);
+        const result = yield session_service_1.SessionService.autoTransitionSessionStatuses();
+        const totalChanges = result.startingSoon + result.inProgress + result.completed + result.noShow + result.expired;
+        if (totalChanges > 0) {
+            logger_1.logger.info(`Session auto-transition: ${result.startingSoon} starting soon, ${result.inProgress} in progress, ${result.completed} completed, ${result.noShow} no-show, ${result.expired} expired`);
         }
     }
     catch (error) {
-        logger_1.errorLogger.error('Failed to auto-complete sessions', { error });
+        logger_1.errorLogger.error('Failed to auto-transition sessions', { error });
     }
+});
+exports.autoTransitionSessions = autoTransitionSessions;
+/**
+ * @deprecated Use autoTransitionSessions instead
+ * Keeping for backward compatibility
+ */
+const autoCompleteSessions = () => __awaiter(void 0, void 0, void 0, function* () {
+    yield (0, exports.autoTransitionSessions)();
 });
 exports.autoCompleteSessions = autoCompleteSessions;
 /**
@@ -177,39 +189,45 @@ exports.generateTutorEarnings = generateTutorEarnings;
  * Initialize all cron jobs
  */
 const initializeCronJobs = () => {
-    // TODO: Uncomment when node-cron is installed
-    // // Expire trial requests - Every hour
-    // cron.schedule('0 * * * *', () => {
-    //   logger.info('Running cron: Expire trial requests');
-    //   expireTrialRequests();
-    // });
-    // // Auto-complete sessions - Every 30 minutes
-    // cron.schedule('*/30 * * * *', () => {
-    //   logger.info('Running cron: Auto-complete sessions');
-    //   autoCompleteSessions();
-    // });
-    // // Send session reminders - Every hour
-    // cron.schedule('0 * * * *', () => {
-    //   logger.info('Running cron: Send session reminders');
-    //   sendSessionReminders();
-    // });
-    // // Generate monthly billings - 1st of month at 2:00 AM
-    // cron.schedule('0 2 1 * *', () => {
-    //   logger.info('Running cron: Generate monthly billings');
-    //   generateMonthlyBillings();
-    // });
-    // // Generate tutor earnings - 1st of month at 3:00 AM
-    // cron.schedule('0 3 1 * *', () => {
-    //   logger.info('Running cron: Generate tutor earnings');
-    //   generateTutorEarnings();
-    // });
-    logger_1.logger.info('Cron jobs initialized (placeholders - install node-cron to activate)');
+    // Expire trial requests - Every hour
+    node_cron_1.default.schedule('0 * * * *', () => {
+        logger_1.logger.info('Running cron: Expire trial requests');
+        (0, exports.expireTrialRequests)();
+    });
+    // Auto-transition sessions with attendance tracking
+    // TEST_MODE: Every 1 minute (for testing 5 min sessions)
+    // PRODUCTION: Every 5 minutes
+    const sessionTransitionSchedule = TEST_MODE ? '* * * * *' : '*/5 * * * *';
+    node_cron_1.default.schedule(sessionTransitionSchedule, () => {
+        logger_1.logger.info(`Running cron: Auto-transition sessions (TEST_MODE: ${TEST_MODE})`);
+        (0, exports.autoTransitionSessions)();
+    });
+    // Send session reminders - Every hour
+    node_cron_1.default.schedule('0 * * * *', () => {
+        logger_1.logger.info('Running cron: Send session reminders');
+        (0, exports.sendSessionReminders)();
+    });
+    // Generate monthly billings - 1st of month at 2:00 AM
+    node_cron_1.default.schedule('0 2 1 * *', () => {
+        logger_1.logger.info('Running cron: Generate monthly billings');
+        (0, exports.generateMonthlyBillings)();
+    });
+    // Generate tutor earnings - 1st of month at 3:00 AM
+    node_cron_1.default.schedule('0 3 1 * *', () => {
+        logger_1.logger.info('Running cron: Generate tutor earnings');
+        (0, exports.generateTutorEarnings)();
+    });
+    logger_1.logger.info(`✅ Cron jobs initialized (TEST_MODE: ${TEST_MODE})`);
+    if (TEST_MODE) {
+        logger_1.logger.info('🧪 TEST MODE: Session auto-transition runs every 1 minute');
+    }
 };
 exports.initializeCronJobs = initializeCronJobs;
 exports.CronService = {
     initializeCronJobs: exports.initializeCronJobs,
     expireTrialRequests: exports.expireTrialRequests,
     autoCompleteSessions: exports.autoCompleteSessions,
+    autoTransitionSessions: exports.autoTransitionSessions,
     sendSessionReminders: exports.sendSessionReminders,
     generateMonthlyBillings: exports.generateMonthlyBillings,
     generateTutorEarnings: exports.generateTutorEarnings,

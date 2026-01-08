@@ -14,9 +14,9 @@ const router = express_1.default.Router();
 // User Login
 // ✅ FRONTEND: useLogin | Used in: src/app/(auth)/login/page.tsx
 router.post('/login', (0, validateRequest_1.default)(auth_validation_1.AuthValidation.createLoginZodSchema), auth_controller_1.AuthController.loginUser);
-// User Logout
+// User Logout (Public - no auth required so expired tokens can still logout)
 // ✅ FRONTEND: useLogout | Used in: MobileMenuTutor.tsx, TopNavbar.tsx, MobileMenu.tsx
-router.post('/logout', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), auth_controller_1.AuthController.logoutUser);
+router.post('/logout', auth_controller_1.AuthController.logoutUser);
 // Forget Password Request
 // ❌ NOT INTEGRATED IN FRONTEND
 router.post('/forget-password', (0, validateRequest_1.default)(auth_validation_1.AuthValidation.createForgetPasswordZodSchema), auth_controller_1.AuthController.forgetPassword);

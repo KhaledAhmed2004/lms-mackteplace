@@ -165,6 +165,34 @@ const getMyBookedInterview = (0, catchAsync_1.default)((req, res) => __awaiter(v
         data: result,
     });
 }));
+/**
+ * Get all scheduled meetings (Admin only)
+ */
+const getScheduledMeetings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield interviewSlot_service_1.InterviewSlotService.getScheduledMeetings(req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Scheduled meetings retrieved successfully',
+        data: result.data,
+        pagination: result.meta,
+    });
+}));
+/**
+ * Get meeting token for interview video call
+ */
+const getMeetingToken = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { id } = req.params;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const result = yield interviewSlot_service_1.InterviewSlotService.getInterviewMeetingToken(id, userId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Meeting token generated successfully',
+        data: result,
+    });
+}));
 exports.InterviewSlotController = {
     createInterviewSlot,
     getAllInterviewSlots,
@@ -176,4 +204,6 @@ exports.InterviewSlotController = {
     updateInterviewSlot,
     deleteInterviewSlot,
     getMyBookedInterview,
+    getScheduledMeetings,
+    getMeetingToken,
 };

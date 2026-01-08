@@ -265,6 +265,59 @@ const recordParticipantLeave = (callId, userId) => __awaiter(void 0, void 0, voi
     }
     return { call: call.toObject(), activeCount };
 });
+/**
+ * Session-based Call Join করে
+ * Session এর জন্য call থাকলে join করবে, না থাকলে নতুন তৈরি করবে
+ * Both participants will join the SAME channel based on sessionId
+ */
+const joinSessionCall = (userId_1, sessionId_1, otherUserId_1, ...args_1) => __awaiter(void 0, [userId_1, sessionId_1, otherUserId_1, ...args_1], void 0, function* (userId, sessionId, otherUserId, callType = 'video') {
+    if (!userId) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'User not authenticated');
+    }
+    // Generate deterministic channel name from sessionId
+    const channelName = (0, agora_helper_1.generateSessionChannelName)(sessionId);
+    const uid = (0, agora_helper_1.userIdToAgoraUid)(userId);
+    // Check if a call already exists for this session (any status)
+    let call = yield call_model_1.Call.findOne({ channelName });
+    let isNew = false;
+    if (!call) {
+        // Create new call for this session
+        call = yield call_model_1.Call.create({
+            channelName,
+            callType,
+            participants: [userId, otherUserId],
+            initiator: userId,
+            receiver: otherUserId,
+            status: 'active', // Session calls start as active immediately
+            startTime: new Date(),
+            sessionId: new mongoose_1.Types.ObjectId(sessionId),
+        });
+        isNew = true;
+    }
+    else if (call.status === 'ended' || call.status === 'cancelled' || call.status === 'missed' || call.status === 'rejected') {
+        // Re-activate ended/cancelled call for this session (user rejoining)
+        call.status = 'active';
+        call.startTime = new Date();
+        call.endTime = undefined;
+        call.duration = undefined;
+        // Make sure this user is a participant
+        const isParticipant = call.participants.some(p => p.toString() === userId);
+        if (!isParticipant) {
+            call.participants.push(new mongoose_1.Types.ObjectId(userId));
+        }
+        yield call.save();
+    }
+    else {
+        // Call is pending or active - just make sure user is participant
+        const isParticipant = call.participants.some(p => p.toString() === userId);
+        if (!isParticipant) {
+            call.participants.push(new mongoose_1.Types.ObjectId(userId));
+            yield call.save();
+        }
+    }
+    const token = (0, agora_helper_1.generateRtcToken)(channelName, uid);
+    return { call: call.toObject(), token, channelName, uid, isNew };
+});
 exports.CallService = {
     initiateCall,
     acceptCall,
@@ -277,4 +330,5 @@ exports.CallService = {
     getActiveParticipants,
     recordParticipantJoin,
     recordParticipantLeave,
+    joinSessionCall,
 };

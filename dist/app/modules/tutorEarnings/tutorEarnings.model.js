@@ -84,7 +84,7 @@ const tutorEarningsSchema = new mongoose_1.Schema({
     commissionRate: {
         type: Number,
         required: [true, 'Commission rate is required'],
-        default: 0.2, // 20%
+        default: 0, // 0% - No commission, tutor gets 100%
     },
     netEarnings: {
         type: Number,

@@ -24,29 +24,24 @@ const sessionRequestSchema = new mongoose_1.Schema({
     },
     gradeLevel: {
         type: String,
-        enum: Object.values(sessionRequest_interface_1.GRADE_LEVEL),
         required: [true, 'Grade level is required'],
+        trim: true,
     },
     schoolType: {
         type: String,
-        enum: Object.values(sessionRequest_interface_1.SCHOOL_TYPE),
         required: [true, 'School type is required'],
+        trim: true,
     },
-    // Learning Details
+    // Learning Details (simplified - no description or preferredDateTime for session requests)
     description: {
         type: String,
-        required: [true, 'Description is required'],
         trim: true,
-        minlength: [10, 'Description must be at least 10 characters'],
         maxlength: [500, 'Description cannot exceed 500 characters'],
     },
     learningGoals: {
         type: String,
         trim: true,
         maxlength: [1000, 'Learning goals cannot exceed 1000 characters'],
-    },
-    preferredDateTime: {
-        type: Date,
     },
     // Documents (Optional)
     documents: [

@@ -103,6 +103,30 @@ router.get('/unified-sessions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMI
  */
 // ✅ FRONTEND: useSessionStats | Used in: src/app/(admin)/admin/session/page.tsx
 router.get('/session-stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getSessionStats);
+/**
+ * @route   GET /api/v1/admin/application-stats
+ * @desc    Get application statistics by status
+ * @access  Admin only
+ * @returns { total, pending, interview, approved, rejected, revision }
+ */
+// ✅ FRONTEND: useApplicationStats | Used in: src/app/(admin)/admin/application/page.tsx
+router.get('/application-stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getApplicationStats);
+// ============ TRANSACTIONS ============
+/**
+ * @route   GET /api/v1/admin/transactions
+ * @desc    Get all transactions (Student Payments + Tutor Payouts)
+ * @access  Admin only
+ * @query   ?page=1&limit=10&type=all&status=PAID&search=john&sortBy=date&sortOrder=desc
+ */
+// ✅ FRONTEND: useTransactions | Used in: src/app/(admin)/admin/transaction/page.tsx
+router.get('/transactions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getTransactions);
+/**
+ * @route   GET /api/v1/admin/transaction-stats
+ * @desc    Get transaction statistics (totals for student payments and tutor payouts)
+ * @access  Admin only
+ */
+// ✅ FRONTEND: useTransactionStats | Used in: src/app/(admin)/admin/transaction/page.tsx
+router.get('/transaction-stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getTransactionStats);
 // ============ ACTIVITY LOG ============
 /**
  * @route   GET /api/v1/admin/recent-activity
@@ -126,6 +150,7 @@ router.get('/activity-stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN)
  * @access  Admin only
  * @query   ?role=STUDENT (optional: filter by role)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/users', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportUsers);
 /**
  * @route   GET /api/v1/admin/export/applications
@@ -133,6 +158,7 @@ router.get('/export/users', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), 
  * @access  Admin only
  * @query   ?status=SUBMITTED (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/applications', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportApplications);
 /**
  * @route   GET /api/v1/admin/export/sessions
@@ -140,6 +166,7 @@ router.get('/export/applications', (0, auth_1.default)(user_1.USER_ROLES.SUPER_A
  * @access  Admin only
  * @query   ?status=COMPLETED&startDate=2024-01-01&endDate=2024-12-31
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/sessions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportSessions);
 /**
  * @route   GET /api/v1/admin/export/billings
@@ -147,6 +174,7 @@ router.get('/export/sessions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN
  * @access  Admin only
  * @query   ?status=PAID&year=2024&month=1
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/billings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportBillings);
 /**
  * @route   GET /api/v1/admin/export/earnings
@@ -154,6 +182,7 @@ router.get('/export/billings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN
  * @access  Admin only
  * @query   ?status=PAID&year=2024&month=1
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/earnings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportEarnings);
 /**
  * @route   GET /api/v1/admin/export/subscriptions
@@ -161,6 +190,7 @@ router.get('/export/earnings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN
  * @access  Admin only
  * @query   ?status=ACTIVE (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/subscriptions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportSubscriptions);
 /**
  * @route   GET /api/v1/admin/export/trial-requests
@@ -168,5 +198,6 @@ router.get('/export/subscriptions', (0, auth_1.default)(user_1.USER_ROLES.SUPER_
  * @access  Admin only
  * @query   ?status=PENDING (optional: filter by status)
  */
+// ❌ NOT INTEGRATED IN FRONTEND
 router.get('/export/trial-requests', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), export_controller_1.ExportController.exportTrialRequests);
 exports.AdminRoutes = router;

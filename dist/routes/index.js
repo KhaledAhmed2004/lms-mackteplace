@@ -12,6 +12,8 @@ const payment_routes_1 = require("../app/modules/payment/payment.routes");
 const bookmark_route_1 = require("../app/modules/bookmark/bookmark.route");
 const notification_routes_1 = require("../app/modules/notification/notification.routes");
 const subject_route_1 = require("../app/modules/subject/subject.route");
+const grade_route_1 = require("../app/modules/grade/grade.route");
+const schoolType_route_1 = require("../app/modules/schoolType/schoolType.route");
 const tutorApplication_route_1 = require("../app/modules/tutorApplication/tutorApplication.route");
 const interviewSlot_route_1 = require("../app/modules/interviewSlot/interviewSlot.route");
 const trialRequest_route_1 = require("../app/modules/trialRequest/trialRequest.route");
@@ -25,6 +27,8 @@ const sessionReview_route_1 = require("../app/modules/sessionReview/sessionRevie
 const tutorSessionFeedback_route_1 = require("../app/modules/tutorSessionFeedback/tutorSessionFeedback.route");
 const call_route_1 = require("../app/modules/call/call.route");
 const whiteboard_route_1 = require("../app/modules/whiteboard/whiteboard.route");
+const paymentMethod_route_1 = require("../app/modules/paymentMethod/paymentMethod.route");
+const legalPolicy_route_1 = require("../app/modules/legalPolicy/legalPolicy.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -58,6 +62,14 @@ const apiRoutes = [
     {
         path: '/subjects',
         route: subject_route_1.SubjectRoutes,
+    },
+    {
+        path: '/grades',
+        route: grade_route_1.GradeRoutes,
+    },
+    {
+        path: '/school-types',
+        route: schoolType_route_1.SchoolTypeRoutes,
     },
     {
         path: '/applications',
@@ -110,6 +122,14 @@ const apiRoutes = [
     {
         path: '/whiteboard',
         route: whiteboard_route_1.WhiteboardRoutes,
+    },
+    {
+        path: '/payment-methods',
+        route: paymentMethod_route_1.PaymentMethodRoutes,
+    },
+    {
+        path: '/legal-policies',
+        route: legalPolicy_route_1.LegalPolicyRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

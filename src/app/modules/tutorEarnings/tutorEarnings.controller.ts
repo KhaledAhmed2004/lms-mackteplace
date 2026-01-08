@@ -179,7 +179,12 @@ const getEarningsHistory = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Earnings history retrieved successfully',
     data: result.data,
-    pagination: result.meta,
+    pagination: {
+      total: result.meta.total,
+      page: result.meta.page,
+      limit: result.meta.limit,
+      totalPage: result.meta.totalPages,
+    },
   });
 });
 

@@ -39,15 +39,8 @@ const interviewSlotSchema = new mongoose_1.Schema({
         enum: Object.values(interviewSlot_interface_1.INTERVIEW_SLOT_STATUS),
         default: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE,
     },
-    googleMeetLink: {
+    agoraChannelName: {
         type: String,
-    },
-    googleCalendarEventId: {
-        type: String,
-    },
-    notes: {
-        type: String,
-        trim: true,
     },
     cancellationReason: {
         type: String,

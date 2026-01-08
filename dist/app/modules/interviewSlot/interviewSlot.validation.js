@@ -22,7 +22,6 @@ const createInterviewSlotZodSchema = zod_1.z.object({
             .refine(date => !isNaN(Date.parse(date)), {
             message: 'Invalid end time format',
         }),
-        notes: zod_1.z.string().trim().optional(),
     }).refine(data => new Date(data.endTime) > new Date(data.startTime), {
         message: 'End time must be after start time',
         path: ['endTime'],
@@ -40,14 +39,7 @@ const bookInterviewSlotZodSchema = zod_1.z.object({
 });
 // Cancel interview slot validation
 const cancelInterviewSlotZodSchema = zod_1.z.object({
-    body: zod_1.z.object({
-        cancellationReason: zod_1.z
-            .string({
-            required_error: 'Cancellation reason is required',
-        })
-            .trim()
-            .min(10, 'Cancellation reason must be at least 10 characters'),
-    }),
+    body: zod_1.z.object({}).optional(),
 });
 // Reschedule interview slot validation (Applicant)
 const rescheduleInterviewSlotZodSchema = zod_1.z.object({
@@ -74,7 +66,6 @@ const updateInterviewSlotZodSchema = zod_1.z.object({
             message: 'Invalid end time format',
         })
             .optional(),
-        notes: zod_1.z.string().trim().optional(),
         status: zod_1.z
             .enum(['AVAILABLE', 'BOOKED', 'COMPLETED', 'CANCELLED'])
             .optional(),

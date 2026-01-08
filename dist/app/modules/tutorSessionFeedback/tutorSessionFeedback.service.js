@@ -61,6 +61,21 @@ const submitFeedback = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     if (!session) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
     }
+    // Auto-complete session if endTime has passed (handles cron delay)
+    const now = new Date();
+    const eligibleStatuses = [
+        session_interface_1.SESSION_STATUS.SCHEDULED,
+        session_interface_1.SESSION_STATUS.STARTING_SOON,
+        session_interface_1.SESSION_STATUS.IN_PROGRESS,
+    ];
+    if (eligibleStatuses.includes(session.status) && session.endTime <= now) {
+        session.status = session_interface_1.SESSION_STATUS.COMPLETED;
+        session.completedAt = now;
+        if (!session.startedAt) {
+            session.startedAt = session.startTime; // Mark as started if wasn't
+        }
+        yield session.save();
+    }
     if (session.status !== session_interface_1.SESSION_STATUS.COMPLETED) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Can only submit feedback for completed sessions');
     }
@@ -70,7 +85,6 @@ const submitFeedback = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     }
     // Check if feedback already exists
     let feedback = yield tutorSessionFeedback_model_1.TutorSessionFeedback.findOne({ sessionId });
-    const now = new Date();
     const dueDate = (feedback === null || feedback === void 0 ? void 0 : feedback.dueDate) || calculateDueDate(session.completedAt || now);
     const isLate = now > dueDate;
     if (feedback) {

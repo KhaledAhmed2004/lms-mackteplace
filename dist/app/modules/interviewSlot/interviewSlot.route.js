@@ -20,6 +20,19 @@ const router = express_1.default.Router();
  */
 router.get('/my-interview', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT), interviewSlot_controller_1.InterviewSlotController.getMyBookedInterview);
 /**
+ * @route   GET /api/v1/interview-slots/scheduled-meetings
+ * @desc    Get all scheduled meetings (BOOKED interview slots)
+ * @access  Admin only
+ * @query   ?page=1&limit=10&sort=-startTime
+ */
+router.get('/scheduled-meetings', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getScheduledMeetings);
+/**
+ * @route   GET /api/v1/interview-slots/:id/meeting-token
+ * @desc    Get Agora meeting token for interview video call
+ * @access  Applicant or Admin (must be participant of the meeting)
+ */
+router.get('/:id/meeting-token', (0, auth_1.default)(user_1.USER_ROLES.APPLICANT, user_1.USER_ROLES.SUPER_ADMIN), interviewSlot_controller_1.InterviewSlotController.getMeetingToken);
+/**
  * @route   GET /api/v1/interview-slots
  * @desc    Get available interview slots
  * @access  Applicant (must be SELECTED_FOR_INTERVIEW) or Admin

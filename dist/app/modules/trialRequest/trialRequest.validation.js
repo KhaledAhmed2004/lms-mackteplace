@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TrialRequestValidation = void 0;
 const zod_1 = require("zod");
-const trialRequest_interface_1 = require("./trialRequest.interface");
 // Guardian info schema (nested inside studentInfo, required for students under 18)
 const guardianInfoSchema = zod_1.z.object({
     name: zod_1.z
@@ -104,14 +103,18 @@ const createTrialRequestZodSchema = zod_1.z.object({
         })
             .trim()
             .min(1, 'Subject is required'),
-        gradeLevel: zod_1.z.nativeEnum(trialRequest_interface_1.GRADE_LEVEL, {
+        gradeLevel: zod_1.z
+            .string({
             required_error: 'Grade level is required',
-            invalid_type_error: 'Invalid grade level',
-        }),
-        schoolType: zod_1.z.nativeEnum(trialRequest_interface_1.SCHOOL_TYPE, {
+        })
+            .trim()
+            .min(1, 'Grade level is required'),
+        schoolType: zod_1.z
+            .string({
             required_error: 'School type is required',
-            invalid_type_error: 'Invalid school type',
-        }),
+        })
+            .trim()
+            .min(1, 'School type is required'),
         // Learning Details
         description: zod_1.z
             .string({
@@ -162,9 +165,11 @@ const acceptTrialRequestZodSchema = zod_1.z.object({
         introductoryMessage: zod_1.z
             .string()
             .trim()
-            .min(10, 'Introductory message must be at least 10 characters')
-            .max(500, 'Introductory message cannot exceed 500 characters')
-            .optional(),
+            .transform(val => val === '' ? undefined : val)
+            .optional()
+            .refine(val => val === undefined || (val.length >= 10 && val.length <= 500), {
+            message: 'Introductory message must be between 10 and 500 characters',
+        }),
     }),
 });
 exports.TrialRequestValidation = {

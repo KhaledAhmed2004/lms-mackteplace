@@ -45,6 +45,10 @@ const createReview = (studentId, payload) => __awaiter(void 0, void 0, void 0, f
     }
     // Create review
     const review = yield sessionReview_model_1.SessionReview.create(Object.assign(Object.assign({}, payload), { studentId: new mongoose_1.Types.ObjectId(studentId), tutorId: session.tutorId }));
+    // Update session with reviewId
+    yield session_model_1.Session.findByIdAndUpdate(payload.sessionId, {
+        reviewId: review._id,
+    });
     return review;
 });
 /**
@@ -185,6 +189,30 @@ const toggleVisibility = (id, isPublic) => __awaiter(void 0, void 0, void 0, fun
     yield review.save();
     return review;
 });
+/**
+ * Link orphaned reviews to sessions (migration helper)
+ * This fixes reviews that were created before the reviewId update was added
+ */
+const linkOrphanedReviews = () => __awaiter(void 0, void 0, void 0, function* () {
+    const reviews = yield sessionReview_model_1.SessionReview.find({});
+    let linked = 0;
+    let alreadyLinked = 0;
+    for (const review of reviews) {
+        const session = yield session_model_1.Session.findById(review.sessionId);
+        if (session) {
+            if (!session.reviewId) {
+                yield session_model_1.Session.findByIdAndUpdate(review.sessionId, {
+                    reviewId: review._id,
+                });
+                linked++;
+            }
+            else {
+                alreadyLinked++;
+            }
+        }
+    }
+    return { linked, alreadyLinked };
+});
 exports.SessionReviewService = {
     createReview,
     getMyReviews,
@@ -194,4 +222,5 @@ exports.SessionReviewService = {
     deleteReview,
     getTutorStats,
     toggleVisibility,
+    linkOrphanedReviews,
 };

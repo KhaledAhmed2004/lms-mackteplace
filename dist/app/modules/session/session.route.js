@@ -22,24 +22,38 @@ const router = express_1.default.Router();
  * @note    Proposal expires in 24 hours
  */
 router.post('/propose', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(session_validation_1.SessionValidation.proposeSessionZodSchema), session_controller_1.SessionController.proposeSession);
-// ============ STUDENT ROUTES ============
+// ============ PROPOSAL RESPONSE ROUTES (Student or Tutor) ============
 /**
  * @route   POST /api/v1/sessions/proposals/:messageId/accept
  * @desc    Accept session proposal
- * @access  Student only
+ * @access  Student or Tutor (recipient of proposal, not sender)
+ * @note    Student accepts tutor's proposal OR Tutor accepts student's counter-proposal
+ * @note    User cannot accept their own proposal
  * @note    Creates session with status: SCHEDULED
  * @note    Generates Google Meet link (placeholder)
  * @note    Updates proposal message status to ACCEPTED
  */
-router.post('/proposals/:messageId/accept', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(session_validation_1.SessionValidation.acceptSessionProposalZodSchema), session_controller_1.SessionController.acceptSessionProposal);
+router.post('/proposals/:messageId/accept', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(session_validation_1.SessionValidation.acceptSessionProposalZodSchema), session_controller_1.SessionController.acceptSessionProposal);
+/**
+ * @route   POST /api/v1/sessions/proposals/:messageId/counter
+ * @desc    Counter-propose session with alternative time
+ * @access  Student only
+ * @body    { newStartTime: Date, newEndTime: Date, reason?: string }
+ * @note    Original proposal status changes to COUNTER_PROPOSED
+ * @note    Creates new proposal message with student's preferred time
+ * @note    Tutor can then accept or reject the counter-proposal
+ */
+router.post('/proposals/:messageId/counter', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(session_validation_1.SessionValidation.counterProposeSessionZodSchema), session_controller_1.SessionController.counterProposeSession);
 /**
  * @route   POST /api/v1/sessions/proposals/:messageId/reject
  * @desc    Reject session proposal
- * @access  Student only
+ * @access  Student or Tutor (recipient of proposal, not sender)
  * @body    { rejectionReason: string }
+ * @note    Student rejects tutor's proposal OR Tutor rejects student's counter-proposal
+ * @note    User cannot reject their own proposal
  * @note    Updates proposal message status to REJECTED
  */
-router.post('/proposals/:messageId/reject', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(session_validation_1.SessionValidation.rejectSessionProposalZodSchema), session_controller_1.SessionController.rejectSessionProposal);
+router.post('/proposals/:messageId/reject', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(session_validation_1.SessionValidation.rejectSessionProposalZodSchema), session_controller_1.SessionController.rejectSessionProposal);
 // ============ SHARED ROUTES (STUDENT + TUTOR + ADMIN) ============
 /**
  * @route   GET /api/v1/sessions/my-upcoming

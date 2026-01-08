@@ -241,7 +241,7 @@ const createTrialRequest = async (
   }
 
   // Send real-time notification to matching tutors via socket
-  const io = global.io;
+  const io = (global as any).io;
   if (io) {
     // Get all verified tutors who teach this subject
     const matchingTutors = await User.find({
@@ -489,7 +489,7 @@ const acceptTrialRequest = async (
   }
 
   // Send real-time notification to student via socket
-  const io = global.io;
+  const io = (global as any).io;
   if (io) {
     // Populate the request with tutor info for the notification
     const populatedRequest = await TrialRequest.findById(request._id)

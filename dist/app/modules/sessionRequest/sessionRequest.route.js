@@ -18,7 +18,7 @@ router.patch('/:id/cancel', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, 
 router.patch('/:id/extend', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), sessionRequest_controller_1.SessionRequestController.extendSessionRequest);
 // Tutor routes
 router.get('/matching', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), sessionRequest_controller_1.SessionRequestController.getMatchingSessionRequests);
-router.patch('/:id/accept', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), sessionRequest_controller_1.SessionRequestController.acceptSessionRequest);
+router.patch('/:id/accept', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), (0, validateRequest_1.default)(sessionRequest_validation_1.SessionRequestValidation.acceptSessionRequestZodSchema), sessionRequest_controller_1.SessionRequestController.acceptSessionRequest);
 // Admin routes
 router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionRequest_controller_1.SessionRequestController.getAllSessionRequests);
 router.post('/expire-old', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionRequest_controller_1.SessionRequestController.expireOldRequests);

@@ -66,10 +66,12 @@ const createStripeAccount = (data) => __awaiter(void 0, void 0, void 0, function
             businessType: account.business_type || 'individual',
         });
         yield stripeAccount.save();
+        // Create onboarding link for the newly created account
+        const onboardingUrl = yield (0, stripe_adapter_1.createOnboardingLink)(account.id, `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=refresh`, `${process.env.FRONTEND_URL}/free-trial-teacher-dash?stripe_onboarding=success`);
         return {
-            account_id: account.id,
+            accountId: account.id,
+            onboardingUrl,
             onboarding_required: !account.charges_enabled,
-            database_record: stripeAccount,
         };
     }
     catch (error) {
@@ -100,12 +102,18 @@ const createOnboardingLink = (userId) => __awaiter(void 0, void 0, void 0, funct
 });
 // Check if freelancer has completed Stripe onboarding
 const checkOnboardingStatus = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c, _d;
     try {
         const userObjectId = new mongoose_1.default.Types.ObjectId(userId);
         const stripeAccount = yield payment_model_1.StripeAccount.isExistAccountByUserId(userObjectId);
         if (!stripeAccount) {
-            return { completed: false };
+            return {
+                hasStripeAccount: false,
+                isOnboardingComplete: false,
+                chargesEnabled: false,
+                payoutsEnabled: false,
+                detailsSubmitted: false,
+            };
         }
         const account = yield (0, stripe_adapter_1.retrieveAccount)(stripeAccount.stripeAccountId);
         const completed = account.charges_enabled && account.payouts_enabled;
@@ -118,8 +126,13 @@ const checkOnboardingStatus = (userId) => __awaiter(void 0, void 0, void 0, func
             });
         }
         return {
-            completed,
-            account_id: stripeAccount.stripeAccountId,
+            hasStripeAccount: true,
+            isOnboardingComplete: completed,
+            chargesEnabled: (_b = account.charges_enabled) !== null && _b !== void 0 ? _b : false,
+            payoutsEnabled: (_c = account.payouts_enabled) !== null && _c !== void 0 ? _c : false,
+            detailsSubmitted: (_d = account.details_submitted) !== null && _d !== void 0 ? _d : false,
+            accountId: stripeAccount.stripeAccountId,
+            stripeAccountId: stripeAccount.stripeAccountId,
             missing_fields: currentlyDue !== null && currentlyDue !== void 0 ? currentlyDue : undefined,
         };
     }

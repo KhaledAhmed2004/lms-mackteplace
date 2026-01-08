@@ -46,7 +46,7 @@ const SessionProposalSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED'],
         default: 'PROPOSED',
     },
     sessionId: {
@@ -60,6 +60,14 @@ const SessionProposalSchema = new mongoose_1.Schema({
     expiresAt: {
         type: Date,
         required: true,
+    },
+    originalProposalId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Message',
+    },
+    counterProposalReason: {
+        type: String,
+        trim: true,
     },
 }, { _id: false });
 // Message Schema

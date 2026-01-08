@@ -58,6 +58,13 @@ router.post('/create-payment-intent', (0, auth_1.default)(user_1.USER_ROLES.STUD
  * @body    { subscriptionId, paymentIntentId }
  */
 router.post('/confirm-payment', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), (0, validateRequest_1.default)(studentSubscription_validation_1.StudentSubscriptionValidation.confirmPaymentZodSchema), studentSubscription_controller_1.StudentSubscriptionController.confirmPayment);
+/**
+ * @route   GET /api/v1/subscriptions/payment-history
+ * @desc    Get payment history
+ * @access  Student only
+ * @query   ?page=1&limit=10
+ */
+router.get('/payment-history', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), studentSubscription_controller_1.StudentSubscriptionController.getPaymentHistory);
 // ============ ADMIN ROUTES ============
 /**
  * @route   GET /api/v1/subscriptions

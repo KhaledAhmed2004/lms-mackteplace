@@ -204,6 +204,55 @@ const getSessionStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
         data: result,
     });
 }));
+/**
+ * Get application statistics for admin dashboard
+ * Returns counts by status
+ */
+const getApplicationStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield admin_service_1.AdminService.getApplicationStats();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Application statistics retrieved successfully',
+        data: result,
+    });
+}));
+/**
+ * Get all transactions (Student Payments + Tutor Payouts)
+ * Query: ?page=1&limit=10&type=all&status=PAID&search=john&sortBy=date&sortOrder=desc
+ */
+const getTransactions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { page, limit, type, status, search, sortBy, sortOrder, } = req.query;
+    const query = {
+        page: page ? parseInt(page) : undefined,
+        limit: limit ? parseInt(limit) : undefined,
+        type: type,
+        status: status,
+        search: search,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+    };
+    const result = yield admin_service_1.AdminService.getTransactions(query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Transactions retrieved successfully',
+        data: result.data,
+        meta: result.meta,
+    });
+}));
+/**
+ * Get transaction statistics
+ */
+const getTransactionStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield admin_service_1.AdminService.getTransactionStats();
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Transaction statistics retrieved successfully',
+        data: result,
+    });
+}));
 exports.AdminController = {
     getDashboardStats,
     getRevenueByMonth,
@@ -216,4 +265,7 @@ exports.AdminController = {
     getUserDistribution,
     getUnifiedSessions,
     getSessionStats,
+    getApplicationStats,
+    getTransactions,
+    getTransactionStats,
 };

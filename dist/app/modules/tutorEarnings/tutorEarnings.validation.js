@@ -40,8 +40,24 @@ const markAsFailedZodSchema = zod_1.z.object({
             .min(1, 'Failure reason cannot be empty'),
     }),
 });
+const updatePayoutSettingsZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        recipient: zod_1.z
+            .string({
+            required_error: 'Recipient name is required',
+        })
+            .min(2, 'Recipient name must be at least 2 characters'),
+        iban: zod_1.z
+            .string({
+            required_error: 'IBAN is required',
+        })
+            .min(15, 'IBAN must be at least 15 characters')
+            .max(34, 'IBAN must be at most 34 characters'),
+    }),
+});
 exports.TutorEarningsValidation = {
     generateTutorEarningsZodSchema,
     initiatePayoutZodSchema,
     markAsFailedZodSchema,
+    updatePayoutSettingsZodSchema,
 };

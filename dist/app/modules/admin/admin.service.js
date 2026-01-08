@@ -28,6 +28,7 @@ const studentSubscription_interface_1 = require("../studentSubscription/studentS
 const AggregationBuilder_1 = __importDefault(require("../../builder/AggregationBuilder"));
 const trialRequest_model_1 = require("../trialRequest/trialRequest.model");
 const trialRequest_interface_1 = require("../trialRequest/trialRequest.interface");
+const tutorEarnings_interface_1 = require("../tutorEarnings/tutorEarnings.interface");
 /**
  * Get comprehensive dashboard statistics
  */
@@ -728,6 +729,237 @@ const getSessionStats = () => __awaiter(void 0, void 0, void 0, function* () {
         trialSessions,
     };
 });
+/**
+ * Get application statistics for admin dashboard
+ * Returns counts by status with growth metrics (current month vs last month)
+ */
+const getApplicationStats = () => __awaiter(void 0, void 0, void 0, function* () {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    // Get total counts
+    const [total, pending, interview, approved, rejected, revision] = yield Promise.all([
+        tutorApplication_model_1.TutorApplication.countDocuments(),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.APPROVED }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REJECTED }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REVISION }),
+    ]);
+    // Get this month counts
+    const [totalThisMonth, pendingThisMonth, interviewThisMonth, approvedThisMonth, rejectedThisMonth, revisionThisMonth,] = yield Promise.all([
+        tutorApplication_model_1.TutorApplication.countDocuments({ createdAt: { $gte: firstDayOfMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED, createdAt: { $gte: firstDayOfMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW, selectedForInterviewAt: { $gte: firstDayOfMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.APPROVED, approvedAt: { $gte: firstDayOfMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REJECTED, rejectedAt: { $gte: firstDayOfMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REVISION, revisionRequestedAt: { $gte: firstDayOfMonth } }),
+    ]);
+    // Get last month counts
+    const [totalLastMonth, pendingLastMonth, interviewLastMonth, approvedLastMonth, rejectedLastMonth, revisionLastMonth,] = yield Promise.all([
+        tutorApplication_model_1.TutorApplication.countDocuments({ createdAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED, createdAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW, selectedForInterviewAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.APPROVED, approvedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REJECTED, rejectedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+        tutorApplication_model_1.TutorApplication.countDocuments({ status: tutorApplication_interface_1.APPLICATION_STATUS.REVISION, revisionRequestedAt: { $gte: firstDayOfLastMonth, $lte: lastDayOfLastMonth } }),
+    ]);
+    // Calculate growth helper
+    const calculateGrowth = (current, previous) => {
+        if (previous === 0) {
+            return {
+                growth: current > 0 ? 100 : 0,
+                growthType: current > 0 ? 'increase' : 'no_change',
+            };
+        }
+        const growth = ((current - previous) / previous) * 100;
+        return {
+            growth: Math.round(growth * 10) / 10,
+            growthType: growth > 0 ? 'increase' : growth < 0 ? 'decrease' : 'no_change',
+        };
+    };
+    return {
+        total: Object.assign({ count: total }, calculateGrowth(totalThisMonth, totalLastMonth)),
+        pending: Object.assign({ count: pending }, calculateGrowth(pendingThisMonth, pendingLastMonth)),
+        interview: Object.assign({ count: interview }, calculateGrowth(interviewThisMonth, interviewLastMonth)),
+        approved: Object.assign({ count: approved }, calculateGrowth(approvedThisMonth, approvedLastMonth)),
+        rejected: Object.assign({ count: rejected }, calculateGrowth(rejectedThisMonth, rejectedLastMonth)),
+        revision: Object.assign({ count: revision }, calculateGrowth(revisionThisMonth, revisionLastMonth)),
+    };
+});
+/**
+ * Get all transactions (Student Payments + Tutor Payouts + Subscription Purchases)
+ * Combines MonthlyBilling (student payments), TutorEarnings (tutor payouts), and StudentSubscription (subscription purchases)
+ */
+const getTransactions = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const { page = 1, limit = 10, type = 'all', status, search, sortBy = 'date', sortOrder = 'desc', } = query;
+    const transactions = [];
+    // Get Student Payments (MonthlyBilling)
+    if (type === 'all' || type === 'STUDENT_PAYMENT') {
+        const billings = yield monthlyBilling_model_1.MonthlyBilling.find()
+            .populate('studentId', 'name email')
+            .lean();
+        billings.forEach((billing) => {
+            var _a, _b;
+            transactions.push({
+                _id: billing._id.toString(),
+                transactionId: billing.invoiceNumber,
+                type: 'STUDENT_PAYMENT',
+                amount: billing.total,
+                userName: ((_a = billing.studentId) === null || _a === void 0 ? void 0 : _a.name) || 'Unknown',
+                userEmail: ((_b = billing.studentId) === null || _b === void 0 ? void 0 : _b.email) || '',
+                userType: 'student',
+                status: billing.status,
+                date: billing.paidAt || billing.createdAt,
+                description: `Invoice for ${billing.billingMonth}/${billing.billingYear}`,
+                sessions: billing.totalSessions,
+                hours: billing.totalHours,
+            });
+        });
+        // Get All Subscription Purchases
+        const subscriptions = yield studentSubscription_model_1.StudentSubscription.find()
+            .populate('studentId', 'name email')
+            .lean();
+        subscriptions.forEach((sub) => {
+            var _a, _b;
+            // Calculate subscription value based on tier
+            let subscriptionAmount = 0;
+            let tierName = '';
+            let description = '';
+            if (sub.tier === 'FLEXIBLE') {
+                tierName = 'Flexible';
+                subscriptionAmount = 0; // Pay as you go - no upfront
+                description = 'Flexible Plan Activation (Pay per session)';
+            }
+            else if (sub.tier === 'REGULAR') {
+                tierName = 'Regular';
+                subscriptionAmount = sub.pricePerHour * sub.minimumHours; // €28 * 4 = €112
+                description = `${tierName} Subscription (${sub.minimumHours}hrs @ €${sub.pricePerHour}/hr)`;
+            }
+            else if (sub.tier === 'LONG_TERM') {
+                tierName = 'Long-term';
+                subscriptionAmount = sub.pricePerHour * sub.minimumHours * sub.commitmentMonths; // €25 * 4 * 3 = €300
+                description = `${tierName} Subscription (${sub.commitmentMonths} months)`;
+            }
+            // Generate a subscription reference
+            const subDate = new Date(sub.createdAt);
+            const subRef = `SUB-${subDate.getFullYear().toString().slice(-2)}${(subDate.getMonth() + 1).toString().padStart(2, '0')}-${sub._id.toString().slice(-6).toUpperCase()}`;
+            transactions.push({
+                _id: sub._id.toString(),
+                transactionId: subRef,
+                type: 'STUDENT_PAYMENT',
+                amount: subscriptionAmount,
+                userName: ((_a = sub.studentId) === null || _a === void 0 ? void 0 : _a.name) || 'Unknown',
+                userEmail: ((_b = sub.studentId) === null || _b === void 0 ? void 0 : _b.email) || '',
+                userType: 'student',
+                status: sub.status === 'ACTIVE' ? 'PAID' : sub.status === 'PENDING' ? 'PENDING' : 'PAID',
+                date: sub.paidAt || sub.createdAt,
+                description,
+            });
+        });
+    }
+    // Get Tutor Payouts (TutorEarnings)
+    if (type === 'all' || type === 'TUTOR_PAYOUT') {
+        const earnings = yield tutorEarnings_model_1.TutorEarnings.find()
+            .populate('tutorId', 'name email')
+            .lean();
+        earnings.forEach((earning) => {
+            var _a, _b;
+            transactions.push({
+                _id: earning._id.toString(),
+                transactionId: earning.payoutReference,
+                type: 'TUTOR_PAYOUT',
+                amount: earning.netEarnings,
+                userName: ((_a = earning.tutorId) === null || _a === void 0 ? void 0 : _a.name) || 'Unknown',
+                userEmail: ((_b = earning.tutorId) === null || _b === void 0 ? void 0 : _b.email) || '',
+                userType: 'tutor',
+                status: earning.status,
+                date: earning.paidAt || earning.createdAt,
+                description: `Payout for ${earning.payoutMonth}/${earning.payoutYear}`,
+                sessions: earning.totalSessions,
+                hours: earning.totalHours,
+            });
+        });
+    }
+    // Apply filters
+    let filtered = transactions;
+    if (status) {
+        filtered = filtered.filter(t => t.status === status);
+    }
+    if (search) {
+        const searchLower = search.toLowerCase();
+        filtered = filtered.filter(t => {
+            var _a, _b, _c;
+            return ((_a = t.transactionId) === null || _a === void 0 ? void 0 : _a.toLowerCase().includes(searchLower)) ||
+                ((_b = t.userName) === null || _b === void 0 ? void 0 : _b.toLowerCase().includes(searchLower)) ||
+                ((_c = t.userEmail) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(searchLower));
+        });
+    }
+    // Sort
+    filtered.sort((a, b) => {
+        const aValue = sortBy === 'date' ? new Date(a.date).getTime() : a.amount;
+        const bValue = sortBy === 'date' ? new Date(b.date).getTime() : b.amount;
+        return sortOrder === 'desc' ? bValue - aValue : aValue - bValue;
+    });
+    // Pagination
+    const total = filtered.length;
+    const totalPage = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedData = filtered.slice(startIndex, startIndex + limit);
+    return {
+        data: paginatedData,
+        meta: {
+            page,
+            limit,
+            total,
+            totalPage,
+        },
+    };
+});
+/**
+ * Get transaction statistics
+ */
+const getTransactionStats = () => __awaiter(void 0, void 0, void 0, function* () {
+    // Student payments (paid billings)
+    const paidBillings = yield monthlyBilling_model_1.MonthlyBilling.find({ status: monthlyBilling_interface_1.BILLING_STATUS.PAID });
+    const billingPaymentsTotal = paidBillings.reduce((sum, b) => sum + b.total, 0);
+    // All subscription purchases
+    const allSubscriptions = yield studentSubscription_model_1.StudentSubscription.find({
+        status: studentSubscription_interface_1.SUBSCRIPTION_STATUS.ACTIVE,
+    });
+    let subscriptionPaymentsTotal = 0;
+    allSubscriptions.forEach((sub) => {
+        if (sub.tier === 'REGULAR') {
+            subscriptionPaymentsTotal += sub.pricePerHour * sub.minimumHours;
+        }
+        else if (sub.tier === 'LONG_TERM') {
+            subscriptionPaymentsTotal += sub.pricePerHour * sub.minimumHours * sub.commitmentMonths;
+        }
+        // FLEXIBLE = 0, no upfront payment
+    });
+    const studentPaymentsTotal = billingPaymentsTotal + subscriptionPaymentsTotal;
+    const studentPaymentsCount = paidBillings.length + allSubscriptions.length;
+    // Tutor payouts (paid earnings)
+    const paidEarnings = yield tutorEarnings_model_1.TutorEarnings.find({ status: tutorEarnings_interface_1.PAYOUT_STATUS.PAID });
+    const tutorPayoutsTotal = paidEarnings.reduce((sum, e) => sum + e.netEarnings, 0);
+    // All billings, subscriptions and earnings count
+    const allBillingsCount = yield monthlyBilling_model_1.MonthlyBilling.countDocuments();
+    const allSubscriptionsCount = yield studentSubscription_model_1.StudentSubscription.countDocuments();
+    const allEarningsCount = yield tutorEarnings_model_1.TutorEarnings.countDocuments();
+    return {
+        totalTransactions: allBillingsCount + allSubscriptionsCount + allEarningsCount,
+        totalAmount: studentPaymentsTotal + tutorPayoutsTotal,
+        studentPayments: {
+            count: studentPaymentsCount,
+            total: studentPaymentsTotal,
+        },
+        tutorPayouts: {
+            count: paidEarnings.length,
+            total: tutorPayoutsTotal,
+        },
+    };
+});
 exports.AdminService = {
     getDashboardStats,
     getRevenueByMonth,
@@ -740,4 +972,7 @@ exports.AdminService = {
     getUserDistribution,
     getUnifiedSessions,
     getSessionStats,
+    getApplicationStats,
+    getTransactions,
+    getTransactionStats,
 };

@@ -141,6 +141,28 @@ const confirmPayment = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         data: result,
     });
 }));
+/**
+ * Get Payment History (Student)
+ * Returns paginated payment history
+ */
+const getPaymentHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const studentId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const result = yield studentSubscription_service_1.StudentSubscriptionService.getPaymentHistory(studentId, page, limit);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Payment history retrieved successfully',
+        data: result.data,
+        pagination: {
+            page: result.meta.page,
+            limit: result.meta.limit,
+            total: result.meta.total,
+            totalPage: result.meta.totalPages,
+        },
+    });
+}));
 exports.StudentSubscriptionController = {
     subscribeToPlan,
     getMySubscription,
@@ -151,4 +173,5 @@ exports.StudentSubscriptionController = {
     getMyPlanUsage,
     createPaymentIntent,
     confirmPayment,
+    getPaymentHistory,
 };

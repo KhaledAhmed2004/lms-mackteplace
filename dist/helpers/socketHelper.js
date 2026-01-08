@@ -22,6 +22,7 @@ const chat_model_1 = require("../app/modules/chat/chat.model");
 const node_cache_1 = __importDefault(require("node-cache"));
 const call_service_1 = require("../app/modules/call/call.service");
 const whiteboard_service_1 = require("../app/modules/whiteboard/whiteboard.service");
+const session_service_1 = require("../app/modules/session/session.service");
 const user_model_1 = require("../app/modules/user/user.model");
 const presenceHelper_1 = require("../app/helpers/presenceHelper");
 // -------------------------
@@ -372,6 +373,42 @@ const socket = (io) => {
                     logger_1.logger.error(colors_1.default.red(`CALL_CANCEL error: ${String(err)}`));
                 }
             }));
+            // Join a session-based call (for tutoring sessions)
+            // Both participants join the SAME channel based on sessionId
+            socket.on('CALL_JOIN_SESSION', (_a) => __awaiter(void 0, [_a], void 0, function* ({ sessionId, otherUserId, callType = 'video', }) {
+                try {
+                    const { call, token, channelName, uid, isNew } = yield call_service_1.CallService.joinSessionCall(userId, sessionId, otherUserId, callType);
+                    // Send token and channel info to this user
+                    socket.emit('SESSION_CALL_JOINED', {
+                        callId: call._id,
+                        channelName,
+                        token,
+                        uid,
+                        callType,
+                        isNew,
+                    });
+                    // If this is a new call, notify the other user
+                    if (isNew) {
+                        const caller = yield user_model_1.User.findById(userId).select('name profilePicture');
+                        io.to(USER_ROOM(otherUserId)).emit('SESSION_CALL_READY', {
+                            callId: call._id,
+                            channelName,
+                            sessionId,
+                            callType,
+                            caller: {
+                                id: userId,
+                                name: caller === null || caller === void 0 ? void 0 : caller.name,
+                                profilePicture: caller === null || caller === void 0 ? void 0 : caller.profilePicture,
+                            },
+                        });
+                    }
+                    handleEventProcessed('CALL_JOIN_SESSION', `sessionId: ${sessionId}, channelName: ${channelName}, isNew: ${isNew}`);
+                }
+                catch (err) {
+                    socket.emit('CALL_ERROR', { message: String(err) });
+                    logger_1.logger.error(colors_1.default.red(`CALL_JOIN_SESSION error: ${String(err)}`));
+                }
+            }));
             // User joined Agora channel
             socket.on('CALL_USER_JOINED_CHANNEL', (_a) => __awaiter(void 0, [_a], void 0, function* ({ callId, agoraUid }) {
                 try {
@@ -405,6 +442,17 @@ const socket = (io) => {
             socket.on('CALL_USER_LEFT_CHANNEL', (_a) => __awaiter(void 0, [_a], void 0, function* ({ callId }) {
                 try {
                     const { call, activeCount } = yield call_service_1.CallService.recordParticipantLeave(callId, userId);
+                    // Sync attendance to session if this is a session call
+                    if (call.sessionId) {
+                        try {
+                            yield session_service_1.SessionService.syncAttendanceFromCall(call.sessionId.toString());
+                            logger_1.logger.info(colors_1.default.cyan(`Session attendance synced for session: ${call.sessionId}`));
+                        }
+                        catch (syncErr) {
+                            // Don't fail the main operation if sync fails
+                            logger_1.logger.warn(colors_1.default.yellow(`Failed to sync session attendance: ${String(syncErr)}`));
+                        }
+                    }
                     // Notify remaining participants
                     call.participants.forEach(participantId => {
                         if (participantId.toString() !== userId) {

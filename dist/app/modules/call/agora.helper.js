@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userIdToAgoraUid = exports.generateChannelName = exports.generateRtcToken = void 0;
+exports.userIdToAgoraUid = exports.generateSessionChannelName = exports.generateChannelName = exports.generateRtcToken = void 0;
 const agora_token_1 = require("agora-token");
 const uuid_1 = require("uuid");
 const config_1 = __importDefault(require("../../../config"));
@@ -28,6 +28,14 @@ const generateChannelName = () => {
     return `call_${(0, uuid_1.v4)().replace(/-/g, '').substring(0, 16)}`;
 };
 exports.generateChannelName = generateChannelName;
+/**
+ * Session ID থেকে Channel Name তৈরি করে
+ * Same session এর জন্য সবসময় same channel name return করবে
+ */
+const generateSessionChannelName = (sessionId) => {
+    return `session_${sessionId}`;
+};
+exports.generateSessionChannelName = generateSessionChannelName;
 /**
  * User ID থেকে Agora UID তৈরি করে
  * MongoDB ObjectId কে number এ convert করে

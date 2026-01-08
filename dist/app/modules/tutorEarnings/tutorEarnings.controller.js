@@ -110,6 +110,68 @@ const markAsFailed = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         data: result,
     });
 }));
+// ============ PAYOUT SETTINGS ============
+/**
+ * Get tutor's payout settings
+ */
+const getPayoutSettings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const result = yield tutorEarnings_service_1.TutorEarningsService.getPayoutSettings(tutorId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Payout settings retrieved successfully',
+        data: result,
+    });
+}));
+/**
+ * Update tutor's payout settings
+ */
+const updatePayoutSettings = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const result = yield tutorEarnings_service_1.TutorEarningsService.updatePayoutSettings(tutorId, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Payout settings updated successfully',
+        data: result,
+    });
+}));
+// ============ TUTOR STATS ============
+/**
+ * Get tutor's comprehensive stats including level progress
+ */
+const getMyStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const result = yield tutorEarnings_service_1.TutorEarningsService.getMyStats(tutorId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor stats retrieved successfully',
+        data: result,
+    });
+}));
+/**
+ * Get formatted earnings history for frontend
+ */
+const getEarningsHistory = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const result = yield tutorEarnings_service_1.TutorEarningsService.getEarningsHistory(tutorId, page, limit);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Earnings history retrieved successfully',
+        data: result.data,
+        pagination: {
+            total: result.meta.total,
+            page: result.meta.page,
+            limit: result.meta.limit,
+            totalPage: result.meta.totalPages,
+        },
+    });
+}));
 exports.TutorEarningsController = {
     generateTutorEarnings,
     getMyEarnings,
@@ -118,4 +180,9 @@ exports.TutorEarningsController = {
     initiatePayout,
     markAsPaid,
     markAsFailed,
+    // New methods
+    getPayoutSettings,
+    updatePayoutSettings,
+    getMyStats,
+    getEarningsHistory,
 };
