@@ -24,6 +24,8 @@ import { CallRoutes } from '../app/modules/call/call.route';
 import { WhiteboardRoutes } from '../app/modules/whiteboard/whiteboard.route';
 import { PaymentMethodRoutes } from '../app/modules/paymentMethod/paymentMethod.route';
 import { LegalPolicyRoutes } from '../app/modules/legalPolicy/legalPolicy.route';
+import { OERResourceRoutes } from '../app/modules/oerResource/oerResource.route';
+import { SupportTicketRoutes } from '../app/modules/supportTicket/supportTicket.route';
 
 const router = express.Router();
 
@@ -127,6 +129,14 @@ const apiRoutes = [
   {
     path: '/legal-policies',
     route: LegalPolicyRoutes,
+  },
+  {
+    path: '/oer-resources',
+    route: OERResourceRoutes,
+  },
+  {
+    path: '/support-tickets',
+    route: SupportTicketRoutes,
   },
 ];
 
