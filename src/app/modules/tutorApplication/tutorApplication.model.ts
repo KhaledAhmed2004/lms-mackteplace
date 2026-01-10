@@ -89,6 +89,15 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
       trim: true,
     },
 
+    // Interview cancellation (by admin)
+    interviewCancelledReason: {
+      type: String,
+      trim: true,
+    },
+    interviewCancelledAt: {
+      type: Date,
+    },
+
     // Admin Notes
     adminNotes: {
       type: String,
@@ -99,6 +108,9 @@ const tutorApplicationSchema = new Schema<ITutorApplication>(
     submittedAt: {
       type: Date,
       default: Date.now,
+    },
+    resubmittedAt: {
+      type: Date,
     },
     selectedForInterviewAt: {
       type: Date,

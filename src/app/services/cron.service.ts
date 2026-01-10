@@ -24,6 +24,7 @@ const TEST_MODE = true;
 import { MonthlyBillingService } from '../modules/monthlyBilling/monthlyBilling.service';
 import { TutorEarningsService } from '../modules/tutorEarnings/tutorEarnings.service';
 import { SessionService } from '../modules/session/session.service';
+import { InterviewSlotService } from '../modules/interviewSlot/interviewSlot.service';
 import { TrialRequest } from '../modules/trialRequest/trialRequest.model';
 import { TRIAL_REQUEST_STATUS } from '../modules/trialRequest/trialRequest.interface';
 import { Session } from '../modules/session/session.model';
@@ -187,6 +188,24 @@ export const generateTutorEarnings = async () => {
 };
 
 /**
+ * Cleanup expired available interview slots
+ * Runs daily at midnight (00:00)
+ * Deletes all AVAILABLE slots where the day has passed
+ * Booked/completed/cancelled slots are kept for records
+ */
+export const cleanupExpiredInterviewSlots = async () => {
+  try {
+    const deletedCount = await InterviewSlotService.cleanupExpiredAvailableSlots();
+
+    if (deletedCount > 0) {
+      logger.info(`Cleaned up ${deletedCount} expired available interview slots`);
+    }
+  } catch (error) {
+    errorLogger.error('Failed to cleanup expired interview slots', { error });
+  }
+};
+
+/**
  * Initialize all cron jobs
  */
 export const initializeCronJobs = () => {
@@ -223,6 +242,12 @@ export const initializeCronJobs = () => {
     generateTutorEarnings();
   });
 
+  // Cleanup expired available interview slots - Daily at midnight (00:00)
+  cron.schedule('0 0 * * *', () => {
+    logger.info('Running cron: Cleanup expired interview slots');
+    cleanupExpiredInterviewSlots();
+  });
+
   logger.info(`✅ Cron jobs initialized (TEST_MODE: ${TEST_MODE})`);
   if (TEST_MODE) {
     logger.info('🧪 TEST MODE: Session auto-transition runs every 1 minute');
@@ -237,4 +262,5 @@ export const CronService = {
   sendSessionReminders,
   generateMonthlyBillings,
   generateTutorEarnings,
+  cleanupExpiredInterviewSlots,
 };

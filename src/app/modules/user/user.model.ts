@@ -54,10 +54,6 @@ const userSchema = new Schema<IUser, UserModal>(
       enum: Object.values(USER_STATUS),
       default: USER_STATUS.ACTIVE,
     },
-    verified: {
-      type: Boolean,
-      default: false,
-    },
     deviceTokens: {
       type: [String],
       default: [],

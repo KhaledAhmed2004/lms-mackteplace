@@ -117,8 +117,9 @@ const submitApplication = async (payload: TApplicationPayload) => {
 
 // Get my application (for logged in applicant)
 const getMyApplication = async (
-  userEmail: string
-): Promise<ITutorApplication | null> => {
+  userEmail: string,
+  currentUserRole: string
+) => {
   const application = await TutorApplication.findOne({
     email: userEmail,
   }).populate({ path: 'subjects', select: 'name -_id' });
@@ -127,7 +128,24 @@ const getMyApplication = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'No application found');
   }
 
-  return application;
+  // If application is APPROVED but user still has APPLICANT role token,
+  // generate new token with updated TUTOR role
+  let newAccessToken = null;
+  if (
+    application.status === APPLICATION_STATUS.APPROVED &&
+    currentUserRole === USER_ROLES.APPLICANT
+  ) {
+    const user = await User.findOne({ email: userEmail });
+    if (user && user.role === USER_ROLES.TUTOR) {
+      newAccessToken = jwtHelper.createToken(
+        { id: user._id, role: user.role, email: user.email },
+        config.jwt.jwt_secret as Secret,
+        config.jwt.jwt_expire_in as string
+      );
+    }
+  }
+
+  return { application, newAccessToken };
 };
 
 /**
@@ -209,14 +227,15 @@ const selectForInterview = async (
     );
   }
 
-  // Only SUBMITTED or REVISION status can be selected for interview
+  // Only SUBMITTED, REVISION or RESUBMITTED status can be selected for interview
   if (
     application.status !== APPLICATION_STATUS.SUBMITTED &&
-    application.status !== APPLICATION_STATUS.REVISION
+    application.status !== APPLICATION_STATUS.REVISION &&
+    application.status !== APPLICATION_STATUS.RESUBMITTED
   ) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      'Only submitted or revision applications can be selected for interview'
+      'Only submitted, revision, or resubmitted applications can be selected for interview'
     );
   }
 
@@ -310,7 +329,17 @@ const approveApplication = async (
     });
   }
 
-  return application;
+  // Generate new access token with updated TUTOR role
+  let newAccessToken = null;
+  if (updatedUser) {
+    newAccessToken = jwtHelper.createToken(
+      { id: updatedUser._id, role: updatedUser.role, email: updatedUser.email },
+      config.jwt.jwt_secret as Secret,
+      config.jwt.jwt_expire_in as string
+    );
+  }
+
+  return { application, newAccessToken };
 };
 
 /**
@@ -411,6 +440,77 @@ const deleteApplication = async (
   return result;
 };
 
+type TUpdateApplicationPayload = {
+  cv?: string;
+  abiturCertificate?: string;
+  officialId?: string;
+};
+
+/**
+ * Update my application (applicant only - when in REVISION status)
+ * Allows applicant to update documents and resubmit
+ */
+const updateMyApplication = async (
+  userEmail: string,
+  payload: TUpdateApplicationPayload
+): Promise<ITutorApplication | null> => {
+  const application = await TutorApplication.findOne({ email: userEmail });
+
+  if (!application) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Application not found');
+  }
+
+  // Only allow updates when in REVISION status
+  if (application.status !== APPLICATION_STATUS.REVISION) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'You can only update your application when revision is requested'
+    );
+  }
+
+  // Update documents if provided
+  if (payload.cv) {
+    application.cv = payload.cv;
+  }
+  if (payload.abiturCertificate) {
+    application.abiturCertificate = payload.abiturCertificate;
+  }
+  if (payload.officialId) {
+    application.officialId = payload.officialId;
+  }
+
+  // Change status to RESUBMITTED (not back to SUBMITTED)
+  application.status = APPLICATION_STATUS.RESUBMITTED;
+  application.resubmittedAt = new Date();
+
+  // Also update user's tutorProfile with new documents
+  await User.findOneAndUpdate(
+    { email: userEmail },
+    {
+      'tutorProfile.cvUrl': application.cv,
+      'tutorProfile.abiturCertificateUrl': application.abiturCertificate,
+    }
+  );
+
+  await application.save();
+
+  // Log activity
+  const user = await User.findOne({ email: userEmail });
+  if (user) {
+    ActivityLogService.logActivity({
+      userId: user._id,
+      actionType: 'APPLICATION_RESUBMITTED',
+      title: 'Application Resubmitted',
+      description: `${application.name} resubmitted their tutor application after revision`,
+      entityType: 'APPLICATION',
+      entityId: application._id,
+      status: 'success',
+    });
+  }
+
+  return application.populate({ path: 'subjects', select: 'name -_id' });
+};
+
 export const TutorApplicationService = {
   submitApplication,
   getMyApplication,
@@ -421,4 +521,5 @@ export const TutorApplicationService = {
   rejectApplication,
   sendForRevision,
   deleteApplication,
+  updateMyApplication,
 };

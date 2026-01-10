@@ -123,8 +123,6 @@ const BASE_TO_CONTROLLER: Record<string, string> = {
   notifications: 'NotificationController',
   message: 'MessageController',
   messages: 'MessageController',
-  bookmark: 'BookmarkController',
-  bookmarks: 'BookmarkController',
   payment: 'PaymentController',
   payments: 'PaymentController',
   chat: 'ChatController',

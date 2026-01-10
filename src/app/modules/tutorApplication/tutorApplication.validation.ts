@@ -151,6 +151,21 @@ const sendForRevisionZodSchema = z.object({
   }),
 });
 
+// Update my application (applicant only - when in REVISION status)
+const updateMyApplicationZodSchema = z.object({
+  body: z.object({
+    cv: z.string().url('CV must be a valid URL').optional(),
+    abiturCertificate: z
+      .string()
+      .url('Abitur certificate must be a valid URL')
+      .optional(),
+    officialId: z
+      .string()
+      .url('Official ID document must be a valid URL')
+      .optional(),
+  }),
+});
+
 export const TutorApplicationValidation = {
   createApplicationZodSchema,
   updateApplicationStatusZodSchema,
@@ -158,4 +173,5 @@ export const TutorApplicationValidation = {
   approveApplicationZodSchema,
   rejectApplicationZodSchema,
   sendForRevisionZodSchema,
+  updateMyApplicationZodSchema,
 };

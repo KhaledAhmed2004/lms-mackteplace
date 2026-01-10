@@ -19,13 +19,19 @@ const submitApplication = catchAsync(async (req: Request, res: Response) => {
 // Get my application (applicant view - requires auth)
 const getMyApplication = catchAsync(async (req: Request, res: Response) => {
   const userEmail = req.user?.email as string;
-  const result = await TutorApplicationService.getMyApplication(userEmail);
+  const userRole = req.user?.role as string;
+  const result = await TutorApplicationService.getMyApplication(
+    userEmail,
+    userRole
+  );
 
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Application retrieved successfully',
-    data: result,
+    data: result.application,
+    // Include new token if role was updated
+    ...(result.newAccessToken && { accessToken: result.newAccessToken }),
   });
 });
 
@@ -136,6 +142,22 @@ const deleteApplication = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// Update my application (Applicant only - when in REVISION status)
+const updateMyApplication = catchAsync(async (req: Request, res: Response) => {
+  const userEmail = req.user?.email as string;
+  const result = await TutorApplicationService.updateMyApplication(
+    userEmail,
+    req.body
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Application updated and resubmitted successfully',
+    data: result,
+  });
+});
+
 export const TutorApplicationController = {
   submitApplication,
   getMyApplication,
@@ -146,4 +168,5 @@ export const TutorApplicationController = {
   rejectApplication,
   sendForRevision,
   deleteApplication,
+  updateMyApplication,
 };

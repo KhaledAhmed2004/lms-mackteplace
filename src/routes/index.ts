@@ -4,7 +4,6 @@ import { UserRoutes } from '../app/modules/user/user.route';
 import { ChatRoutes } from '../app/modules/chat/chat.route';
 import { MessageRoutes } from '../app/modules/message/message.route';
 import { PaymentRoutes } from '../app/modules/payment/payment.routes';
-import { BookmarkRoutes } from '../app/modules/bookmark/bookmark.route';
 import { NotificationRoutes } from '../app/modules/notification/notification.routes';
 import { SubjectRoutes } from '../app/modules/subject/subject.route';
 import { GradeRoutes } from '../app/modules/grade/grade.route';
@@ -49,10 +48,6 @@ const apiRoutes = [
   {
     path: '/payments',
     route: PaymentRoutes,
-  },
-  {
-    path: '/bookmarks',
-    route: BookmarkRoutes,
   },
   {
     path: '/notifications',

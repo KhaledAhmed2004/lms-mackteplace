@@ -19,11 +19,7 @@ import { FEEDBACK_STATUS } from '../tutorSessionFeedback/tutorSessionFeedback.in
 import { ActivityLogService } from '../activityLog/activityLog.service';
 
 const createUserToDB = async (payload: Partial<IUser>): Promise<IUser> => {
-  // Auto-verify user on creation (skipping email verification for now)
-  const createUser = await User.create({
-    ...payload,
-    verified: true,
-  });
+  const createUser = await User.create(payload);
   if (!createUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
   }
@@ -132,10 +128,6 @@ const resendVerifyEmailToDB = async (email: string) => {
   const isExistUser = await User.findOne({ email });
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
-
-  if (isExistUser.verified) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'User is already verified!');
   }
 
   // Generate new OTP

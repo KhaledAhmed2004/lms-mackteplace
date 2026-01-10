@@ -41,6 +41,25 @@ router.get(
   TutorApplicationController.getMyApplication
 );
 
+/**
+ * @route   PATCH /api/v1/applications/my-application
+ * @desc    Update my application (when in REVISION status)
+ * @access  Applicant only
+ * @body    { cv?: string, abiturCertificate?: string, officialId?: string }
+ * @note    Applicant can update documents and resubmit when revision is requested
+ */
+router.patch(
+  '/my-application',
+  auth(USER_ROLES.APPLICANT),
+  fileHandler([
+    { name: 'cv', maxCount: 1 },
+    { name: 'abiturCertificate', maxCount: 1 },
+    { name: 'officialId', maxCount: 1 },
+  ]),
+  validateRequest(TutorApplicationValidation.updateMyApplicationZodSchema),
+  TutorApplicationController.updateMyApplication
+);
+
 // ============ ADMIN ROUTES ============
 
 /**

@@ -184,6 +184,11 @@ const bookInterviewSlot = async (
 
   await slot.save();
 
+  // Clear any previous cancellation reason from the application
+  await TutorApplication.findByIdAndUpdate(applicationId, {
+    $unset: { interviewCancelledReason: 1, interviewCancelledAt: 1 },
+  });
+
   // TODO: Send email notification to applicant with meeting details
   // await sendEmail({
   //   to: application.email,
@@ -257,10 +262,19 @@ const cancelInterviewSlot = async (
 
   // Keep application status as SELECTED_FOR_INTERVIEW (so they can book again)
   // The applicant should still be able to book a new interview slot
+  // If admin cancelled, save the cancellation reason to the application
   if (savedApplicationId) {
-    await TutorApplication.findByIdAndUpdate(savedApplicationId, {
+    const updateData: Record<string, unknown> = {
       status: APPLICATION_STATUS.SELECTED_FOR_INTERVIEW,
-    });
+    };
+
+    // Only save cancellation reason if admin cancelled (with a reason)
+    if (isAdmin && cancellationReason) {
+      updateData.interviewCancelledReason = cancellationReason;
+      updateData.interviewCancelledAt = new Date();
+    }
+
+    await TutorApplication.findByIdAndUpdate(savedApplicationId, updateData);
   }
 
   // TODO: Send cancellation email
@@ -440,16 +454,18 @@ const deleteInterviewSlot = async (id: string): Promise<IInterviewSlot | null> =
 
 /**
  * Get my booked interview slot (Applicant only)
+ * Returns BOOKED or COMPLETED interview slots
  */
 const getMyBookedInterview = async (
   applicantId: string
 ): Promise<IInterviewSlot | null> => {
   const slot = await InterviewSlot.findOne({
     applicantId: new Types.ObjectId(applicantId),
-    status: INTERVIEW_SLOT_STATUS.BOOKED,
+    status: { $in: [INTERVIEW_SLOT_STATUS.BOOKED, INTERVIEW_SLOT_STATUS.COMPLETED] },
   })
     .populate('adminId', 'name email')
-    .populate('applicationId');
+    .populate('applicationId')
+    .sort({ createdAt: -1 }); // Get the most recent one
 
   return slot;
 };
@@ -568,6 +584,24 @@ const getInterviewMeetingToken = async (
   };
 };
 
+/**
+ * Cleanup expired available interview slots
+ * Deletes all AVAILABLE slots where the day has passed (startTime < start of today)
+ * Only deletes unbooked slots - booked/completed/cancelled slots are kept for records
+ */
+const cleanupExpiredAvailableSlots = async (): Promise<number> => {
+  // Get start of today (midnight)
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const result = await InterviewSlot.deleteMany({
+    status: INTERVIEW_SLOT_STATUS.AVAILABLE,
+    startTime: { $lt: startOfToday },
+  });
+
+  return result.deletedCount;
+};
+
 export const InterviewSlotService = {
   createInterviewSlot,
   getAllInterviewSlots,
@@ -581,4 +615,5 @@ export const InterviewSlotService = {
   getMyBookedInterview,
   getScheduledMeetings,
   getInterviewMeetingToken,
+  cleanupExpiredAvailableSlots,
 };

@@ -111,8 +111,6 @@ export type IUser = {
   phone: string;
   profilePicture?: string;
   status: USER_STATUS;
-  verified: boolean;
-  isEmailVerified?: boolean;
   deviceTokens?: string[];
   averageRating: number;
   ratingsCount: number;

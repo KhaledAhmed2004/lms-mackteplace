@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 export enum APPLICATION_STATUS {
   SUBMITTED = 'SUBMITTED',
   REVISION = 'REVISION', // Admin requests changes
+  RESUBMITTED = 'RESUBMITTED', // Applicant resubmitted after revision
   SELECTED_FOR_INTERVIEW = 'SELECTED_FOR_INTERVIEW', // Admin selected after initial review
   APPROVED = 'APPROVED', // Approved after interview, becomes TUTOR
   REJECTED = 'REJECTED',
@@ -36,11 +37,16 @@ export type ITutorApplication = {
   rejectionReason?: string;
   revisionNote?: string; // Admin's note for what needs to be fixed
 
+  // Interview cancellation (by admin)
+  interviewCancelledReason?: string;
+  interviewCancelledAt?: Date;
+
   // Admin Notes
   adminNotes?: string;
 
   // Timestamps
   submittedAt: Date;
+  resubmittedAt?: Date;
   selectedForInterviewAt?: Date;
   approvedAt?: Date;
   rejectedAt?: Date;
