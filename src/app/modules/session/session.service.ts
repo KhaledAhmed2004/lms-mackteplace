@@ -64,18 +64,25 @@ const proposeSession = async (
     throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a participant in this chat');
   }
 
-  // Get student from chat
-  const studentId = chat.participants.find(
+  // Get the other participant from chat (should be a student)
+  const otherParticipantId = chat.participants.find(
     (p: Types.ObjectId) => p.toString() !== tutorId
   );
-  if (!studentId) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'No student found in chat');
+  if (!otherParticipantId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'No other participant found in chat');
   }
 
-  const student = await User.findById(studentId);
+  const student = await User.findById(otherParticipantId);
   if (!student) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Other participant not found');
   }
+
+  // Verify the other participant is actually a student (not admin or other role)
+  if (student.role !== USER_ROLES.STUDENT) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Session proposals can only be sent to students');
+  }
+
+  const studentId = otherParticipantId;
 
   // Calculate duration
   const startTime = new Date(payload.startTime);
