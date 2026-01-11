@@ -30,6 +30,8 @@ export const allowedOrigins: string[] = [
   'http://127.0.0.1:5003',
   'http://localhost:5005',
   'http://127.0.0.1:5005',
+  // Production frontend
+  'https://lms-frontend-dun-three.vercel.app',
 ];
 
 // Enable with env CORS_DEBUG=true or CORS_DEBUG=1
