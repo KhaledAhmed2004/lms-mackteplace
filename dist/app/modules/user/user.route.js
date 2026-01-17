@@ -35,6 +35,13 @@ router.get('/students', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user
 router.patch('/students/:id/block', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.blockStudent);
 // Unblock a student (admin only)
 router.patch('/students/:id/unblock', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.unblockStudent);
+/**
+ * @route   PATCH /api/v1/user/students/:id/profile
+ * @desc    Admin: Update student profile (all fields except password)
+ * @access  Admin only
+ * @body    { name?, email?, phone?, dateOfBirth?, location? }
+ */
+router.patch('/students/:id/profile', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.adminUpdateStudentProfileZodSchema), user_controller_1.UserController.adminUpdateStudentProfile);
 // ============ ADMIN: TUTOR MANAGEMENT ============
 // Get all tutors (admin only)
 router.get('/tutors', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getAllTutors);
@@ -44,6 +51,13 @@ router.patch('/tutors/:id/block', (0, auth_1.default)(user_1.USER_ROLES.SUPER_AD
 router.patch('/tutors/:id/unblock', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.unblockTutor);
 // Update tutor subjects (admin only)
 router.patch('/tutors/:id/subjects', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.updateTutorSubjectsZodSchema), user_controller_1.UserController.updateTutorSubjects);
+/**
+ * @route   PATCH /api/v1/user/tutors/:id/profile
+ * @desc    Admin: Update tutor profile (all fields except password)
+ * @access  Admin only
+ * @body    { name?, email?, phone?, dateOfBirth?, location?, tutorProfile?: { address?, birthDate?, bio?, subjects? } }
+ */
+router.patch('/tutors/:id/profile', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.adminUpdateTutorProfileZodSchema), user_controller_1.UserController.adminUpdateTutorProfile);
 // ============ GENERAL ADMIN ROUTES ============
 // Get all users (admin only)
 router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getAllUsers);

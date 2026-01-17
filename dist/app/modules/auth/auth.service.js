@@ -31,9 +31,6 @@ const loginUserFromDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "User doesn't exist!");
     }
-    if (!isExistUser.verified) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Please verify your account, then try to login again');
-    }
     if (isExistUser.status === user_1.USER_STATUS.DELETE) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Your account has been deactivated. Contact support.');
     }
@@ -100,32 +97,25 @@ const verifyEmailToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     if (date > ((_b = isExistUser.authentication) === null || _b === void 0 ? void 0 : _b.expireAt)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Otp already expired, Please try again');
     }
-    let message;
-    let data;
-    if (!isExistUser.verified) {
-        yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, { verified: true, authentication: { oneTimeCode: null, expireAt: null } });
-        message = 'Email verify successfully';
-    }
-    else {
-        yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, {
-            authentication: {
-                isResetPassword: true,
-                oneTimeCode: null,
-                expireAt: null,
-            },
-        });
-        //create token ;
-        const createToken = (0, cryptoToken_1.default)();
-        yield resetToken_model_1.ResetToken.create({
-            user: isExistUser._id,
-            token: createToken,
-            expireAt: new Date(Date.now() + 5 * 60000),
-        });
-        message =
-            'Verification Successful: Please securely store and utilize this code for reset password';
-        data = createToken;
-    }
-    return { data, message };
+    // OTP verification for password reset
+    yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, {
+        authentication: {
+            isResetPassword: true,
+            oneTimeCode: null,
+            expireAt: null,
+        },
+    });
+    // Create reset token
+    const createToken = (0, cryptoToken_1.default)();
+    yield resetToken_model_1.ResetToken.create({
+        user: isExistUser._id,
+        token: createToken,
+        expireAt: new Date(Date.now() + 5 * 60000),
+    });
+    return {
+        data: createToken,
+        message: 'Verification Successful: Please securely store and utilize this code for reset password',
+    };
 });
 //forget password
 const resetPasswordToDB = (token, payload) => __awaiter(void 0, void 0, void 0, function* () {
@@ -191,9 +181,6 @@ const resendVerifyEmailToDB = (email) => __awaiter(void 0, void 0, void 0, funct
     const isExistUser = yield user_model_1.User.findOne({ email });
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "User doesn't exist!");
-    }
-    if (isExistUser.verified) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'User is already verified!');
     }
     // Generate new OTP
     const otp = (0, generateOTP_1.default)();

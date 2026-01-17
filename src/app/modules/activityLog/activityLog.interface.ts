@@ -13,6 +13,7 @@ export const ACTION_TYPES = [
   'APPLICATION_SUBMITTED',
   'APPLICATION_APPROVED',
   'APPLICATION_REJECTED',
+  'APPLICATION_RESUBMITTED',
 ] as const;
 
 export type ActionType = (typeof ACTION_TYPES)[number];

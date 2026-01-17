@@ -140,6 +140,44 @@ const linkOrphanedReviews = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         data: result,
     });
 }));
+/**
+ * Admin: Create a review for a tutor (without session requirement)
+ */
+const adminCreateReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield sessionReview_service_1.SessionReviewService.adminCreateReview(req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.CREATED,
+        message: 'Review created successfully',
+        data: result,
+    });
+}));
+/**
+ * Admin: Update any review
+ */
+const adminUpdateReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield sessionReview_service_1.SessionReviewService.adminUpdateReview(id, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Review updated successfully',
+        data: result,
+    });
+}));
+/**
+ * Admin: Delete any review
+ */
+const adminDeleteReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    yield sessionReview_service_1.SessionReviewService.adminDeleteReview(id);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Review deleted successfully',
+        data: null,
+    });
+}));
 exports.SessionReviewController = {
     createReview,
     getMyReviews,
@@ -150,4 +188,8 @@ exports.SessionReviewController = {
     getTutorStats,
     toggleVisibility,
     linkOrphanedReviews,
+    // Admin functions
+    adminCreateReview,
+    adminUpdateReview,
+    adminDeleteReview,
 };

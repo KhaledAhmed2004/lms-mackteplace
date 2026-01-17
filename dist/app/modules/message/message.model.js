@@ -46,7 +46,7 @@ const SessionProposalSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED'],
+        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
         default: 'PROPOSED',
     },
     sessionId: {

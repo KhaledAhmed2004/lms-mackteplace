@@ -60,8 +60,40 @@ const updateTutorSubjectsZodSchema = zod_1.z.object({
             .min(1, 'At least one subject is required'),
     }),
 });
+// Admin: Update tutor profile (without password)
+const adminUpdateTutorProfileZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        name: zod_1.z.string().min(1, 'Name cannot be empty').optional(),
+        email: zod_1.z.string().email('Invalid email address').optional(),
+        phone: zod_1.z.string().regex(phoneRegex, 'Phone must be 7-15 digits, optional +').optional().or(zod_1.z.literal('')),
+        dateOfBirth: zod_1.z.string().optional(),
+        location: zod_1.z.string().optional(),
+        // Tutor profile fields
+        tutorProfile: zod_1.z.object({
+            address: zod_1.z.string().optional(),
+            birthDate: zod_1.z.string().optional(),
+            bio: zod_1.z.string().optional(),
+            languages: zod_1.z.array(zod_1.z.string()).optional(),
+            teachingExperience: zod_1.z.string().optional(),
+            education: zod_1.z.string().optional(),
+            subjects: zod_1.z.array(zod_1.z.string()).optional(),
+        }).optional(),
+    }),
+});
+// Admin: Update student profile (without password)
+const adminUpdateStudentProfileZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        name: zod_1.z.string().min(1, 'Name cannot be empty').optional(),
+        email: zod_1.z.string().email('Invalid email address').optional(),
+        phone: zod_1.z.string().regex(phoneRegex, 'Phone must be 7-15 digits, optional +').optional().or(zod_1.z.literal('')),
+        dateOfBirth: zod_1.z.string().optional(),
+        location: zod_1.z.string().optional(),
+    }),
+});
 exports.UserValidation = {
     createUserZodSchema,
     updateUserZodSchema,
     updateTutorSubjectsZodSchema,
+    adminUpdateTutorProfileZodSchema,
+    adminUpdateStudentProfileZodSchema,
 };

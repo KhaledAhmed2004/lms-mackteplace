@@ -28,7 +28,7 @@ const getChatFromDB = (user, search) => __awaiter(void 0, void 0, void 0, functi
     const chats = yield chat_model_1.Chat.find({ participants: { $in: [user.id] } })
         .populate({
         path: 'participants',
-        select: '_id name image',
+        select: '_id name image role',
         match: Object.assign({ _id: { $ne: user.id } }, (search && { name: { $regex: search, $options: 'i' } })),
     })
         .select('participants status updatedAt');

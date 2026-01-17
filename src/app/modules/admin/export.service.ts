@@ -48,7 +48,7 @@ const jsonToCSV = (data: any[], headers?: string[]): string => {
 const exportUsers = async (role?: string): Promise<string> => {
   const query = role ? { role } : {};
   const users = await User.find(query).select(
-    'name email role phone createdAt isEmailVerified'
+    'name email role phone createdAt'
   );
 
   const data = users.map(user => ({
@@ -56,7 +56,6 @@ const exportUsers = async (role?: string): Promise<string> => {
     email: user.email,
     role: user.role,
     phone: user.phone || 'N/A',
-    emailVerified: user.isEmailVerified ? 'Yes' : 'No',
     joinedAt: user.createdAt?.toISOString().split('T')[0],
   }));
 

@@ -2,7 +2,7 @@ import { StatusCodes } from 'http-status-codes';
 import { Types } from 'mongoose';
 import ApiError from '../../../errors/ApiError';
 import { Session } from '../session/session.model';
-import { SESSION_STATUS } from '../session/session.interface';
+import { SESSION_STATUS, COMPLETION_STATUS } from '../session/session.interface';
 import { User } from '../user/user.model';
 import { TutorSessionFeedback } from './tutorSessionFeedback.model';
 import {
@@ -94,7 +94,7 @@ const submitFeedback = async (
     await session.save();
   }
 
-  if (session.status !== SESSION_STATUS.COMPLETED) {
+  if (session.status !== SESSION_STATUS.COMPLETED && session.status !== SESSION_STATUS.NO_SHOW) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'Can only submit feedback for completed sessions'
@@ -113,12 +113,27 @@ const submitFeedback = async (
   let feedback = await TutorSessionFeedback.findOne({ sessionId });
 
   const dueDate = feedback?.dueDate || calculateDueDate(session.completedAt || now);
-  const isLate = now > dueDate;
+
+  // ❌ NEW: Check deadline - cannot submit after deadline
+  if (now > dueDate) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Feedback deadline has passed. You can no longer submit feedback for this session.'
+    );
+  }
 
   if (feedback) {
     // Update existing feedback record
     if (feedback.status === FEEDBACK_STATUS.SUBMITTED) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Feedback already submitted');
+    }
+
+    // Check if already forfeited
+    if (feedback.paymentForfeited) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'This feedback has been forfeited due to missed deadline. Payment cannot be recovered.'
+      );
     }
 
     feedback.rating = rating;
@@ -127,7 +142,7 @@ const submitFeedback = async (
     feedback.feedbackAudioUrl = feedbackAudioUrl;
     feedback.audioDuration = audioDuration;
     feedback.submittedAt = now;
-    feedback.isLate = isLate;
+    feedback.isLate = false; // Since we block late submissions, this will always be false
     feedback.status = FEEDBACK_STATUS.SUBMITTED;
 
     await feedback.save();
@@ -144,14 +159,18 @@ const submitFeedback = async (
       audioDuration,
       dueDate,
       submittedAt: now,
-      isLate,
+      isLate: false,
       status: FEEDBACK_STATUS.SUBMITTED,
+      paymentForfeited: false,
     });
   }
 
-  // Update session with feedback reference
+  // Update session with feedback reference and teacher completion status
   await Session.findByIdAndUpdate(sessionId, {
     tutorFeedbackId: feedback._id,
+    teacherCompletionStatus: COMPLETION_STATUS.COMPLETED,
+    teacherCompletedAt: now,
+    teacherFeedbackRequired: false,
   });
 
   // Decrement tutor's pending feedback count
@@ -323,6 +342,147 @@ const getOverdueFeedbacks = async (): Promise<ITutorSessionFeedback[]> => {
     .populate('studentId', 'name');
 };
 
+/**
+ * Process feedbacks that missed deadline - Payment forfeit to platform
+ * Called by cron on 4th of every month at 1:00 AM
+ */
+const processForfeitedFeedbacks = async (): Promise<{
+  processed: number;
+  totalForfeited: number;
+}> => {
+  const now = new Date();
+  let processed = 0;
+  let totalForfeited = 0;
+
+  // Find all PENDING feedbacks past deadline that haven't been forfeited yet
+  const overdueFeedbacks = await TutorSessionFeedback.find({
+    status: FEEDBACK_STATUS.PENDING,
+    dueDate: { $lt: now },
+    paymentForfeited: { $ne: true },
+  }).populate('sessionId');
+
+  for (const feedback of overdueFeedbacks) {
+    try {
+      const session = feedback.sessionId as any;
+      const forfeitedAmount = session?.totalPrice || 0;
+
+      // Mark feedback as forfeited
+      feedback.paymentForfeited = true;
+      feedback.forfeitedAmount = forfeitedAmount;
+      feedback.forfeitedAt = now;
+      await feedback.save();
+
+      // Update session - teacher will never complete
+      if (session?._id) {
+        await Session.findByIdAndUpdate(session._id, {
+          teacherCompletionStatus: COMPLETION_STATUS.NOT_APPLICABLE,
+          teacherFeedbackRequired: false,
+        });
+      }
+
+      // Decrement tutor's pending feedback count
+      await User.findByIdAndUpdate(feedback.tutorId, {
+        $inc: { 'tutorProfile.pendingFeedbackCount': -1 },
+      });
+
+      processed++;
+      totalForfeited += forfeitedAmount;
+
+      console.log(
+        `Payment forfeited: Session ${session?._id}, Tutor ${feedback.tutorId}, Amount €${forfeitedAmount}`
+      );
+    } catch (error) {
+      console.error(`Error processing forfeited feedback ${feedback._id}:`, error);
+    }
+  }
+
+  console.log(`Processed ${processed} forfeited feedbacks. Total forfeited: €${totalForfeited}`);
+
+  return { processed, totalForfeited };
+};
+
+/**
+ * Get forfeited payments summary (for admin dashboard)
+ */
+const getForfeitedPaymentsSummary = async (query?: {
+  month?: number;
+  year?: number;
+}) => {
+  const matchStage: any = { paymentForfeited: true };
+
+  if (query?.month && query?.year) {
+    const startDate = new Date(query.year, query.month - 1, 1);
+    const endDate = new Date(query.year, query.month, 0, 23, 59, 59);
+    matchStage.forfeitedAt = { $gte: startDate, $lte: endDate };
+  }
+
+  const summary = await TutorSessionFeedback.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$forfeitedAt' },
+          month: { $month: '$forfeitedAt' },
+        },
+        totalAmount: { $sum: '$forfeitedAmount' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': -1, '_id.month': -1 } },
+  ]);
+
+  const grandTotal = await TutorSessionFeedback.aggregate([
+    { $match: { paymentForfeited: true } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$forfeitedAmount' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  return {
+    monthly: summary,
+    grandTotal: grandTotal[0] || { total: 0, count: 0 },
+  };
+};
+
+/**
+ * Send deadline reminders to tutors with pending feedbacks
+ * Called by cron on 1st of month at 10:00 AM
+ */
+const sendDeadlineReminders = async (): Promise<number> => {
+  const feedbacksDueSoon = await getFeedbacksDueSoon(3); // Due within 3 days
+
+  // Here you would send emails/notifications to tutors
+  // For now, just log
+  for (const feedback of feedbacksDueSoon) {
+    console.log(
+      `Reminder: Feedback due for session ${feedback.sessionId}, Tutor: ${(feedback.tutorId as any)?.email}`
+    );
+  }
+
+  return feedbacksDueSoon.length;
+};
+
+/**
+ * Send final reminders to tutors (last day warning)
+ * Called by cron on 2nd of month at 10:00 AM
+ */
+const sendFinalReminders = async (): Promise<number> => {
+  const feedbacksDueSoon = await getFeedbacksDueSoon(1); // Due within 1 day
+
+  // Here you would send urgent emails/notifications
+  for (const feedback of feedbacksDueSoon) {
+    console.log(
+      `FINAL REMINDER: Feedback due TOMORROW for session ${feedback.sessionId}, Tutor: ${(feedback.tutorId as any)?.email}`
+    );
+  }
+
+  return feedbacksDueSoon.length;
+};
+
 export const TutorSessionFeedbackService = {
   createPendingFeedback,
   submitFeedback,
@@ -333,4 +493,8 @@ export const TutorSessionFeedbackService = {
   getStudentFeedbacks,
   getFeedbacksDueSoon,
   getOverdueFeedbacks,
+  processForfeitedFeedbacks,
+  getForfeitedPaymentsSummary,
+  sendDeadlineReminders,
+  sendFinalReminders,
 };

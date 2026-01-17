@@ -96,14 +96,24 @@ const submitApplication = (payload) => __awaiter(void 0, void 0, void 0, functio
     };
 });
 // Get my application (for logged in applicant)
-const getMyApplication = (userEmail) => __awaiter(void 0, void 0, void 0, function* () {
+const getMyApplication = (userEmail, currentUserRole) => __awaiter(void 0, void 0, void 0, function* () {
     const application = yield tutorApplication_model_1.TutorApplication.findOne({
         email: userEmail,
     }).populate({ path: 'subjects', select: 'name -_id' });
     if (!application) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'No application found');
     }
-    return application;
+    // If application is APPROVED but user still has APPLICANT role token,
+    // generate new token with updated TUTOR role
+    let newAccessToken = null;
+    if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.APPROVED &&
+        currentUserRole === user_1.USER_ROLES.APPLICANT) {
+        const user = yield user_model_1.User.findOne({ email: userEmail });
+        if (user && user.role === user_1.USER_ROLES.TUTOR) {
+            newAccessToken = jwtHelper_1.jwtHelper.createToken({ id: user._id, role: user.role, email: user.email }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
+        }
+    }
+    return { application, newAccessToken };
 });
 /**
  * Get all applications (admin)
@@ -158,10 +168,11 @@ const selectForInterview = (id, adminNotes) => __awaiter(void 0, void 0, void 0,
     if (application.status === tutorApplication_interface_1.APPLICATION_STATUS.REJECTED) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot select a rejected application for interview');
     }
-    // Only SUBMITTED or REVISION status can be selected for interview
+    // Only SUBMITTED, REVISION or RESUBMITTED status can be selected for interview
     if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.SUBMITTED &&
-        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only submitted or revision applications can be selected for interview');
+        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION &&
+        application.status !== tutorApplication_interface_1.APPLICATION_STATUS.RESUBMITTED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Only submitted, revision, or resubmitted applications can be selected for interview');
     }
     // Update application status
     application.status = tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW;
@@ -225,7 +236,12 @@ const approveApplication = (id, adminNotes) => __awaiter(void 0, void 0, void 0,
             status: 'success',
         });
     }
-    return application;
+    // Generate new access token with updated TUTOR role
+    let newAccessToken = null;
+    if (updatedUser) {
+        newAccessToken = jwtHelper_1.jwtHelper.createToken({ id: updatedUser._id, role: updatedUser.role, email: updatedUser.email }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
+    }
+    return { application, newAccessToken };
 });
 /**
  * Reject application (admin only)
@@ -292,6 +308,53 @@ const deleteApplication = (id) => __awaiter(void 0, void 0, void 0, function* ()
     const result = yield tutorApplication_model_1.TutorApplication.findByIdAndDelete(id);
     return result;
 });
+/**
+ * Update my application (applicant only - when in REVISION status)
+ * Allows applicant to update documents and resubmit
+ */
+const updateMyApplication = (userEmail, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const application = yield tutorApplication_model_1.TutorApplication.findOne({ email: userEmail });
+    if (!application) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Application not found');
+    }
+    // Only allow updates when in REVISION status
+    if (application.status !== tutorApplication_interface_1.APPLICATION_STATUS.REVISION) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You can only update your application when revision is requested');
+    }
+    // Update documents if provided
+    if (payload.cv) {
+        application.cv = payload.cv;
+    }
+    if (payload.abiturCertificate) {
+        application.abiturCertificate = payload.abiturCertificate;
+    }
+    if (payload.officialId) {
+        application.officialId = payload.officialId;
+    }
+    // Change status to RESUBMITTED (not back to SUBMITTED)
+    application.status = tutorApplication_interface_1.APPLICATION_STATUS.RESUBMITTED;
+    application.resubmittedAt = new Date();
+    // Also update user's tutorProfile with new documents
+    yield user_model_1.User.findOneAndUpdate({ email: userEmail }, {
+        'tutorProfile.cvUrl': application.cv,
+        'tutorProfile.abiturCertificateUrl': application.abiturCertificate,
+    });
+    yield application.save();
+    // Log activity
+    const user = yield user_model_1.User.findOne({ email: userEmail });
+    if (user) {
+        activityLog_service_1.ActivityLogService.logActivity({
+            userId: user._id,
+            actionType: 'APPLICATION_RESUBMITTED',
+            title: 'Application Resubmitted',
+            description: `${application.name} resubmitted their tutor application after revision`,
+            entityType: 'APPLICATION',
+            entityId: application._id,
+            status: 'success',
+        });
+    }
+    return application.populate({ path: 'subjects', select: 'name -_id' });
+});
 exports.TutorApplicationService = {
     submitApplication,
     getMyApplication,
@@ -302,4 +365,5 @@ exports.TutorApplicationService = {
     rejectApplication,
     sendForRevision,
     deleteApplication,
+    updateMyApplication,
 };

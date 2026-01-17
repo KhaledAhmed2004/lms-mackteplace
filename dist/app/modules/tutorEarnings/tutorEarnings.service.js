@@ -69,20 +69,21 @@ const generateTutorEarnings = (month_1, year_1, ...args_1) => __awaiter(void 0, 
             continue; // Skip if already generated
         }
         // Get completed sessions for this tutor in billing period
+        // NEW: Query by teacherCompletionStatus - only sessions where feedback was submitted
         const sessions = yield session_model_1.Session.find({
             tutorId: tutor._id,
-            status: session_interface_1.SESSION_STATUS.COMPLETED,
-            completedAt: { $gte: periodStart, $lte: periodEnd },
+            teacherCompletionStatus: session_interface_1.COMPLETION_STATUS.COMPLETED,
+            teacherCompletedAt: { $gte: periodStart, $lte: periodEnd },
         }).populate('studentId', 'name');
         if (sessions.length === 0) {
             continue; // Skip tutors with no sessions
         }
-        // Build line items
+        // Build line items - use teacherCompletedAt for date
         const lineItems = sessions.map(session => ({
             sessionId: session._id,
             studentName: session.studentId.name,
             subject: session.subject,
-            completedAt: session.completedAt,
+            completedAt: session.teacherCompletedAt || session.completedAt,
             duration: session.duration,
             sessionPrice: session.totalPrice,
             tutorEarning: session.totalPrice * (1 - commissionRate),

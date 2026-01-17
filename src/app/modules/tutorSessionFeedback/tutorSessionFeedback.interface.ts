@@ -31,6 +31,11 @@ export type ITutorSessionFeedback = {
 
   // Status
   status: FEEDBACK_STATUS;
+
+  // Payment forfeit tracking (when deadline missed)
+  paymentForfeited: boolean;         // true if deadline missed
+  forfeitedAmount?: number;          // Amount forfeited to platform
+  forfeitedAt?: Date;                // When payment was forfeited
 };
 
 export type TutorSessionFeedbackModel = Model<ITutorSessionFeedback>;

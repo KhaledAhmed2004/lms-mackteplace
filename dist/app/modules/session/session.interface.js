@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PAYMENT_STATUS = exports.RESCHEDULE_STATUS = exports.SESSION_STATUS = void 0;
+exports.COMPLETION_STATUS = exports.PAYMENT_STATUS = exports.RESCHEDULE_STATUS = exports.SESSION_STATUS = void 0;
 var SESSION_STATUS;
 (function (SESSION_STATUS) {
     SESSION_STATUS["AWAITING_RESPONSE"] = "AWAITING_RESPONSE";
@@ -26,3 +26,9 @@ var PAYMENT_STATUS;
     PAYMENT_STATUS["FAILED"] = "FAILED";
     PAYMENT_STATUS["REFUNDED"] = "REFUNDED";
 })(PAYMENT_STATUS || (exports.PAYMENT_STATUS = PAYMENT_STATUS = {}));
+// Completion status for student and teacher separately
+var COMPLETION_STATUS;
+(function (COMPLETION_STATUS) {
+    COMPLETION_STATUS["NOT_APPLICABLE"] = "NOT_APPLICABLE";
+    COMPLETION_STATUS["COMPLETED"] = "COMPLETED";
+})(COMPLETION_STATUS || (exports.COMPLETION_STATUS = COMPLETION_STATUS = {}));

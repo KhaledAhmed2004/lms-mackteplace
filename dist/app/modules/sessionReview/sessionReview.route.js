@@ -73,4 +73,24 @@ router.patch('/:id/visibility', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMI
  * @access  Admin only
  */
 router.post('/link-orphaned', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.linkOrphanedReviews);
+/**
+ * @route   POST /api/v1/reviews/admin
+ * @desc    Admin: Create a review for a tutor (without session requirement)
+ * @access  Admin only
+ * @body    { tutorId, overallRating, teachingQuality, communication, punctuality, preparedness, comment?, wouldRecommend, isPublic?, reviewerName? }
+ */
+router.post('/admin', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(sessionReview_validation_1.SessionReviewValidation.adminCreateReviewZodSchema), sessionReview_controller_1.SessionReviewController.adminCreateReview);
+/**
+ * @route   PATCH /api/v1/reviews/admin/:id
+ * @desc    Admin: Update any review
+ * @access  Admin only
+ * @body    Partial review fields
+ */
+router.patch('/admin/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(sessionReview_validation_1.SessionReviewValidation.adminUpdateReviewZodSchema), sessionReview_controller_1.SessionReviewController.adminUpdateReview);
+/**
+ * @route   DELETE /api/v1/reviews/admin/:id
+ * @desc    Admin: Delete any review
+ * @access  Admin only
+ */
+router.delete('/admin/:id', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.adminDeleteReview);
 exports.SessionReviewRoutes = router;

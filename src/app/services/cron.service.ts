@@ -25,6 +25,7 @@ import { MonthlyBillingService } from '../modules/monthlyBilling/monthlyBilling.
 import { TutorEarningsService } from '../modules/tutorEarnings/tutorEarnings.service';
 import { SessionService } from '../modules/session/session.service';
 import { InterviewSlotService } from '../modules/interviewSlot/interviewSlot.service';
+import { TutorSessionFeedbackService } from '../modules/tutorSessionFeedback/tutorSessionFeedback.service';
 import { TrialRequest } from '../modules/trialRequest/trialRequest.model';
 import { TRIAL_REQUEST_STATUS } from '../modules/trialRequest/trialRequest.interface';
 import { Session } from '../modules/session/session.model';
@@ -170,7 +171,8 @@ export const generateMonthlyBillings = async () => {
 };
 
 /**
- * Generate tutor earnings (1st of every month at 3:00 AM)
+ * Generate tutor earnings (4th of every month at 3:00 AM)
+ * CHANGED: Moved from 1st to 4th to allow feedback deadline (3rd) to pass first
  */
 export const generateTutorEarnings = async () => {
   try {
@@ -184,6 +186,45 @@ export const generateTutorEarnings = async () => {
     logger.info(`Generated ${result.length} tutor earnings for ${year}-${month}`);
   } catch (error) {
     errorLogger.error('Failed to generate tutor earnings', { error });
+  }
+};
+
+/**
+ * Process forfeited feedbacks (4th of every month at 1:00 AM)
+ * NEW: Runs before tutor earnings to mark missed deadlines
+ */
+export const processForfeitedFeedbacks = async () => {
+  try {
+    const result = await TutorSessionFeedbackService.processForfeitedFeedbacks();
+    logger.info(`Processed ${result.processed} forfeited feedbacks. Total forfeited: €${result.totalForfeited}`);
+  } catch (error) {
+    errorLogger.error('Failed to process forfeited feedbacks', { error });
+  }
+};
+
+/**
+ * Send feedback deadline reminders (1st of every month at 10:00 AM)
+ * NEW: Remind tutors about pending feedbacks due on 3rd
+ */
+export const sendFeedbackReminders = async () => {
+  try {
+    const count = await TutorSessionFeedbackService.sendDeadlineReminders();
+    logger.info(`Sent deadline reminders for ${count} pending feedbacks`);
+  } catch (error) {
+    errorLogger.error('Failed to send feedback reminders', { error });
+  }
+};
+
+/**
+ * Send final feedback reminders (2nd of every month at 10:00 AM)
+ * NEW: Last warning before deadline
+ */
+export const sendFinalFeedbackReminders = async () => {
+  try {
+    const count = await TutorSessionFeedbackService.sendFinalReminders();
+    logger.info(`Sent final reminders for ${count} pending feedbacks`);
+  } catch (error) {
+    errorLogger.error('Failed to send final feedback reminders', { error });
   }
 };
 
@@ -236,8 +277,26 @@ export const initializeCronJobs = () => {
     generateMonthlyBillings();
   });
 
-  // Generate tutor earnings - 1st of month at 3:00 AM
-  cron.schedule('0 3 1 * *', () => {
+  // Send feedback deadline reminders - 1st of month at 10:00 AM
+  cron.schedule('0 10 1 * *', () => {
+    logger.info('Running cron: Send feedback deadline reminders');
+    sendFeedbackReminders();
+  });
+
+  // Send final feedback reminders - 2nd of month at 10:00 AM
+  cron.schedule('0 10 2 * *', () => {
+    logger.info('Running cron: Send final feedback reminders');
+    sendFinalFeedbackReminders();
+  });
+
+  // Process forfeited feedbacks - 4th of month at 1:00 AM (before earnings)
+  cron.schedule('0 1 4 * *', () => {
+    logger.info('Running cron: Process forfeited feedbacks');
+    processForfeitedFeedbacks();
+  });
+
+  // Generate tutor earnings - 4th of month at 3:00 AM (after forfeit processing)
+  cron.schedule('0 3 4 * *', () => {
     logger.info('Running cron: Generate tutor earnings');
     generateTutorEarnings();
   });
@@ -263,4 +322,7 @@ export const CronService = {
   generateMonthlyBillings,
   generateTutorEarnings,
   cleanupExpiredInterviewSlots,
+  processForfeitedFeedbacks,
+  sendFeedbackReminders,
+  sendFinalFeedbackReminders,
 };

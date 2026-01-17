@@ -54,7 +54,7 @@ const jsonToCSV = (data, headers) => {
  */
 const exportUsers = (role) => __awaiter(void 0, void 0, void 0, function* () {
     const query = role ? { role } : {};
-    const users = yield user_model_1.User.find(query).select('name email role phone createdAt isEmailVerified');
+    const users = yield user_model_1.User.find(query).select('name email role phone createdAt');
     const data = users.map(user => {
         var _a;
         return ({
@@ -62,7 +62,6 @@ const exportUsers = (role) => __awaiter(void 0, void 0, void 0, function* () {
             email: user.email,
             role: user.role,
             phone: user.phone || 'N/A',
-            emailVerified: user.isEmailVerified ? 'Yes' : 'No',
             joinedAt: (_a = user.createdAt) === null || _a === void 0 ? void 0 : _a.toISOString().split('T')[0],
         });
     });

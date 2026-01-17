@@ -35,27 +35,38 @@ const sendMessageToDB = async (payload: any): Promise<IMessage> => {
 
   //@ts-ignore
   const io = global.io;
+
+  // Fetch chat participants for socket emit and notifications
+  const chat = await Chat.findById(response.chatId).select('participants');
+  const participants = (chat?.participants || [])
+    .map(p => String(p))
+    .filter(Boolean);
+  const receivers = participants.filter(
+    p => String(p) !== String(response.sender)
+  );
+
   if (io && populatedMessage) {
-    // Room-based event for chat participants
     // Ensure chatId is a string for frontend matching
     const chatIdStr = String(payload?.chatId);
-    io.to(`chat::${chatIdStr}`).emit('MESSAGE_SENT', {
+    const messagePayload = {
       message: {
         ...populatedMessage,
         chatId: chatIdStr, // Ensure string for frontend query key matching
       },
-    });
+    };
+
+    // Emit to chat room for participants who have joined
+    io.to(`chat::${chatIdStr}`).emit('MESSAGE_SENT', messagePayload);
+
+    // Also emit to each participant's user room to ensure delivery
+    // even if they haven't joined the chat room yet (e.g., just opened the page)
+    for (const participantId of participants) {
+      io.to(`user::${participantId}`).emit('MESSAGE_SENT', messagePayload);
+    }
   }
 
   // Offline notification triggers
   try {
-    const chat = await Chat.findById(response.chatId).select('participants');
-    const participants = (chat?.participants || [])
-      .map(p => String(p))
-      .filter(Boolean);
-    const receivers = participants.filter(
-      p => String(p) !== String(response.sender)
-    );
 
     // Increment unread count for receivers
     for (const receiverId of receivers) {

@@ -20,7 +20,7 @@ const message_controller_1 = require("./message.controller");
 const getFilePath_1 = require("../../../shared/getFilePath");
 const fileUploadHandler_1 = __importDefault(require("../../middlewares/fileUploadHandler"));
 const router = express_1.default.Router();
-router.post('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), (0, fileUploadHandler_1.default)(), (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), (0, fileUploadHandler_1.default)(), (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
         // Ensure these are always arrays
@@ -68,9 +68,9 @@ router.post('/', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLE
         return res.status(500).json({ message: 'Invalid File Format' });
     }
 }), message_controller_1.MessageController.sendMessage);
-router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.getMessage);
+router.get('/:id', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), message_controller_1.MessageController.getMessage);
 // Get all messages in a chat (alias route for frontend compatibility)
-router.get('/chat/:chatId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.getChatMessages);
+router.get('/chat/:chatId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), message_controller_1.MessageController.getChatMessages);
 // Mark all messages in a chat as read
-router.post('/chat/:chatId/read', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR), message_controller_1.MessageController.markChatRead);
+router.post('/chat/:chatId/read', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), message_controller_1.MessageController.markChatRead);
 exports.MessageRoutes = router;

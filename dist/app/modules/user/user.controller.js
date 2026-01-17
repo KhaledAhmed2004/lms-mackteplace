@@ -142,6 +142,19 @@ const unblockStudent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         data: result,
     });
 }));
+/**
+ * Admin: Update student profile (without password)
+ */
+const adminUpdateStudentProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.adminUpdateStudentProfile(id, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Student profile updated successfully',
+        data: result,
+    });
+}));
 // ============ ADMIN: TUTOR MANAGEMENT ============
 const getAllTutors = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield user_service_1.UserService.getAllTutors(req.query);
@@ -184,6 +197,19 @@ const updateTutorSubjects = (0, catchAsync_1.default)((req, res) => __awaiter(vo
         data: result,
     });
 }));
+/**
+ * Admin: Update tutor profile (without password)
+ */
+const adminUpdateTutorProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const result = yield user_service_1.UserService.adminUpdateTutorProfile(id, req.body);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Tutor profile updated successfully',
+        data: result,
+    });
+}));
 // ============ TUTOR: STATISTICS ============
 const getTutorStatistics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
@@ -208,11 +234,13 @@ exports.UserController = {
     getAllStudents,
     blockStudent,
     unblockStudent,
+    adminUpdateStudentProfile,
     // Admin: Tutor Management
     getAllTutors,
     blockTutor,
     unblockTutor,
     updateTutorSubjects,
+    adminUpdateTutorProfile,
     // Tutor: Statistics
     getTutorStatistics,
 };

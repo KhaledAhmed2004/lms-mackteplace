@@ -67,10 +67,6 @@ const userSchema = new mongoose_1.Schema({
         enum: Object.values(user_interface_1.USER_STATUS),
         default: user_interface_1.USER_STATUS.ACTIVE,
     },
-    verified: {
-        type: Boolean,
-        default: false,
-    },
     deviceTokens: {
         type: [String],
         default: [],

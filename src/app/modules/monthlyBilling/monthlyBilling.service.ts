@@ -5,7 +5,7 @@ import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { Session } from '../session/session.model';
 import { StudentSubscription } from '../studentSubscription/studentSubscription.model';
-import { SESSION_STATUS } from '../session/session.interface';
+import { SESSION_STATUS, COMPLETION_STATUS } from '../session/session.interface';
 import { SUBSCRIPTION_STATUS } from '../studentSubscription/studentSubscription.interface';
 import {
   IMonthlyBilling,
@@ -49,10 +49,11 @@ const generateMonthlyBillings = async (
       }
 
       // Get completed sessions for this student in billing period
+      // NEW: Query by studentCompletionStatus instead of main status
       const sessions = await Session.find({
         studentId: subscription.studentId,
-        status: SESSION_STATUS.COMPLETED,
-        completedAt: {
+        studentCompletionStatus: COMPLETION_STATUS.COMPLETED,
+        studentCompletedAt: {
           $gte: periodStart,
           $lte: periodEnd,
         },
@@ -62,12 +63,12 @@ const generateMonthlyBillings = async (
         continue; // Skip if no sessions
       }
 
-      // Build line items
+      // Build line items - use studentCompletedAt for date
       const lineItems: IBillingLineItem[] = sessions.map(session => ({
         sessionId: session._id as Types.ObjectId,
         subject: session.subject,
         tutorName: (session.tutorId as any).name,
-        date: session.completedAt!,
+        date: session.studentCompletedAt || session.completedAt!,
         duration: session.duration,
         pricePerHour: session.pricePerHour,
         amount: session.totalPrice,

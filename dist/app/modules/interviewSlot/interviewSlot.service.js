@@ -133,6 +133,10 @@ const bookInterviewSlot = (slotId, applicantId, applicationId) => __awaiter(void
     // Generate Agora channel name for video call
     slot.agoraChannelName = (0, agora_helper_1.generateChannelName)();
     yield slot.save();
+    // Clear any previous cancellation reason from the application
+    yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(applicationId, {
+        $unset: { interviewCancelledReason: 1, interviewCancelledAt: 1 },
+    });
     // TODO: Send email notification to applicant with meeting details
     // await sendEmail({
     //   to: application.email,
@@ -184,10 +188,17 @@ const cancelInterviewSlot = (slotId, userId, cancellationReason) => __awaiter(vo
     yield slot.save();
     // Keep application status as SELECTED_FOR_INTERVIEW (so they can book again)
     // The applicant should still be able to book a new interview slot
+    // If admin cancelled, save the cancellation reason to the application
     if (savedApplicationId) {
-        yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(savedApplicationId, {
+        const updateData = {
             status: tutorApplication_interface_1.APPLICATION_STATUS.SELECTED_FOR_INTERVIEW,
-        });
+        };
+        // Only save cancellation reason if admin cancelled (with a reason)
+        if (isAdmin && cancellationReason) {
+            updateData.interviewCancelledReason = cancellationReason;
+            updateData.interviewCancelledAt = new Date();
+        }
+        yield tutorApplication_model_1.TutorApplication.findByIdAndUpdate(savedApplicationId, updateData);
     }
     // TODO: Send cancellation email
     // await sendEmail({
@@ -311,14 +322,16 @@ const deleteInterviewSlot = (id) => __awaiter(void 0, void 0, void 0, function* 
 });
 /**
  * Get my booked interview slot (Applicant only)
+ * Returns BOOKED or COMPLETED interview slots
  */
 const getMyBookedInterview = (applicantId) => __awaiter(void 0, void 0, void 0, function* () {
     const slot = yield interviewSlot_model_1.InterviewSlot.findOne({
         applicantId: new mongoose_1.Types.ObjectId(applicantId),
-        status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED,
+        status: { $in: [interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.BOOKED, interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.COMPLETED] },
     })
         .populate('adminId', 'name email')
-        .populate('applicationId');
+        .populate('applicationId')
+        .sort({ createdAt: -1 }); // Get the most recent one
     return slot;
 });
 /**
@@ -401,6 +414,21 @@ const getInterviewMeetingToken = (slotId, userId) => __awaiter(void 0, void 0, v
         appId: config_1.default.agora.appId,
     };
 });
+/**
+ * Cleanup expired available interview slots
+ * Deletes all AVAILABLE slots where the day has passed (startTime < start of today)
+ * Only deletes unbooked slots - booked/completed/cancelled slots are kept for records
+ */
+const cleanupExpiredAvailableSlots = () => __awaiter(void 0, void 0, void 0, function* () {
+    // Get start of today (midnight)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const result = yield interviewSlot_model_1.InterviewSlot.deleteMany({
+        status: interviewSlot_interface_1.INTERVIEW_SLOT_STATUS.AVAILABLE,
+        startTime: { $lt: startOfToday },
+    });
+    return result.deletedCount;
+});
 exports.InterviewSlotService = {
     createInterviewSlot,
     getAllInterviewSlots,
@@ -414,4 +442,5 @@ exports.InterviewSlotService = {
     getMyBookedInterview,
     getScheduledMeetings,
     getInterviewMeetingToken,
+    cleanupExpiredAvailableSlots,
 };

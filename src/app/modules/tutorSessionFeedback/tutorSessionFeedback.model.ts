@@ -65,6 +65,18 @@ const tutorSessionFeedbackSchema = new Schema<ITutorSessionFeedback>(
       enum: Object.values(FEEDBACK_STATUS),
       default: FEEDBACK_STATUS.PENDING,
     },
+
+    // Payment forfeit tracking
+    paymentForfeited: {
+      type: Boolean,
+      default: false,
+    },
+    forfeitedAmount: {
+      type: Number,
+    },
+    forfeitedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
@@ -75,6 +87,7 @@ tutorSessionFeedbackSchema.index({ studentId: 1, createdAt: -1 });
 tutorSessionFeedbackSchema.index({ sessionId: 1 }, { unique: true });
 tutorSessionFeedbackSchema.index({ status: 1, dueDate: 1 }); // For finding pending feedbacks due soon
 tutorSessionFeedbackSchema.index({ tutorId: 1, dueDate: 1 }); // For tutor's pending feedbacks
+tutorSessionFeedbackSchema.index({ paymentForfeited: 1, forfeitedAt: 1 }); // For forfeit queries
 
 // Pre-save validation for feedback type
 tutorSessionFeedbackSchema.pre('save', function (next) {

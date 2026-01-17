@@ -88,8 +88,6 @@ const BASE_TO_CONTROLLER = {
     notifications: 'NotificationController',
     message: 'MessageController',
     messages: 'MessageController',
-    bookmark: 'BookmarkController',
-    bookmarks: 'BookmarkController',
     payment: 'PaymentController',
     payments: 'PaymentController',
     chat: 'ChatController',

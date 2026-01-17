@@ -144,7 +144,7 @@ const updateReview = async (
   }
 
   // Verify ownership
-  if (review.studentId.toString() !== studentId) {
+  if (review.studentId?.toString() !== studentId) {
     throw new ApiError(
       StatusCodes.FORBIDDEN,
       'You can only update your own reviews'
@@ -175,7 +175,7 @@ const deleteReview = async (
   }
 
   // Verify ownership
-  if (review.studentId.toString() !== studentId) {
+  if (review.studentId?.toString() !== studentId) {
     throw new ApiError(
       StatusCodes.FORBIDDEN,
       'You can only delete your own reviews'

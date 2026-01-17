@@ -5,13 +5,15 @@ import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { Chat } from '../chat/chat.model';
 import { Message } from '../message/message.model';
+import { MessageService } from '../message/message.service';
 import { USER_ROLES } from '../../../enums/user';
-import { ISession, ISessionAttendance, SESSION_STATUS, RESCHEDULE_STATUS } from './session.interface';
+import { ISession, ISessionAttendance, SESSION_STATUS, RESCHEDULE_STATUS, COMPLETION_STATUS } from './session.interface';
 import { Session } from './session.model';
 import { Call } from '../call/call.model';
 import { TutorSessionFeedbackService } from '../tutorSessionFeedback/tutorSessionFeedback.service';
 import { UserService } from '../user/user.service';
 import { ActivityLogService } from '../activityLog/activityLog.service';
+import { logger } from '../../../shared/logger';
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 
 // ============================================
@@ -82,6 +84,39 @@ const proposeSession = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Session proposals can only be sent to students');
   }
 
+  // Check if there's already a pending proposal in this chat
+  const pendingProposal = await Message.findOne({
+    chatId: chat._id,
+    type: 'session_proposal',
+    'sessionProposal.status': 'PROPOSED',
+  });
+
+  if (pendingProposal) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'There is already a pending session proposal. Please wait for a response before creating a new one.'
+    );
+  }
+
+  // Check if there's already an active session in this chat (Rule 2: One Session Per Chat)
+  const activeSession = await Session.findOne({
+    chatId: chat._id,
+    status: {
+      $in: [
+        SESSION_STATUS.SCHEDULED,
+        SESSION_STATUS.STARTING_SOON,
+        SESSION_STATUS.IN_PROGRESS,
+      ],
+    },
+  });
+
+  if (activeSession) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'There is already an active session in this chat. Please wait for it to complete before scheduling a new one.'
+    );
+  }
+
   const studentId = otherParticipantId;
 
   // Calculate duration
@@ -99,11 +134,11 @@ const proposeSession = async (
 
   const totalPrice = (pricePerHour * duration) / 60;
 
-  // Create session proposal message
+  // Create session proposal message using MessageService for real-time socket notification
   // expiresAt = startTime (proposal expires when session time passes)
-  const message = await Message.create({
-    chatId: new Types.ObjectId(payload.chatId),
-    sender: new Types.ObjectId(tutorId),
+  const message = await MessageService.sendMessageToDB({
+    chatId: payload.chatId,
+    sender: tutorId,
     type: 'session_proposal',
     text: `Session proposal: ${payload.subject}`,
     sessionProposal: {
@@ -117,15 +152,6 @@ const proposeSession = async (
       expiresAt: startTime, // Expires when session start time passes
     },
   });
-
-  // TODO: Send real-time notification to student
-  // io.to(studentId.toString()).emit('sessionProposal', {
-  //   tutorName: tutor.name,
-  //   subject: payload.subject,
-  //   startTime,
-  //   totalPrice,
-  //   messageId: message._id
-  // });
 
   return message;
 };
@@ -240,6 +266,25 @@ const acceptSessionProposal = async (
   message.sessionProposal.sessionId = session._id as Types.ObjectId;
   await message.save();
 
+  // Emit socket event for real-time update
+  //@ts-ignore
+  const io = global.io;
+  if (io) {
+    const chatIdStr = String(chat._id);
+    const proposalPayload = {
+      messageId: String(message._id),
+      chatId: chatIdStr,
+      status: 'ACCEPTED',
+      sessionId: String(session._id),
+    };
+    // Emit to chat room
+    io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    // Also emit to each participant's user room for guaranteed delivery
+    for (const participant of chat.participants) {
+      io.to(`user::${String(participant)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    }
+  }
+
   // Log activity - Session scheduled
   const student = await User.findById(studentId);
   ActivityLogService.logActivity({
@@ -345,10 +390,28 @@ const counterProposeSession = async (
   originalMessage.sessionProposal.status = 'COUNTER_PROPOSED';
   await originalMessage.save();
 
-  // Create new counter-proposal message (sent by student)
-  const counterProposalMessage = await Message.create({
-    chatId: chat._id,
-    sender: new Types.ObjectId(studentId),
+  // Emit socket event for original proposal status update
+  //@ts-ignore
+  const io = global.io;
+  if (io) {
+    const chatIdStr = String(chat._id);
+    const proposalPayload = {
+      messageId: String(originalMessage._id),
+      chatId: chatIdStr,
+      status: 'COUNTER_PROPOSED',
+    };
+    // Emit to chat room
+    io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    // Also emit to each participant's user room for guaranteed delivery
+    for (const participant of chat.participants) {
+      io.to(`user::${String(participant)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    }
+  }
+
+  // Create new counter-proposal message using MessageService for real-time socket notification
+  const counterProposalMessage = await MessageService.sendMessageToDB({
+    chatId: chat._id.toString(),
+    sender: studentId,
     type: 'session_proposal',
     text: `Counter-proposal: ${originalMessage.sessionProposal.subject}`,
     sessionProposal: {
@@ -364,13 +427,6 @@ const counterProposeSession = async (
       counterProposalReason: payload.reason,
     },
   });
-
-  // TODO: Send real-time notification to tutor
-  // io.to(originalMessage.sender.toString()).emit('counterProposal', {
-  //   studentName: student.name,
-  //   newStartTime,
-  //   messageId: counterProposalMessage._id
-  // });
 
   return counterProposalMessage;
 };
@@ -420,10 +476,24 @@ const rejectSessionProposal = async (
   message.sessionProposal.rejectionReason = rejectionReason;
   await message.save();
 
-  // TODO: Notify the proposal sender
-  // io.to(message.sender.toString()).emit('sessionRejected', {
-  //   rejectionReason
-  // });
+  // Emit socket event for real-time update
+  //@ts-ignore
+  const io = global.io;
+  if (io) {
+    const chatIdStr = String(chat._id);
+    const proposalPayload = {
+      messageId: String(message._id),
+      chatId: chatIdStr,
+      status: 'REJECTED',
+      rejectionReason,
+    };
+    // Emit to chat room
+    io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    // Also emit to each participant's user room for guaranteed delivery
+    for (const participant of chat.participants) {
+      io.to(`user::${String(participant)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    }
+  }
 
   return message;
 };
@@ -529,6 +599,23 @@ const cancelSession = async (
     await Message.findByIdAndUpdate(session.messageId, {
       'sessionProposal.status': 'CANCELLED',
     });
+
+    // Emit socket event for real-time update
+    //@ts-ignore
+    const io = global.io;
+    if (io && session.chatId) {
+      const chatIdStr = String(session.chatId);
+      const proposalPayload = {
+        messageId: String(session.messageId),
+        chatId: chatIdStr,
+        status: 'CANCELLED',
+      };
+      // Emit to chat room
+      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Also emit to student and tutor user rooms for guaranteed delivery
+      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+    }
   }
 
   // Log activity - Session cancelled
@@ -1261,6 +1348,9 @@ const checkAttendanceRequirement = (session: ISession): {
 
 /**
  * Complete session with attendance check
+ * NEW LOGIC: Simple join check instead of 80% attendance
+ * - If tutor joined: Student is COMPLETED, Teacher is pending feedback
+ * - If tutor didn't join: Neither is completed (no charge to student)
  */
 const completeSessionWithAttendanceCheck = async (
   sessionId: string
@@ -1277,44 +1367,104 @@ const completeSessionWithAttendanceCheck = async (
     throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
   }
 
-  // Check attendance requirement
+  const now = new Date();
+
+  // Simple join check - did they join at all? (No 80% attendance check)
+  const tutorJoined = (session.tutorAttendance?.joinCount || 0) > 0;
+  const studentJoined = (session.studentAttendance?.joinCount || 0) > 0;
+
+  // Save join status using set() for Mongoose Document compatibility
+  session.set('tutorJoined', tutorJoined);
+  session.set('studentJoined', studentJoined);
+  session.completedAt = now;
+
+  // Check attendance requirement (for backward compatibility)
   const attendanceCheck = checkAttendanceRequirement(session);
 
-  if (attendanceCheck.canComplete) {
-    // Mark as completed
-    session.status = SESSION_STATUS.COMPLETED;
-    session.completedAt = new Date();
-  } else if (attendanceCheck.noShowBy) {
-    // Mark as no show
+  if (!tutorJoined) {
+    // ❌ Tutor didn't join - Student NOT charged
+    session.set('studentCompletionStatus', COMPLETION_STATUS.NOT_APPLICABLE);
+    session.set('teacherCompletionStatus', COMPLETION_STATUS.NOT_APPLICABLE);
+    session.set('teacherFeedbackRequired', false);
     session.status = SESSION_STATUS.NO_SHOW;
-    session.noShowBy = attendanceCheck.noShowBy;
-    session.completedAt = new Date();
+    session.noShowBy = 'tutor';
   } else {
-    // Both have low attendance - mark as expired
-    session.status = SESSION_STATUS.EXPIRED;
-    session.expiredAt = new Date();
-  }
+    // ✅ Tutor joined - Student is COMPLETED, Teacher pending feedback
+    session.set('studentCompletionStatus', COMPLETION_STATUS.COMPLETED);
+    session.set('studentCompletedAt', now);
+    session.set('teacherCompletionStatus', COMPLETION_STATUS.NOT_APPLICABLE);
+    session.set('teacherFeedbackRequired', true);
 
-  await session.save();
+    // Main status for backward compatibility
+    if (studentJoined) {
+      session.status = SESSION_STATUS.COMPLETED;
+    } else {
+      session.status = SESSION_STATUS.NO_SHOW;
+      session.noShowBy = 'student';
+    }
 
-  // If completed successfully, create feedback and update tutor level
-  if (session.status === SESSION_STATUS.COMPLETED) {
+    // Create pending feedback record for tutor
     try {
       await TutorSessionFeedbackService.createPendingFeedback(
         sessionId,
         session.tutorId.toString(),
         session.studentId.toString(),
-        session.completedAt!
+        now
       );
     } catch {
-      // Feedback creation failed, but session is still completed
+      // Feedback creation failed, but session is still processed
     }
 
+    // Update tutor level
     try {
       await UserService.updateTutorLevelAfterSession(session.tutorId.toString());
     } catch {
-      // Level update failed, but session is still completed
+      // Level update failed, but session is still processed
     }
+  }
+
+  await session.save();
+
+  // DEBUG: Log session completion details
+  logger.info(`[Session Complete] sessionId: ${session._id}, status: ${session.status}, messageId: ${session.messageId}, chatId: ${session.chatId}`);
+
+  // Update the message's proposal status to match session status (COMPLETED, NO_SHOW, etc.)
+  // This enables frontend to show correct calendar button state
+  if (session.messageId) {
+    const finalStatus = session.status; // COMPLETED, NO_SHOW, or EXPIRED
+
+    // Update message with { new: true } to verify the update
+    const updateResult = await Message.findByIdAndUpdate(
+      session.messageId,
+      { 'sessionProposal.status': finalStatus },
+      { new: true }
+    );
+
+    logger.info(`[Message Update] messageId: ${session.messageId}, newStatus: ${updateResult?.sessionProposal?.status || 'UPDATE FAILED'}`);
+
+    // Emit socket event for real-time update
+    const io = global.io;
+    if (io && session.chatId) {
+      const chatIdStr = String(session.chatId);
+      const proposalPayload = {
+        messageId: String(session.messageId),
+        chatId: chatIdStr,
+        status: finalStatus,
+        sessionId: String(session._id),
+      };
+
+      // Emit to chat room
+      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Also emit to user rooms for reliability
+      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+
+      logger.info(`[Socket Emit] PROPOSAL_UPDATED sent to chat::${chatIdStr} and user rooms`);
+    } else {
+      logger.warn(`[Socket Emit] No socket.io instance or chatId available`);
+    }
+  } else {
+    logger.warn(`[Session Complete] No messageId found for session ${session._id} - cannot update proposal status`);
   }
 
   return { session: session.toObject() as ISession, attendanceCheck };

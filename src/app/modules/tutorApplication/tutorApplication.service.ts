@@ -260,7 +260,7 @@ const selectForInterview = async (
 const approveApplication = async (
   id: string,
   adminNotes?: string
-): Promise<ITutorApplication | null> => {
+): Promise<{ application: ITutorApplication; newAccessToken: string | null }> => {
   const application = await TutorApplication.findById(id);
 
   if (!application) {

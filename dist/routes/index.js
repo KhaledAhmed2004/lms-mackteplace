@@ -9,7 +9,6 @@ const user_route_1 = require("../app/modules/user/user.route");
 const chat_route_1 = require("../app/modules/chat/chat.route");
 const message_route_1 = require("../app/modules/message/message.route");
 const payment_routes_1 = require("../app/modules/payment/payment.routes");
-const bookmark_route_1 = require("../app/modules/bookmark/bookmark.route");
 const notification_routes_1 = require("../app/modules/notification/notification.routes");
 const subject_route_1 = require("../app/modules/subject/subject.route");
 const grade_route_1 = require("../app/modules/grade/grade.route");
@@ -29,6 +28,8 @@ const call_route_1 = require("../app/modules/call/call.route");
 const whiteboard_route_1 = require("../app/modules/whiteboard/whiteboard.route");
 const paymentMethod_route_1 = require("../app/modules/paymentMethod/paymentMethod.route");
 const legalPolicy_route_1 = require("../app/modules/legalPolicy/legalPolicy.route");
+const oerResource_route_1 = require("../app/modules/oerResource/oerResource.route");
+const supportTicket_route_1 = require("../app/modules/supportTicket/supportTicket.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -50,10 +51,6 @@ const apiRoutes = [
     {
         path: '/payments',
         route: payment_routes_1.PaymentRoutes,
-    },
-    {
-        path: '/bookmarks',
-        route: bookmark_route_1.BookmarkRoutes,
     },
     {
         path: '/notifications',
@@ -130,6 +127,14 @@ const apiRoutes = [
     {
         path: '/legal-policies',
         route: legalPolicy_route_1.LegalPolicyRoutes,
+    },
+    {
+        path: '/oer-resources',
+        route: oerResource_route_1.OERResourceRoutes,
+    },
+    {
+        path: '/support-tickets',
+        route: supportTicket_route_1.SupportTicketRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

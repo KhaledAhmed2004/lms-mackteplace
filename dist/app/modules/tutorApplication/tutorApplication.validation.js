@@ -135,6 +135,20 @@ const sendForRevisionZodSchema = zod_1.z.object({
             .min(10, 'Revision note must be at least 10 characters'),
     }),
 });
+// Update my application (applicant only - when in REVISION status)
+const updateMyApplicationZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        cv: zod_1.z.string().url('CV must be a valid URL').optional(),
+        abiturCertificate: zod_1.z
+            .string()
+            .url('Abitur certificate must be a valid URL')
+            .optional(),
+        officialId: zod_1.z
+            .string()
+            .url('Official ID document must be a valid URL')
+            .optional(),
+    }),
+});
 exports.TutorApplicationValidation = {
     createApplicationZodSchema,
     updateApplicationStatusZodSchema,
@@ -142,4 +156,5 @@ exports.TutorApplicationValidation = {
     approveApplicationZodSchema,
     rejectApplicationZodSchema,
     sendForRevisionZodSchema,
+    updateMyApplicationZodSchema,
 };

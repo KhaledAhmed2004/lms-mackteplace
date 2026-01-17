@@ -50,10 +50,11 @@ const generateMonthlyBillings = (month, year) => __awaiter(void 0, void 0, void 
                 continue; // Skip if already billed
             }
             // Get completed sessions for this student in billing period
+            // NEW: Query by studentCompletionStatus instead of main status
             const sessions = yield session_model_1.Session.find({
                 studentId: subscription.studentId,
-                status: session_interface_1.SESSION_STATUS.COMPLETED,
-                completedAt: {
+                studentCompletionStatus: session_interface_1.COMPLETION_STATUS.COMPLETED,
+                studentCompletedAt: {
                     $gte: periodStart,
                     $lte: periodEnd,
                 },
@@ -61,12 +62,12 @@ const generateMonthlyBillings = (month, year) => __awaiter(void 0, void 0, void 
             if (sessions.length === 0) {
                 continue; // Skip if no sessions
             }
-            // Build line items
+            // Build line items - use studentCompletedAt for date
             const lineItems = sessions.map(session => ({
                 sessionId: session._id,
                 subject: session.subject,
                 tutorName: session.tutorId.name,
-                date: session.completedAt,
+                date: session.studentCompletedAt || session.completedAt,
                 duration: session.duration,
                 pricePerHour: session.pricePerHour,
                 amount: session.totalPrice,

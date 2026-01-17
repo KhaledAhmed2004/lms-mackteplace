@@ -116,11 +116,11 @@ const rejectSessionProposalZodSchema = z.object({
   }),
   body: z.object({
     rejectionReason: z
-      .string({
-        required_error: 'Rejection reason is required',
-      })
+      .string()
       .trim()
-      .min(10, 'Rejection reason must be at least 10 characters'),
+      .min(10, 'Rejection reason must be at least 10 characters')
+      .optional()
+      .default('Declined by user'),
   }),
 });
 

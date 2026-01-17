@@ -10,6 +10,10 @@ const sendResponse = (res, data) => {
         meta: data.meta,
         data: data.data,
     };
+    // Include accessToken if provided (for role updates)
+    if (data.accessToken) {
+        resData.accessToken = data.accessToken;
+    }
     res.status(data.statusCode).json(resData);
 };
 exports.default = sendResponse;

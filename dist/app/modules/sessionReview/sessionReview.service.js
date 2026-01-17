@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -101,12 +124,13 @@ const getSingleReview = (id) => __awaiter(void 0, void 0, void 0, function* () {
  * Update review (only by student who created it)
  */
 const updateReview = (id, studentId, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const review = yield sessionReview_model_1.SessionReview.findById(id);
     if (!review) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Review not found');
     }
     // Verify ownership
-    if (review.studentId.toString() !== studentId) {
+    if (((_a = review.studentId) === null || _a === void 0 ? void 0 : _a.toString()) !== studentId) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You can only update your own reviews');
     }
     // Update fields
@@ -120,12 +144,13 @@ const updateReview = (id, studentId, payload) => __awaiter(void 0, void 0, void 
  * Delete review (only by student who created it)
  */
 const deleteReview = (id, studentId) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const review = yield sessionReview_model_1.SessionReview.findById(id);
     if (!review) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Review not found');
     }
     // Verify ownership
-    if (review.studentId.toString() !== studentId) {
+    if (((_a = review.studentId) === null || _a === void 0 ? void 0 : _a.toString()) !== studentId) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You can only delete your own reviews');
     }
     yield sessionReview_model_1.SessionReview.findByIdAndDelete(id);
@@ -213,6 +238,64 @@ const linkOrphanedReviews = () => __awaiter(void 0, void 0, void 0, function* ()
     }
     return { linked, alreadyLinked };
 });
+const adminCreateReview = (payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    // Validate tutor exists
+    const { User } = yield Promise.resolve().then(() => __importStar(require('../user/user.model')));
+    const tutor = yield User.findById(payload.tutorId);
+    if (!tutor) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Tutor not found');
+    }
+    // Create review without session (admin-created)
+    const review = yield sessionReview_model_1.SessionReview.create({
+        tutorId: new mongoose_1.Types.ObjectId(payload.tutorId),
+        studentId: null, // Admin created, no student
+        sessionId: null, // No session for admin-created reviews
+        overallRating: payload.overallRating,
+        teachingQuality: payload.teachingQuality,
+        communication: payload.communication,
+        punctuality: payload.punctuality,
+        preparedness: payload.preparedness,
+        comment: payload.comment,
+        wouldRecommend: payload.wouldRecommend,
+        isPublic: (_a = payload.isPublic) !== null && _a !== void 0 ? _a : true,
+        isAdminCreated: true,
+        reviewerName: payload.reviewerName,
+    });
+    return review;
+});
+/**
+ * Admin: Update any review
+ */
+const adminUpdateReview = (id, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const review = yield sessionReview_model_1.SessionReview.findById(id);
+    if (!review) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Review not found');
+    }
+    // Update fields
+    Object.assign(review, payload);
+    review.isEdited = true;
+    review.editedAt = new Date();
+    yield review.save();
+    return review;
+});
+/**
+ * Admin: Delete any review
+ */
+const adminDeleteReview = (id) => __awaiter(void 0, void 0, void 0, function* () {
+    const review = yield sessionReview_model_1.SessionReview.findById(id);
+    if (!review) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Review not found');
+    }
+    // If review has a session, remove reviewId from session
+    if (review.sessionId) {
+        yield session_model_1.Session.findByIdAndUpdate(review.sessionId, {
+            $unset: { reviewId: 1 },
+        });
+    }
+    yield sessionReview_model_1.SessionReview.findByIdAndDelete(id);
+    return review;
+});
 exports.SessionReviewService = {
     createReview,
     getMyReviews,
@@ -223,4 +306,8 @@ exports.SessionReviewService = {
     getTutorStats,
     toggleVisibility,
     linkOrphanedReviews,
+    // Admin functions
+    adminCreateReview,
+    adminUpdateReview,
+    adminDeleteReview,
 };

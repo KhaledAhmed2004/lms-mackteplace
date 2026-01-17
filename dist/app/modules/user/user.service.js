@@ -31,8 +31,7 @@ const tutorSessionFeedback_model_1 = require("../tutorSessionFeedback/tutorSessi
 const tutorSessionFeedback_interface_1 = require("../tutorSessionFeedback/tutorSessionFeedback.interface");
 const activityLog_service_1 = require("../activityLog/activityLog.service");
 const createUserToDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    // Auto-verify user on creation (skipping email verification for now)
-    const createUser = yield user_model_1.User.create(Object.assign(Object.assign({}, payload), { verified: true }));
+    const createUser = yield user_model_1.User.create(payload);
     if (!createUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Failed to create user');
     }
@@ -121,9 +120,6 @@ const resendVerifyEmailToDB = (email) => __awaiter(void 0, void 0, void 0, funct
     const isExistUser = yield user_model_1.User.findOne({ email });
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "User doesn't exist!");
-    }
-    if (isExistUser.verified) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'User is already verified!');
     }
     // Generate new OTP
     const otp = (0, generateOTP_1.default)();
@@ -270,6 +266,77 @@ const updateTutorSubjects = (id, subjects) => __awaiter(void 0, void 0, void 0, 
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'User is not a tutor');
     }
     const updatedUser = yield user_model_1.User.findByIdAndUpdate(id, { 'tutorProfile.subjects': subjects }, { new: true }).select('-password -authentication');
+    return updatedUser;
+});
+const adminUpdateTutorProfile = (id, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findById(id);
+    if (!user) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
+    }
+    if (user.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'User is not a tutor');
+    }
+    // Build update object
+    const updateData = {};
+    // Update basic fields
+    if (payload.name)
+        updateData.name = payload.name;
+    if (payload.email)
+        updateData.email = payload.email;
+    if (payload.phone !== undefined)
+        updateData.phone = payload.phone;
+    if (payload.dateOfBirth)
+        updateData.dateOfBirth = payload.dateOfBirth;
+    if (payload.location)
+        updateData.location = payload.location;
+    // Update tutor profile fields
+    if (payload.tutorProfile) {
+        const tp = payload.tutorProfile;
+        if (tp.address !== undefined)
+            updateData['tutorProfile.address'] = tp.address;
+        if (tp.birthDate !== undefined)
+            updateData['tutorProfile.birthDate'] = tp.birthDate;
+        if (tp.bio !== undefined)
+            updateData['tutorProfile.bio'] = tp.bio;
+        if (tp.languages !== undefined)
+            updateData['tutorProfile.languages'] = tp.languages;
+        if (tp.teachingExperience !== undefined)
+            updateData['tutorProfile.teachingExperience'] = tp.teachingExperience;
+        if (tp.education !== undefined)
+            updateData['tutorProfile.education'] = tp.education;
+        if (tp.subjects !== undefined)
+            updateData['tutorProfile.subjects'] = tp.subjects;
+    }
+    const updatedUser = yield user_model_1.User.findByIdAndUpdate(id, { $set: updateData }, { new: true })
+        .select('-password -authentication')
+        .populate({
+        path: 'tutorProfile.subjects',
+        select: 'name _id',
+    });
+    return updatedUser;
+});
+const adminUpdateStudentProfile = (id, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findById(id);
+    if (!user) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
+    }
+    if (user.role !== user_1.USER_ROLES.STUDENT) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'User is not a student');
+    }
+    // Build update object
+    const updateData = {};
+    // Update basic fields
+    if (payload.name)
+        updateData.name = payload.name;
+    if (payload.email)
+        updateData.email = payload.email;
+    if (payload.phone !== undefined)
+        updateData.phone = payload.phone;
+    if (payload.dateOfBirth)
+        updateData.dateOfBirth = payload.dateOfBirth;
+    if (payload.location)
+        updateData.location = payload.location;
+    const updatedUser = yield user_model_1.User.findByIdAndUpdate(id, { $set: updateData }, { new: true }).select('-password -authentication');
     return updatedUser;
 });
 // ============ TUTOR STATISTICS ============
@@ -458,11 +525,13 @@ exports.UserService = {
     getAllStudents,
     blockStudent,
     unblockStudent,
+    adminUpdateStudentProfile,
     // Admin: Tutor Management
     getAllTutors,
     blockTutor,
     unblockTutor,
     updateTutorSubjects,
+    adminUpdateTutorProfile,
     // Tutor Statistics
     getTutorStatistics,
     updateTutorLevelAfterSession,

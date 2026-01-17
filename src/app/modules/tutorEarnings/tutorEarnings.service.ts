@@ -4,7 +4,7 @@ import { StatusCodes } from 'http-status-codes';
 import { TutorEarnings } from './tutorEarnings.model';
 import { IEarningLineItem, ITutorEarnings, PAYOUT_STATUS } from './tutorEarnings.interface';
 import { Session } from '../session/session.model';
-import { SESSION_STATUS } from '../session/session.interface';
+import { SESSION_STATUS, COMPLETION_STATUS } from '../session/session.interface';
 import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { TUTOR_LEVEL } from '../user/user.interface';
@@ -65,22 +65,23 @@ const generateTutorEarnings = async (
     }
 
     // Get completed sessions for this tutor in billing period
+    // NEW: Query by teacherCompletionStatus - only sessions where feedback was submitted
     const sessions = await Session.find({
       tutorId: tutor._id,
-      status: SESSION_STATUS.COMPLETED,
-      completedAt: { $gte: periodStart, $lte: periodEnd },
+      teacherCompletionStatus: COMPLETION_STATUS.COMPLETED,
+      teacherCompletedAt: { $gte: periodStart, $lte: periodEnd },
     }).populate('studentId', 'name');
 
     if (sessions.length === 0) {
       continue; // Skip tutors with no sessions
     }
 
-    // Build line items
+    // Build line items - use teacherCompletedAt for date
     const lineItems: IEarningLineItem[] = sessions.map(session => ({
       sessionId: session._id as Types.ObjectId,
       studentName: (session.studentId as any).name,
       subject: session.subject,
-      completedAt: session.completedAt!,
+      completedAt: session.teacherCompletedAt || session.completedAt!,
       duration: session.duration,
       sessionPrice: session.totalPrice,
       tutorEarning: session.totalPrice * (1 - commissionRate),

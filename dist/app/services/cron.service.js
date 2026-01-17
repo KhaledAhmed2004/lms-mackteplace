@@ -22,7 +22,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CronService = exports.initializeCronJobs = exports.generateTutorEarnings = exports.generateMonthlyBillings = exports.sendSessionReminders = exports.autoCompleteSessions = exports.autoTransitionSessions = exports.expireTrialRequests = void 0;
+exports.CronService = exports.initializeCronJobs = exports.cleanupExpiredInterviewSlots = exports.sendFinalFeedbackReminders = exports.sendFeedbackReminders = exports.processForfeitedFeedbacks = exports.generateTutorEarnings = exports.generateMonthlyBillings = exports.sendSessionReminders = exports.autoCompleteSessions = exports.autoTransitionSessions = exports.expireTrialRequests = void 0;
 const logger_1 = require("../../shared/logger");
 const node_cron_1 = __importDefault(require("node-cron"));
 // ============================================
@@ -36,6 +36,8 @@ const TEST_MODE = true;
 const monthlyBilling_service_1 = require("../modules/monthlyBilling/monthlyBilling.service");
 const tutorEarnings_service_1 = require("../modules/tutorEarnings/tutorEarnings.service");
 const session_service_1 = require("../modules/session/session.service");
+const interviewSlot_service_1 = require("../modules/interviewSlot/interviewSlot.service");
+const tutorSessionFeedback_service_1 = require("../modules/tutorSessionFeedback/tutorSessionFeedback.service");
 const trialRequest_model_1 = require("../modules/trialRequest/trialRequest.model");
 const trialRequest_interface_1 = require("../modules/trialRequest/trialRequest.interface");
 const session_model_1 = require("../modules/session/session.model");
@@ -169,7 +171,8 @@ const generateMonthlyBillings = () => __awaiter(void 0, void 0, void 0, function
 });
 exports.generateMonthlyBillings = generateMonthlyBillings;
 /**
- * Generate tutor earnings (1st of every month at 3:00 AM)
+ * Generate tutor earnings (4th of every month at 3:00 AM)
+ * CHANGED: Moved from 1st to 4th to allow feedback deadline (3rd) to pass first
  */
 const generateTutorEarnings = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -185,6 +188,66 @@ const generateTutorEarnings = () => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.generateTutorEarnings = generateTutorEarnings;
+/**
+ * Process forfeited feedbacks (4th of every month at 1:00 AM)
+ * NEW: Runs before tutor earnings to mark missed deadlines
+ */
+const processForfeitedFeedbacks = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const result = yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.processForfeitedFeedbacks();
+        logger_1.logger.info(`Processed ${result.processed} forfeited feedbacks. Total forfeited: €${result.totalForfeited}`);
+    }
+    catch (error) {
+        logger_1.errorLogger.error('Failed to process forfeited feedbacks', { error });
+    }
+});
+exports.processForfeitedFeedbacks = processForfeitedFeedbacks;
+/**
+ * Send feedback deadline reminders (1st of every month at 10:00 AM)
+ * NEW: Remind tutors about pending feedbacks due on 3rd
+ */
+const sendFeedbackReminders = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const count = yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.sendDeadlineReminders();
+        logger_1.logger.info(`Sent deadline reminders for ${count} pending feedbacks`);
+    }
+    catch (error) {
+        logger_1.errorLogger.error('Failed to send feedback reminders', { error });
+    }
+});
+exports.sendFeedbackReminders = sendFeedbackReminders;
+/**
+ * Send final feedback reminders (2nd of every month at 10:00 AM)
+ * NEW: Last warning before deadline
+ */
+const sendFinalFeedbackReminders = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const count = yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.sendFinalReminders();
+        logger_1.logger.info(`Sent final reminders for ${count} pending feedbacks`);
+    }
+    catch (error) {
+        logger_1.errorLogger.error('Failed to send final feedback reminders', { error });
+    }
+});
+exports.sendFinalFeedbackReminders = sendFinalFeedbackReminders;
+/**
+ * Cleanup expired available interview slots
+ * Runs daily at midnight (00:00)
+ * Deletes all AVAILABLE slots where the day has passed
+ * Booked/completed/cancelled slots are kept for records
+ */
+const cleanupExpiredInterviewSlots = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const deletedCount = yield interviewSlot_service_1.InterviewSlotService.cleanupExpiredAvailableSlots();
+        if (deletedCount > 0) {
+            logger_1.logger.info(`Cleaned up ${deletedCount} expired available interview slots`);
+        }
+    }
+    catch (error) {
+        logger_1.errorLogger.error('Failed to cleanup expired interview slots', { error });
+    }
+});
+exports.cleanupExpiredInterviewSlots = cleanupExpiredInterviewSlots;
 /**
  * Initialize all cron jobs
  */
@@ -212,10 +275,30 @@ const initializeCronJobs = () => {
         logger_1.logger.info('Running cron: Generate monthly billings');
         (0, exports.generateMonthlyBillings)();
     });
-    // Generate tutor earnings - 1st of month at 3:00 AM
-    node_cron_1.default.schedule('0 3 1 * *', () => {
+    // Send feedback deadline reminders - 1st of month at 10:00 AM
+    node_cron_1.default.schedule('0 10 1 * *', () => {
+        logger_1.logger.info('Running cron: Send feedback deadline reminders');
+        (0, exports.sendFeedbackReminders)();
+    });
+    // Send final feedback reminders - 2nd of month at 10:00 AM
+    node_cron_1.default.schedule('0 10 2 * *', () => {
+        logger_1.logger.info('Running cron: Send final feedback reminders');
+        (0, exports.sendFinalFeedbackReminders)();
+    });
+    // Process forfeited feedbacks - 4th of month at 1:00 AM (before earnings)
+    node_cron_1.default.schedule('0 1 4 * *', () => {
+        logger_1.logger.info('Running cron: Process forfeited feedbacks');
+        (0, exports.processForfeitedFeedbacks)();
+    });
+    // Generate tutor earnings - 4th of month at 3:00 AM (after forfeit processing)
+    node_cron_1.default.schedule('0 3 4 * *', () => {
         logger_1.logger.info('Running cron: Generate tutor earnings');
         (0, exports.generateTutorEarnings)();
+    });
+    // Cleanup expired available interview slots - Daily at midnight (00:00)
+    node_cron_1.default.schedule('0 0 * * *', () => {
+        logger_1.logger.info('Running cron: Cleanup expired interview slots');
+        (0, exports.cleanupExpiredInterviewSlots)();
     });
     logger_1.logger.info(`✅ Cron jobs initialized (TEST_MODE: ${TEST_MODE})`);
     if (TEST_MODE) {
@@ -231,4 +314,8 @@ exports.CronService = {
     sendSessionReminders: exports.sendSessionReminders,
     generateMonthlyBillings: exports.generateMonthlyBillings,
     generateTutorEarnings: exports.generateTutorEarnings,
+    cleanupExpiredInterviewSlots: exports.cleanupExpiredInterviewSlots,
+    processForfeitedFeedbacks: exports.processForfeitedFeedbacks,
+    sendFeedbackReminders: exports.sendFeedbackReminders,
+    sendFinalFeedbackReminders: exports.sendFinalFeedbackReminders,
 };

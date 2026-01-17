@@ -25,6 +25,12 @@ export enum PAYMENT_STATUS {
   REFUNDED = 'REFUNDED',     // Payment refunded (e.g., session cancelled)
 }
 
+// Completion status for student and teacher separately
+export enum COMPLETION_STATUS {
+  NOT_APPLICABLE = 'NOT_APPLICABLE',  // Session not yet eligible for completion
+  COMPLETED = 'COMPLETED',             // Completed for this party
+}
+
 export type IRescheduleRequest = {
   requestedBy: Types.ObjectId;
   requestedAt: Date;
@@ -101,6 +107,17 @@ export type ISession = {
   tutorAttendance?: ISessionAttendance;
   studentAttendance?: ISessionAttendance;
   noShowBy?: 'tutor' | 'student';     // Who didn't show up (if NO_SHOW status)
+
+  // Student completion tracking
+  studentCompletionStatus?: COMPLETION_STATUS;
+  studentCompletedAt?: Date;
+  studentJoined?: boolean;              // Did student join the call?
+
+  // Teacher completion tracking
+  teacherCompletionStatus?: COMPLETION_STATUS;
+  teacherCompletedAt?: Date;
+  teacherJoined?: boolean;              // Did teacher join the call?
+  teacherFeedbackRequired?: boolean;    // Is feedback pending?
 };
 
 export type SessionModel = Model<ISession>;

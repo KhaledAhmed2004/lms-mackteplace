@@ -197,6 +197,36 @@ const sessionSchema = new mongoose_1.Schema({
         type: String,
         enum: ['tutor', 'student'],
     },
+    // Student completion tracking
+    studentCompletionStatus: {
+        type: String,
+        enum: Object.values(session_interface_1.COMPLETION_STATUS),
+        default: session_interface_1.COMPLETION_STATUS.NOT_APPLICABLE,
+    },
+    studentCompletedAt: {
+        type: Date,
+    },
+    studentJoined: {
+        type: Boolean,
+        default: false,
+    },
+    // Teacher completion tracking
+    teacherCompletionStatus: {
+        type: String,
+        enum: Object.values(session_interface_1.COMPLETION_STATUS),
+        default: session_interface_1.COMPLETION_STATUS.NOT_APPLICABLE,
+    },
+    teacherCompletedAt: {
+        type: Date,
+    },
+    teacherJoined: {
+        type: Boolean,
+        default: false,
+    },
+    teacherFeedbackRequired: {
+        type: Boolean,
+        default: false,
+    },
 }, { timestamps: true });
 // Indexes for performance
 sessionSchema.index({ studentId: 1, createdAt: -1 });
@@ -211,6 +241,9 @@ sessionSchema.index({ status: 1, startTime: 1 });
 sessionSchema.index({ status: 1, endTime: 1 });
 // Index for call-based lookups
 sessionSchema.index({ callId: 1 });
+// Indexes for completion status queries (billing/earnings)
+sessionSchema.index({ studentCompletionStatus: 1, studentCompletedAt: 1 });
+sessionSchema.index({ teacherCompletionStatus: 1, teacherCompletedAt: 1 });
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {
     if (this.endTime <= this.startTime) {
