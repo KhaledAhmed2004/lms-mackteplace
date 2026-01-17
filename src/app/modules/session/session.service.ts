@@ -1436,7 +1436,10 @@ const completeSessionWithAttendanceCheck = async (
     // Update message with { new: true } to verify the update
     const updateResult = await Message.findByIdAndUpdate(
       session.messageId,
-      { 'sessionProposal.status': finalStatus },
+      {
+        'sessionProposal.status': finalStatus,
+        'sessionProposal.noShowBy': session.noShowBy,
+      },
       { new: true }
     );
 
@@ -1451,6 +1454,7 @@ const completeSessionWithAttendanceCheck = async (
         chatId: chatIdStr,
         status: finalStatus,
         sessionId: String(session._id),
+        noShowBy: session.noShowBy,
       };
 
       // Emit to chat room

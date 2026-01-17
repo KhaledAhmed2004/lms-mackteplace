@@ -27,6 +27,7 @@ export type ISessionProposal = {
   expiresAt: Date;                      // Proposal expiration (24 hours)
   originalProposalId?: Types.ObjectId;  // Reference to original proposal (for counter-proposals)
   counterProposalReason?: string;       // Why counter-proposed (e.g., "I'm not available at that time")
+  noShowBy?: 'tutor' | 'student';       // Who didn't join (for NO_SHOW status)
 };
 
 export type IMessage = {

@@ -73,6 +73,10 @@ const SessionProposalSchema = new Schema(
       type: String,
       trim: true,
     },
+    noShowBy: {
+      type: String,
+      enum: ['tutor', 'student'],
+    },
   },
   { _id: false }
 );
