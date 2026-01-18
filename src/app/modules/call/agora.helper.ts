@@ -1,5 +1,5 @@
 import { RtcTokenBuilder, RtcRole } from 'agora-token';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import config from '../../../config';
 
 /**
@@ -38,7 +38,7 @@ export const generateRtcToken = (
 // Unique Channel Name Generate করে
 
 export const generateChannelName = (): string => {
-  return `call_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
+  return `call_${randomUUID().replace(/-/g, '').substring(0, 16)}`;
 };
 
 /**
