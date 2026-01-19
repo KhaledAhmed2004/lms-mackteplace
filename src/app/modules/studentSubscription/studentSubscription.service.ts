@@ -13,12 +13,32 @@ import { StudentSubscription } from './studentSubscription.model';
 import { Session } from '../session/session.model';
 import { SESSION_STATUS } from '../session/session.interface';
 import { stripe } from '../../../config/stripe';
+import { PricingConfigService } from '../pricingConfig/pricingConfig.service';
 
-// Pricing configuration (EUR)
-const TIER_PRICING = {
-  [SUBSCRIPTION_TIER.FLEXIBLE]: { pricePerHour: 30, minimumHours: 1 },
-  [SUBSCRIPTION_TIER.REGULAR]: { pricePerHour: 28, minimumHours: 4 },
-  [SUBSCRIPTION_TIER.LONG_TERM]: { pricePerHour: 25, minimumHours: 4 },
+// Fallback pricing configuration (EUR) - used if DB config not available
+const FALLBACK_TIER_PRICING = {
+  [SUBSCRIPTION_TIER.FLEXIBLE]: { pricePerHour: 30, minimumHours: 0, commitmentMonths: 0 },
+  [SUBSCRIPTION_TIER.REGULAR]: { pricePerHour: 28, minimumHours: 4, commitmentMonths: 1 },
+  [SUBSCRIPTION_TIER.LONG_TERM]: { pricePerHour: 25, minimumHours: 4, commitmentMonths: 3 },
+};
+
+/**
+ * Get pricing for a tier (from DB or fallback)
+ */
+const getTierPricing = async (tier: SUBSCRIPTION_TIER) => {
+  try {
+    const pricingPlan = await PricingConfigService.getPricingByTier(tier);
+    if (pricingPlan) {
+      return {
+        pricePerHour: pricingPlan.pricePerHour,
+        minimumHours: pricingPlan.minimumHours,
+        commitmentMonths: pricingPlan.commitmentMonths,
+      };
+    }
+  } catch {
+    // DB not available, use fallback
+  }
+  return FALLBACK_TIER_PRICING[tier];
 };
 
 /**
@@ -436,28 +456,24 @@ const createSubscriptionPaymentIntent = async (
     );
   }
 
-  // 3. Calculate payment amount and subscription details
-  const pricing = TIER_PRICING[tier];
-  const amount = pricing.pricePerHour * pricing.minimumHours; // EUR
+  // 3. Calculate payment amount and subscription details (from DB config)
+  const pricing = await getTierPricing(tier);
+  // For FLEXIBLE tier (minimumHours = 0), no upfront payment - pay per session
+  // For other tiers, charge for minimum hours upfront
+  const amount = pricing.pricePerHour * pricing.minimumHours; // EUR (will be 0 for FLEXIBLE)
   const amountInCents = Math.round(amount * 100);
 
-  // Calculate end date based on tier
+  // Calculate end date based on tier (from DB config)
   const startDate = new Date();
   const endDate = new Date(startDate);
-  let commitmentMonths = 0;
+  const commitmentMonths = pricing.commitmentMonths;
 
-  if (tier === SUBSCRIPTION_TIER.FLEXIBLE) {
+  if (commitmentMonths === 0) {
     // Flexible: No end date (set to 100 years from now)
     endDate.setFullYear(endDate.getFullYear() + 100);
-    commitmentMonths = 0;
-  } else if (tier === SUBSCRIPTION_TIER.REGULAR) {
-    // Regular: 1 month
-    endDate.setMonth(endDate.getMonth() + 1);
-    commitmentMonths = 1;
-  } else if (tier === SUBSCRIPTION_TIER.LONG_TERM) {
-    // Long-term: 3 months
-    endDate.setMonth(endDate.getMonth() + 3);
-    commitmentMonths = 3;
+  } else {
+    // Regular/Long-term: Set end date based on commitment months
+    endDate.setMonth(endDate.getMonth() + commitmentMonths);
   }
 
   // 4. Create or get Stripe customer
@@ -477,7 +493,46 @@ const createSubscriptionPaymentIntent = async (
     });
   }
 
-  // 5. Create pending subscription record
+  // 5. For FLEXIBLE tier, use SetupIntent to save payment method (required for monthly billing)
+  if (tier === SUBSCRIPTION_TIER.FLEXIBLE) {
+    // Create SetupIntent to save payment method for future charges
+    const setupIntent = await stripe.setupIntents.create({
+      customer: stripeCustomerId,
+      usage: 'off_session', // For charging later without customer present
+      metadata: {
+        studentId,
+        tier,
+        type: 'subscription_setup',
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    // Create pending subscription (will be activated after SetupIntent succeeds)
+    const subscription = await StudentSubscription.create({
+      studentId: new Types.ObjectId(studentId),
+      tier,
+      pricePerHour: pricing.pricePerHour,
+      minimumHours: pricing.minimumHours,
+      commitmentMonths,
+      startDate,
+      endDate,
+      status: SUBSCRIPTION_STATUS.PENDING,
+      stripeCustomerId,
+      stripePaymentIntentId: setupIntent.id, // Store SetupIntent ID
+    });
+
+    // Return SetupIntent clientSecret for FLEXIBLE tier
+    return {
+      clientSecret: setupIntent.client_secret!,
+      subscriptionId: subscription._id.toString(),
+      amount: 0, // No upfront charge
+      currency: 'eur',
+    };
+  }
+
+  // 6. For paid tiers, create pending subscription record
   const subscription = await StudentSubscription.create({
     studentId: new Types.ObjectId(studentId),
     tier,
@@ -490,7 +545,7 @@ const createSubscriptionPaymentIntent = async (
     stripeCustomerId,
   });
 
-  // 6. Create PaymentIntent
+  // 7. Create PaymentIntent for paid tiers
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amountInCents,
     currency: 'eur',
@@ -521,6 +576,7 @@ const createSubscriptionPaymentIntent = async (
 /**
  * Confirm Subscription Payment
  * Called after successful payment to activate subscription
+ * Handles both PaymentIntent (REGULAR/LONG_TERM) and SetupIntent (FLEXIBLE)
  */
 const confirmSubscriptionPayment = async (
   subscriptionId: string,
@@ -538,26 +594,58 @@ const confirmSubscriptionPayment = async (
     throw new ApiError(StatusCodes.FORBIDDEN, 'Unauthorized access to subscription');
   }
 
-  // 3. Verify payment intent
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-  if (paymentIntent.status !== 'succeeded') {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      `Payment not successful. Status: ${paymentIntent.status}`
-    );
+  // 3. Check if this is a SetupIntent (FLEXIBLE tier) or PaymentIntent (others)
+  const isSetupIntent = paymentIntentId.startsWith('seti_');
+
+  if (isSetupIntent) {
+    // Handle SetupIntent for FLEXIBLE tier
+    const setupIntent = await stripe.setupIntents.retrieve(paymentIntentId);
+    if (setupIntent.status !== 'succeeded') {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Setup not successful. Status: ${setupIntent.status}`
+      );
+    }
+
+    // Set the saved payment method as default for this customer
+    if (setupIntent.payment_method) {
+      await stripe.customers.update(subscription.stripeCustomerId!, {
+        invoice_settings: {
+          default_payment_method: setupIntent.payment_method as string,
+        },
+      });
+    }
+  } else {
+    // Handle PaymentIntent for REGULAR/LONG_TERM tiers
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (paymentIntent.status !== 'succeeded') {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Payment not successful. Status: ${paymentIntent.status}`
+      );
+    }
+
+    // Verify payment intent matches subscription
+    if (paymentIntent.metadata.subscriptionId !== subscriptionId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment intent does not match subscription');
+    }
+
+    // Set the payment method as default for this customer (for future charges)
+    if (paymentIntent.payment_method) {
+      await stripe.customers.update(subscription.stripeCustomerId!, {
+        invoice_settings: {
+          default_payment_method: paymentIntent.payment_method as string,
+        },
+      });
+    }
   }
 
-  // 4. Verify payment intent matches subscription
-  if (paymentIntent.metadata.subscriptionId !== subscriptionId) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment intent does not match subscription');
-  }
-
-  // 5. Activate subscription
+  // 4. Activate subscription
   subscription.status = SUBSCRIPTION_STATUS.ACTIVE;
   subscription.paidAt = new Date();
   await subscription.save();
 
-  // 6. Update user's subscription tier
+  // 5. Update user's subscription tier
   await User.findByIdAndUpdate(studentId, {
     'studentProfile.subscriptionTier': subscription.tier,
     'studentProfile.currentPlan': subscription.tier,

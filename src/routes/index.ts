@@ -25,6 +25,7 @@ import { PaymentMethodRoutes } from '../app/modules/paymentMethod/paymentMethod.
 import { LegalPolicyRoutes } from '../app/modules/legalPolicy/legalPolicy.route';
 import { OERResourceRoutes } from '../app/modules/oerResource/oerResource.route';
 import { SupportTicketRoutes } from '../app/modules/supportTicket/supportTicket.route';
+import { PricingConfigRoutes } from '../app/modules/pricingConfig/pricingConfig.route';
 
 const router = express.Router();
 
@@ -132,6 +133,10 @@ const apiRoutes = [
   {
     path: '/support-tickets',
     route: SupportTicketRoutes,
+  },
+  {
+    path: '/pricing',
+    route: PricingConfigRoutes,
   },
 ];
 

@@ -118,6 +118,11 @@ export type ISession = {
   teacherCompletedAt?: Date;
   teacherJoined?: boolean;              // Did teacher join the call?
   teacherFeedbackRequired?: boolean;    // Is feedback pending?
+
+  // Billing tracking (for monthly invoicing)
+  isPaidUpfront?: boolean;              // True if covered by subscription upfront payment (REGULAR/LONG_TERM)
+  billingId?: Types.ObjectId;           // Reference to MonthlyBilling record once invoiced
+  billedAt?: Date;                      // When this session was added to an invoice
 };
 
 export type SessionModel = Model<ISession>;

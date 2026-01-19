@@ -21,7 +21,7 @@ export type ISessionProposal = {
   duration: number;                     // Duration in minutes
   price: number;                        // Price in EUR
   description?: string;                 // Session description
-  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'COUNTER_PROPOSED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'COUNTER_PROPOSED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW' | 'STARTING_SOON' | 'IN_PROGRESS';
   sessionId?: Types.ObjectId;           // Created session (when accepted)
   rejectionReason?: string;             // Why rejected
   expiresAt: Date;                      // Proposal expiration (24 hours)

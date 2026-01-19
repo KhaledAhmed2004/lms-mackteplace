@@ -28,7 +28,8 @@ export type IStudentSubscription = {
   status: SUBSCRIPTION_STATUS;
 
   // Usage tracking
-  totalHoursTaken: number;           // Hours used so far
+  totalHoursTaken: number;           // Total hours used so far
+  prepaidHoursUsed: number;          // Hours covered by upfront payment (max = minimumHours)
 
   // Billing
   stripeCustomerId?: string;         // Stripe customer ID

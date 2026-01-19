@@ -14,6 +14,7 @@ import { TutorSessionFeedbackService } from '../tutorSessionFeedback/tutorSessio
 import { UserService } from '../user/user.service';
 import { ActivityLogService } from '../activityLog/activityLog.service';
 import { logger } from '../../../shared/logger';
+import { StudentSubscriptionService } from '../studentSubscription/studentSubscription.service';
 // import { generateGoogleMeetLink } from '../../../helpers/googleMeetHelper'; // Phase 8
 
 // ============================================
@@ -1040,30 +1041,81 @@ const autoTransitionSessionStatuses = async (): Promise<{
 }> => {
   const now = new Date();
   const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
+  const io = global.io;
 
   // SCHEDULED -> STARTING_SOON (10 minutes before start)
-  const startingSoonResult = await Session.updateMany(
-    {
-      status: SESSION_STATUS.SCHEDULED,
-      startTime: { $lte: tenMinutesFromNow, $gt: now },
-    },
-    { $set: { status: SESSION_STATUS.STARTING_SOON } }
-  );
+  // Find sessions first to emit socket events, then update
+  const sessionsToStartingSoon = await Session.find({
+    status: SESSION_STATUS.SCHEDULED,
+    startTime: { $lte: tenMinutesFromNow, $gt: now },
+  });
+
+  for (const session of sessionsToStartingSoon) {
+    session.status = SESSION_STATUS.STARTING_SOON;
+    await session.save();
+
+    // Update message's sessionProposal.status to match session status
+    if (session.messageId) {
+      await Message.findByIdAndUpdate(session.messageId, {
+        'sessionProposal.status': SESSION_STATUS.STARTING_SOON,
+      });
+      logger.info(`[Cron] Message ${session.messageId} status updated to STARTING_SOON`);
+    }
+
+    // Emit socket event for real-time UI update
+    if (io && session.chatId && session.messageId) {
+      const chatIdStr = String(session.chatId);
+      const proposalPayload = {
+        messageId: String(session.messageId),
+        chatId: chatIdStr,
+        status: SESSION_STATUS.STARTING_SOON,
+        sessionId: String(session._id),
+      };
+
+      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      logger.info(`[Cron] STARTING_SOON socket emitted for session ${session._id}`);
+    }
+  }
 
   // STARTING_SOON/SCHEDULED -> IN_PROGRESS (at start time)
-  const inProgressResult = await Session.updateMany(
-    {
-      status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
-      startTime: { $lte: now },
-      endTime: { $gt: now },
-    },
-    {
-      $set: {
-        status: SESSION_STATUS.IN_PROGRESS,
-        startedAt: now,
-      },
+  // Find sessions first to emit socket events, then update
+  const sessionsToInProgress = await Session.find({
+    status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
+    startTime: { $lte: now },
+    endTime: { $gt: now },
+  });
+
+  for (const session of sessionsToInProgress) {
+    session.status = SESSION_STATUS.IN_PROGRESS;
+    session.startedAt = now;
+    await session.save();
+
+    // Update message's sessionProposal.status to match session status
+    if (session.messageId) {
+      await Message.findByIdAndUpdate(session.messageId, {
+        'sessionProposal.status': SESSION_STATUS.IN_PROGRESS,
+      });
+      logger.info(`[Cron] Message ${session.messageId} status updated to IN_PROGRESS`);
     }
-  );
+
+    // Emit socket event for real-time UI update
+    if (io && session.chatId && session.messageId) {
+      const chatIdStr = String(session.chatId);
+      const proposalPayload = {
+        messageId: String(session.messageId),
+        chatId: chatIdStr,
+        status: SESSION_STATUS.IN_PROGRESS,
+        sessionId: String(session._id),
+      };
+
+      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      logger.info(`[Cron] IN_PROGRESS socket emitted for session ${session._id}`);
+    }
+  }
 
   // IN_PROGRESS -> COMPLETED/NO_SHOW/EXPIRED (at end time)
   // Find sessions to complete and process them with attendance check
@@ -1094,8 +1146,8 @@ const autoTransitionSessionStatuses = async (): Promise<{
   }
 
   return {
-    startingSoon: startingSoonResult.modifiedCount,
-    inProgress: inProgressResult.modifiedCount,
+    startingSoon: sessionsToStartingSoon.length,
+    inProgress: sessionsToInProgress.length,
     completed: completedCount,
     noShow: noShowCount,
     expired: expiredCount,
@@ -1420,6 +1472,21 @@ const completeSessionWithAttendanceCheck = async (
       await UserService.updateTutorLevelAfterSession(session.tutorId.toString());
     } catch {
       // Level update failed, but session is still processed
+    }
+
+    // Deduct hours from student's subscription
+    try {
+      const sessionDurationMinutes =
+        (new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60);
+      const sessionDurationHours = sessionDurationMinutes / 60;
+      await StudentSubscriptionService.incrementHoursTaken(
+        session.studentId.toString(),
+        sessionDurationHours
+      );
+      logger.info(`[Subscription] Deducted ${sessionDurationHours} hours from student ${session.studentId}`);
+    } catch (err) {
+      logger.error(`[Subscription] Failed to deduct hours for session ${session._id}:`, err);
+      // Hours deduction failed, but session is still processed
     }
   }
 
