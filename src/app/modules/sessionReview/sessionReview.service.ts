@@ -60,6 +60,25 @@ const createReview = async (
     reviewId: review._id,
   });
 
+  // Emit socket event for real-time update
+  const io = global.io;
+  if (io && session.chatId) {
+    const chatIdStr = String(session.chatId);
+    const reviewPayload = {
+      sessionId: payload.sessionId,
+      chatId: chatIdStr,
+      reviewId: review._id,
+      rating: review.overallRating,
+    };
+
+    // Emit to chat room and both users
+    io.to(`chat::${chatIdStr}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+    io.to(`user::${studentId}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+    io.to(`user::${String(session.tutorId)}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+
+    console.log(`[Socket Emit] STUDENT_REVIEW_SUBMITTED sent for session ${payload.sessionId}`);
+  }
+
   return review;
 };
 
@@ -111,6 +130,18 @@ const getTutorReviews = async (
   const meta = await reviewQuery.getPaginationInfo();
 
   return { data: result, meta };
+};
+
+/**
+ * Get review by session ID
+ */
+const getReviewBySession = async (sessionId: string): Promise<ISessionReview | null> => {
+  const review = await SessionReview.findOne({ sessionId })
+    .populate('studentId', 'name email')
+    .populate('tutorId', 'name email')
+    .populate('sessionId', 'subject startTime endTime');
+
+  return review;
 };
 
 /**
@@ -390,6 +421,7 @@ export const SessionReviewService = {
   getMyReviews,
   getTutorReviews,
   getSingleReview,
+  getReviewBySession,
   updateReview,
   deleteReview,
   getTutorStats,

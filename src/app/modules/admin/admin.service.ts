@@ -755,11 +755,28 @@ const getUnifiedSessions = async (
   const sessions = await Session.find()
     .populate('studentId', 'name email phone profilePicture')
     .populate('tutorId', 'name email phone profilePicture')
+    .populate({
+      path: 'trialRequestId',
+      select: 'subject',
+      populate: {
+        path: 'subject',
+        select: 'name',
+      },
+    })
     .lean();
 
-  // Get pending/accepted trial requests (not yet converted to session or waiting)
+  // Get trialRequestIds that already have sessions created (to avoid duplicates)
+  // Note: trialRequestId is now populated, so we need to get _id from the object
+  const trialRequestIdsWithSessions = sessions
+    .filter((s: any) => s.trialRequestId)
+    .map((s: any) => s.trialRequestId._id?.toString() || s.trialRequestId.toString());
+
+  // Get pending/accepted trial requests (excluding those that already have sessions)
   const pendingTrialRequests = await TrialRequest.find({
     status: { $in: [TRIAL_REQUEST_STATUS.PENDING, TRIAL_REQUEST_STATUS.ACCEPTED] },
+    ...(trialRequestIdsWithSessions.length > 0 && {
+      _id: { $nin: trialRequestIdsWithSessions },
+    }),
   })
     .populate('studentId', 'name email phone profilePicture')
     .populate('acceptedTutorId', 'name email phone profilePicture')
@@ -776,7 +793,10 @@ const getUnifiedSessions = async (
     tutorName: s.tutorId?.name,
     tutorEmail: s.tutorId?.email,
     tutorPhone: s.tutorId?.phone,
-    subject: s.subject,
+    // Use trialRequest subject if session subject is generic "Tutoring Session"
+    subject: (s.subject === 'Tutoring Session' && s.trialRequestId?.subject?.name)
+      ? s.trialRequestId.subject.name
+      : s.subject,
     status: s.status,
     paymentStatus: s.isTrial ? 'FREE_TRIAL' : s.paymentStatus || PAYMENT_STATUS.PENDING,
     startTime: s.startTime,

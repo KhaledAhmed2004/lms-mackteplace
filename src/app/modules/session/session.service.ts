@@ -133,7 +133,9 @@ const proposeSession = async (
     pricePerHour = 25;
   }
 
-  const totalPrice = (pricePerHour * duration) / 60;
+  // Fixed price per session (not based on duration)
+  // 1 session = 1 session price, regardless of duration
+  const totalPrice = pricePerHour;
 
   // Create session proposal message using MessageService for real-time socket notification
   // expiresAt = startTime (proposal expires when session time passes)
@@ -235,6 +237,8 @@ const acceptSessionProposal = async (
   const isTrial = !!trialRequestId;
 
   // Create session
+  // Note: message.chatId is populated (full Chat object), so we need to extract the _id
+  const chatIdForSession = typeof chat._id !== 'undefined' ? chat._id : message.chatId;
   const session = await Session.create({
     studentId,
     tutorId,
@@ -247,7 +251,7 @@ const acceptSessionProposal = async (
     totalPrice: message.sessionProposal.price,
     status: SESSION_STATUS.SCHEDULED,
     messageId: message._id as Types.ObjectId,
-    chatId: message.chatId as Types.ObjectId,
+    chatId: chatIdForSession as Types.ObjectId,
     isTrial,
     trialRequestId,
   });
@@ -385,7 +389,9 @@ const counterProposeSession = async (
     pricePerHour = 25;
   }
 
-  const totalPrice = (pricePerHour * duration) / 60;
+  // Fixed price per session (not based on duration)
+  // 1 session = 1 session price, regardless of duration
+  const totalPrice = pricePerHour;
 
   // Mark original proposal as COUNTER_PROPOSED
   originalMessage.sessionProposal.status = 'COUNTER_PROPOSED';
@@ -1043,12 +1049,16 @@ const autoTransitionSessionStatuses = async (): Promise<{
   const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
   const io = global.io;
 
+  // Debug: Log at start of function
+  logger.info(`[Cron] autoTransitionSessionStatuses started - io available: ${!!io}, time: ${now.toISOString()}`);
+
   // SCHEDULED -> STARTING_SOON (10 minutes before start)
   // Find sessions first to emit socket events, then update
   const sessionsToStartingSoon = await Session.find({
     status: SESSION_STATUS.SCHEDULED,
     startTime: { $lte: tenMinutesFromNow, $gt: now },
   });
+  logger.info(`[Cron] Found ${sessionsToStartingSoon.length} sessions for STARTING_SOON transition`);
 
   for (const session of sessionsToStartingSoon) {
     session.status = SESSION_STATUS.STARTING_SOON;
@@ -1065,6 +1075,10 @@ const autoTransitionSessionStatuses = async (): Promise<{
     // Emit socket event for real-time UI update
     if (io && session.chatId && session.messageId) {
       const chatIdStr = String(session.chatId);
+      const studentRoom = `user::${String(session.studentId)}`;
+      const tutorRoom = `user::${String(session.tutorId)}`;
+      const chatRoom = `chat::${chatIdStr}`;
+
       const proposalPayload = {
         messageId: String(session.messageId),
         chatId: chatIdStr,
@@ -1072,20 +1086,42 @@ const autoTransitionSessionStatuses = async (): Promise<{
         sessionId: String(session._id),
       };
 
-      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Debug: Check how many sockets are in each room
+      const studentRoomSockets = io.sockets.adapter.rooms.get(studentRoom);
+      const tutorRoomSockets = io.sockets.adapter.rooms.get(tutorRoom);
+      const chatRoomSockets = io.sockets.adapter.rooms.get(chatRoom);
+
+      logger.info(`[Cron] STARTING_SOON - Room sizes - student(${studentRoom}): ${studentRoomSockets?.size || 0}, tutor(${tutorRoom}): ${tutorRoomSockets?.size || 0}, chat(${chatRoom}): ${chatRoomSockets?.size || 0}`);
+
+      io.to(chatRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(studentRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(tutorRoom).emit('PROPOSAL_UPDATED', proposalPayload);
       logger.info(`[Cron] STARTING_SOON socket emitted for session ${session._id}`);
+    } else {
+      logger.warn(`[Cron] Cannot emit STARTING_SOON - io: ${!!io}, chatId: ${!!session.chatId}, messageId: ${!!session.messageId}`);
     }
   }
 
   // STARTING_SOON/SCHEDULED -> IN_PROGRESS (at start time)
   // Find sessions first to emit socket events, then update
+
+  // Debug: Log all STARTING_SOON sessions to see their times
+  const allStartingSoonSessions = await Session.find({
+    status: SESSION_STATUS.STARTING_SOON,
+  });
+  if (allStartingSoonSessions.length > 0) {
+    logger.info(`[Cron Debug] All STARTING_SOON sessions:`);
+    for (const s of allStartingSoonSessions) {
+      logger.info(`[Cron Debug] Session ${s._id}: startTime=${s.startTime?.toISOString()}, endTime=${s.endTime?.toISOString()}, now=${now.toISOString()}, startTime <= now: ${s.startTime <= now}, endTime > now: ${s.endTime > now}`);
+    }
+  }
+
   const sessionsToInProgress = await Session.find({
     status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
     startTime: { $lte: now },
     endTime: { $gt: now },
   });
+  logger.info(`[Cron] Found ${sessionsToInProgress.length} sessions for IN_PROGRESS transition`);
 
   for (const session of sessionsToInProgress) {
     session.status = SESSION_STATUS.IN_PROGRESS;
@@ -1103,6 +1139,10 @@ const autoTransitionSessionStatuses = async (): Promise<{
     // Emit socket event for real-time UI update
     if (io && session.chatId && session.messageId) {
       const chatIdStr = String(session.chatId);
+      const studentRoom = `user::${String(session.studentId)}`;
+      const tutorRoom = `user::${String(session.tutorId)}`;
+      const chatRoom = `chat::${chatIdStr}`;
+
       const proposalPayload = {
         messageId: String(session.messageId),
         chatId: chatIdStr,
@@ -1110,10 +1150,19 @@ const autoTransitionSessionStatuses = async (): Promise<{
         sessionId: String(session._id),
       };
 
-      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Debug: Check how many sockets are in each room
+      const studentRoomSockets = io.sockets.adapter.rooms.get(studentRoom);
+      const tutorRoomSockets = io.sockets.adapter.rooms.get(tutorRoom);
+      const chatRoomSockets = io.sockets.adapter.rooms.get(chatRoom);
+
+      logger.info(`[Cron] IN_PROGRESS - Room sizes - student(${studentRoom}): ${studentRoomSockets?.size || 0}, tutor(${tutorRoom}): ${tutorRoomSockets?.size || 0}, chat(${chatRoom}): ${chatRoomSockets?.size || 0}`);
+
+      io.to(chatRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(studentRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(tutorRoom).emit('PROPOSAL_UPDATED', proposalPayload);
       logger.info(`[Cron] IN_PROGRESS socket emitted for session ${session._id}`);
+    } else {
+      logger.warn(`[Cron] Cannot emit IN_PROGRESS - io: ${!!io}, chatId: ${!!session.chatId}, messageId: ${!!session.messageId}`);
     }
   }
 
@@ -1142,6 +1191,68 @@ const autoTransitionSessionStatuses = async (): Promise<{
       }
     } catch {
       // Continue with next session
+    }
+  }
+
+  // FALLBACK: Handle sessions that missed the transition window
+  // These are SCHEDULED or STARTING_SOON sessions whose endTime has already passed
+  // This can happen if cron missed the window between startTime and endTime
+  const missedSessions = await Session.find({
+    status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
+    endTime: { $lte: now },
+  });
+  logger.info(`[Cron] Found ${missedSessions.length} missed sessions (SCHEDULED/STARTING_SOON but endTime passed)`);
+
+  for (const session of missedSessions) {
+    try {
+      const chatIdStr = session.chatId ? String(session.chatId) : '';
+      const studentRoom = `user::${String(session.studentId)}`;
+      const tutorRoom = `user::${String(session.tutorId)}`;
+      const chatRoom = `chat::${chatIdStr}`;
+
+      // STEP 1: First transition to IN_PROGRESS and emit socket
+      // This ensures frontend receives IN_PROGRESS status update
+      session.status = SESSION_STATUS.IN_PROGRESS;
+      session.startedAt = session.startTime; // Use original start time
+      await session.save();
+
+      if (session.messageId) {
+        await Message.findByIdAndUpdate(session.messageId, {
+          'sessionProposal.status': SESSION_STATUS.IN_PROGRESS,
+        });
+        logger.info(`[Cron] Missed session ${session._id} transitioned to IN_PROGRESS first`);
+      }
+
+      // Emit IN_PROGRESS socket event
+      if (io && session.chatId && session.messageId) {
+        const inProgressPayload = {
+          messageId: String(session.messageId),
+          chatId: chatIdStr,
+          status: SESSION_STATUS.IN_PROGRESS,
+          sessionId: String(session._id),
+        };
+
+        io.to(chatRoom).emit('PROPOSAL_UPDATED', inProgressPayload);
+        io.to(studentRoom).emit('PROPOSAL_UPDATED', inProgressPayload);
+        io.to(tutorRoom).emit('PROPOSAL_UPDATED', inProgressPayload);
+        logger.info(`[Cron] IN_PROGRESS socket emitted for missed session ${session._id}`);
+      }
+
+      // STEP 2: Now complete the session with attendance check
+      // This will emit NO_SHOW/COMPLETED socket
+      const result = await completeSessionWithAttendanceCheck(session._id.toString());
+
+      if (result.session.status === SESSION_STATUS.COMPLETED) {
+        completedCount++;
+      } else if (result.session.status === SESSION_STATUS.NO_SHOW) {
+        noShowCount++;
+      } else if (result.session.status === SESSION_STATUS.EXPIRED) {
+        expiredCount++;
+      }
+
+      logger.info(`[Cron] Missed session ${session._id} completed with status: ${result.session.status}`);
+    } catch (error) {
+      logger.error(`[Cron] Failed to process missed session ${session._id}:`, error);
     }
   }
 
@@ -1516,6 +1627,10 @@ const completeSessionWithAttendanceCheck = async (
     const io = global.io;
     if (io && session.chatId) {
       const chatIdStr = String(session.chatId);
+      const studentRoom = `user::${String(session.studentId)}`;
+      const tutorRoom = `user::${String(session.tutorId)}`;
+      const chatRoom = `chat::${chatIdStr}`;
+
       const proposalPayload = {
         messageId: String(session.messageId),
         chatId: chatIdStr,
@@ -1524,15 +1639,23 @@ const completeSessionWithAttendanceCheck = async (
         noShowBy: session.noShowBy,
       };
 
-      // Emit to chat room
-      io.to(`chat::${chatIdStr}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      // Also emit to user rooms for reliability
-      io.to(`user::${String(session.studentId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
-      io.to(`user::${String(session.tutorId)}`).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Debug: Check how many sockets are in each room
+      const studentRoomSockets = io.sockets.adapter.rooms.get(studentRoom);
+      const tutorRoomSockets = io.sockets.adapter.rooms.get(tutorRoom);
+      const chatRoomSockets = io.sockets.adapter.rooms.get(chatRoom);
 
-      logger.info(`[Socket Emit] PROPOSAL_UPDATED sent to chat::${chatIdStr} and user rooms`);
+      logger.info(`[Socket Debug] Room sizes - student(${studentRoom}): ${studentRoomSockets?.size || 0}, tutor(${tutorRoom}): ${tutorRoomSockets?.size || 0}, chat(${chatRoom}): ${chatRoomSockets?.size || 0}`);
+
+      // Emit to chat room
+      io.to(chatRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      // Also emit to user rooms for reliability
+      io.to(studentRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+      io.to(tutorRoom).emit('PROPOSAL_UPDATED', proposalPayload);
+
+      logger.info(`[Socket Emit] PROPOSAL_UPDATED (${finalStatus}) sent to ${chatRoom}, ${studentRoom}, ${tutorRoom}`);
+      logger.info(`[Socket Emit] Payload: ${JSON.stringify(proposalPayload)}`);
     } else {
-      logger.warn(`[Socket Emit] No socket.io instance or chatId available`);
+      logger.warn(`[Socket Emit] No socket.io instance (io: ${!!io}) or chatId (${session.chatId}) available`);
     }
   } else {
     logger.warn(`[Session Complete] No messageId found for session ${session._id} - cannot update proposal status`);

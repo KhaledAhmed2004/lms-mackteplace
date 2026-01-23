@@ -27,7 +27,15 @@ const getChatFromDB = async (user: any, search: string): Promise<IChat[]> => {
         ...(search && { name: { $regex: search, $options: 'i' } }),
       },
     })
-    .select('participants status updatedAt');
+    .populate({
+      path: 'trialRequestId',
+      select: 'subject',
+      populate: {
+        path: 'subject',
+        select: 'name',
+      },
+    })
+    .select('participants status updatedAt trialRequestId');
 
   // Filter out chats where no participants match the search (empty participants)
   const filteredChats = chats?.filter(
@@ -79,11 +87,15 @@ const getChatFromDB = async (user: any, search: string): Promise<IChat[]> => {
       }
 
 
+      // Extract subject from trialRequest if available
+      const subject = data?.trialRequestId?.subject?.name || null;
+
       return {
         ...data,
         lastMessage: lastMessage || null,
         unreadCount,
         presence,
+        subject,
       };
     })
   );

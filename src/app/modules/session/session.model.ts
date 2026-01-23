@@ -293,9 +293,11 @@ sessionSchema.pre('save', function (next) {
 });
 
 // Calculate total price if not provided
+// Fixed price per session (not based on duration)
+// 1 session = 1 session price, regardless of duration
 sessionSchema.pre('save', function (next) {
   if (!this.totalPrice && this.pricePerHour && this.duration) {
-    this.totalPrice = (this.pricePerHour * this.duration) / 60;
+    this.totalPrice = this.pricePerHour;
   }
   // Calculate buffer price
   if (!this.bufferPrice && this.pricePerHour && this.bufferMinutes) {

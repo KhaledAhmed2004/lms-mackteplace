@@ -181,6 +181,28 @@ const submitFeedback = async (
   // Update tutor's average rating
   await updateTutorRating(tutorId);
 
+  // Emit socket event for real-time update
+  const io = global.io;
+  if (io && session.chatId) {
+    const chatIdStr = String(session.chatId);
+    const feedbackPayload = {
+      sessionId,
+      chatId: chatIdStr,
+      feedbackId: feedback._id,
+      status: 'SUBMITTED',
+      rating: feedback.rating,
+      feedbackType: feedback.feedbackType,
+      feedbackText: feedback.feedbackText,
+    };
+
+    // Emit to chat room and both users
+    io.to(`chat::${chatIdStr}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+    io.to(`user::${String(session.studentId)}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+    io.to(`user::${tutorId}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+
+    console.log(`[Socket Emit] FEEDBACK_SUBMITTED sent for session ${sessionId}`);
+  }
+
   return feedback;
 };
 

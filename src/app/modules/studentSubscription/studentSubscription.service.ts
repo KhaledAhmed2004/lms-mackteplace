@@ -12,6 +12,8 @@ import {
 import { StudentSubscription } from './studentSubscription.model';
 import { Session } from '../session/session.model';
 import { SESSION_STATUS } from '../session/session.interface';
+import { MonthlyBilling } from '../monthlyBilling/monthlyBilling.model';
+import { BILLING_STATUS } from '../monthlyBilling/monthlyBilling.interface';
 import { stripe } from '../../../config/stripe';
 import { PricingConfigService } from '../pricingConfig/pricingConfig.service';
 
@@ -292,11 +294,12 @@ const getMyPlanUsage = async (studentId: string): Promise<PlanUsageResponse> => 
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-  // Get completed sessions for current month
+  // Get completed sessions for current month (excluding trial sessions - they're free!)
   const currentMonthSessions = await Session.find({
     studentId: new Types.ObjectId(studentId),
     status: SESSION_STATUS.COMPLETED,
     completedAt: { $gte: startOfMonth, $lte: endOfMonth },
+    isTrial: false, // Exclude trial sessions from billing
   });
 
   // Calculate current month spending
@@ -307,12 +310,13 @@ const getMyPlanUsage = async (studentId: string): Promise<PlanUsageResponse> => 
     bufferCharges += session.bufferPrice || 0;
   }
 
-  // Get all completed sessions for total stats
+  // Get all completed sessions for total stats (excluding trial sessions - they're free!)
   const allCompletedSessions = await Session.aggregate([
     {
       $match: {
         studentId: new Types.ObjectId(studentId),
         status: SESSION_STATUS.COMPLETED,
+        isTrial: false, // Exclude trial sessions from billing
       },
     },
     {
@@ -665,7 +669,10 @@ type PaymentHistoryItem = {
   amount: number;
   currency: string;
   date: Date;
-  type: 'subscription' | 'session';
+  type: 'subscription' | 'session' | 'billing';
+  status?: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+  invoiceNumber?: string;
+  invoiceUrl?: string;
   stripeInvoiceId?: string;
 };
 
@@ -686,7 +693,7 @@ const getPaymentHistory = async (
 ): Promise<PaymentHistoryResponse> => {
   const skip = (page - 1) * limit;
 
-  // Get student's Stripe customer ID
+  // Get student
   const student = await User.findById(studentId);
   if (!student) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Student not found');
@@ -695,76 +702,29 @@ const getPaymentHistory = async (
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const formattedPayments: PaymentHistoryItem[] = [];
 
-  // 1. Get paid subscriptions from our database
-  const paidSubscriptions = await StudentSubscription.find({
+  // Get monthly billings for this student (this is the source of truth for invoices)
+  const monthlyBillings = await MonthlyBilling.find({
     studentId: new Types.ObjectId(studentId),
-    status: { $in: [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.EXPIRED, SUBSCRIPTION_STATUS.CANCELLED] },
-    paidAt: { $exists: true, $ne: null },
-  }).sort({ paidAt: -1 });
+  }).sort({ billingYear: -1, billingMonth: -1 });
 
-  // Add subscription payments
-  paidSubscriptions.forEach((sub) => {
-    if (sub.paidAt) {
-      const paidDate = new Date(sub.paidAt);
-      const amount = sub.pricePerHour * sub.minimumHours;
-      formattedPayments.push({
-        id: sub._id.toString(),
-        period: `${monthNames[paidDate.getMonth()]} ${paidDate.getFullYear().toString().slice(-2)}`,
-        sessions: 0, // Subscription payment
-        amount: amount,
-        currency: 'EUR',
-        date: paidDate,
-        type: 'subscription',
-      });
-    }
+  // Add monthly billing records
+  monthlyBillings.forEach((billing) => {
+    formattedPayments.push({
+      id: billing._id.toString(),
+      period: `${monthNames[billing.billingMonth - 1]} ${String(billing.billingYear).slice(-2)}`,
+      sessions: billing.totalSessions,
+      amount: billing.total,
+      currency: 'EUR',
+      date: (billing as any).createdAt || billing.periodEnd,
+      type: 'billing',
+      status: billing.status as 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED',
+      invoiceNumber: billing.invoiceNumber,
+      invoiceUrl: billing.invoiceUrl,
+    });
   });
 
-  // 2. Get completed sessions grouped by month
-  const sessionPayments = await Session.aggregate([
-    {
-      $match: {
-        studentId: new Types.ObjectId(studentId),
-        status: SESSION_STATUS.COMPLETED,
-        completedAt: { $ne: null, $exists: true },
-      },
-    },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$completedAt' },
-          month: { $month: '$completedAt' },
-        },
-        sessions: { $sum: 1 },
-        totalAmount: { $sum: { $ifNull: ['$totalPrice', 0] } },
-        date: { $first: '$completedAt' },
-      },
-    },
-    {
-      $match: {
-        '_id.year': { $ne: null },
-        '_id.month': { $ne: null },
-      },
-    },
-    { $sort: { '_id.year': -1, '_id.month': -1 } },
-  ]);
-
-  // Add session payments
-  sessionPayments
-    .filter((payment) => payment._id.year && payment._id.month)
-    .forEach((payment) => {
-      formattedPayments.push({
-        id: `session-${payment._id.year}-${payment._id.month}`,
-        period: `${monthNames[payment._id.month - 1]} ${String(payment._id.year).slice(-2)}`,
-        sessions: payment.sessions || 0,
-        amount: payment.totalAmount || 0,
-        currency: 'EUR',
-        date: new Date(payment._id.year, payment._id.month - 1, 1),
-        type: 'session' as const,
-      });
-    });
-
   // Sort by date (newest first)
-  formattedPayments.sort((a, b) => b.date.getTime() - a.date.getTime());
+  formattedPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Paginate
   const total = formattedPayments.length;

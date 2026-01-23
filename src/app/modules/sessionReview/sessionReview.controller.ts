@@ -72,6 +72,21 @@ const getSingleReview = catchAsync(async (req: Request, res: Response) => {
 });
 
 /**
+ * Get review by session ID
+ */
+const getReviewBySession = catchAsync(async (req: Request, res: Response) => {
+  const { sessionId } = req.params;
+  const result = await SessionReviewService.getReviewBySession(sessionId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: result ? 'Review retrieved successfully' : 'No review found for this session',
+    data: result,
+  });
+});
+
+/**
  * Update review
  */
 const updateReview = catchAsync(async (req: Request, res: Response) => {
@@ -197,6 +212,7 @@ export const SessionReviewController = {
   getMyReviews,
   getTutorReviews,
   getSingleReview,
+  getReviewBySession,
   updateReview,
   deleteReview,
   getTutorStats,

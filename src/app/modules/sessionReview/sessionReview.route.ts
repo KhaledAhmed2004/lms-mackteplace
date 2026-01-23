@@ -84,6 +84,17 @@ router.get(
 );
 
 /**
+ * @route   GET /api/v1/reviews/session/:sessionId
+ * @desc    Get review for a specific session
+ * @access  Student or Tutor (session participants)
+ */
+router.get(
+  '/session/:sessionId',
+  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  SessionReviewController.getReviewBySession
+);
+
+/**
  * @route   GET /api/v1/reviews/:id
  * @desc    Get single review details
  * @access  Student (own) or Admin

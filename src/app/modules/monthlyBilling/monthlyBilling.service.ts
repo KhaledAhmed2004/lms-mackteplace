@@ -43,23 +43,34 @@ const generateMonthlyBillings = async (
 
   const billings: IMonthlyBilling[] = [];
 
+  console.log(`[Billing] Starting billing generation for ${month}/${year}`);
+  console.log(`[Billing] Period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
+  console.log(`[Billing] Found ${activeSubscriptions.length} active subscriptions`);
+
   for (const subscription of activeSubscriptions) {
     try {
+      // Get the actual studentId (ObjectId) - after populate, studentId is the full user object
+      const studentId = (subscription.studentId as any)._id || subscription.studentId;
+
+      console.log(`[Billing] Processing student: ${studentId}`);
+      console.log(`[Billing] studentId type: ${typeof studentId}, value: ${studentId}`);
+
       // Check if billing already exists for this month
       const existingBilling = await MonthlyBilling.findOne({
-        studentId: subscription.studentId,
+        studentId: studentId,
         billingMonth: month,
         billingYear: year,
       });
 
       if (existingBilling) {
+        console.log(`[Billing] Skipping - billing already exists for student ${studentId}`);
         continue; // Skip if already billed
       }
 
       // Get completed sessions for this student in billing period
       // Only get sessions that are NOT already marked as paid upfront and NOT already billed
       const sessions = await Session.find({
-        studentId: subscription.studentId,
+        studentId: studentId,
         studentCompletionStatus: COMPLETION_STATUS.COMPLETED,
         isTrial: false,  // Exclude trial sessions
         isPaidUpfront: { $ne: true },  // Exclude sessions already covered by upfront payment
@@ -69,6 +80,8 @@ const generateMonthlyBillings = async (
           $lte: periodEnd,
         },
       }).populate('tutorId', 'name').sort({ studentCompletedAt: 1 });
+
+      console.log(`[Billing] Found ${sessions.length} billable sessions for student ${studentId}`);
 
       // For REGULAR and LONG_TERM tiers, check if there are still prepaid hours to use
       let sessionsToCharge = sessions;
@@ -80,7 +93,7 @@ const generateMonthlyBillings = async (
 
         // Calculate how many hours were already marked as prepaid for THIS month
         const prepaidSessionsThisMonth = await Session.countDocuments({
-          studentId: subscription.studentId,
+          studentId: studentId,
           isPaidUpfront: true,
           studentCompletedAt: {
             $gte: periodStart,
@@ -142,7 +155,7 @@ const generateMonthlyBillings = async (
 
       // Create billing record
       const billing = await MonthlyBilling.create({
-        studentId: subscription.studentId,
+        studentId: studentId,
         subscriptionId: subscription._id,
         billingMonth: month,
         billingYear: year,
@@ -168,52 +181,68 @@ const generateMonthlyBillings = async (
 
       billings.push(billing);
 
-      // Auto-charge using saved payment method
+      // Create Stripe Invoice and auto-charge
       const student = subscription.studentId as any;
       if (subscription.stripeCustomerId && billing.total > 0) {
         try {
-          // Create a PaymentIntent with off-session payment
-          const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(billing.total * 100), // Convert to cents
-            currency: 'eur',
+          // Create invoice items for each session
+          for (const item of lineItems) {
+            await stripe.invoiceItems.create({
+              customer: subscription.stripeCustomerId,
+              amount: Math.round(item.amount * 100), // Convert to cents
+              currency: 'eur',
+              description: `${item.subject} session with ${item.tutorName} (${new Date(item.date).toLocaleDateString()})`,
+            });
+          }
+
+          // Create the invoice
+          const invoice = await stripe.invoices.create({
             customer: subscription.stripeCustomerId,
-            off_session: true,
-            confirm: true,
-            description: `Tutoring sessions for ${month}/${year}`,
+            auto_advance: true, // Auto-finalize the invoice
+            collection_method: 'charge_automatically',
             metadata: {
               billingId: billing._id.toString(),
-              studentId: student._id.toString(),
+              studentId: studentId.toString(),
               billingMonth: month.toString(),
               billingYear: year.toString(),
             },
           });
 
-          if (paymentIntent.status === 'succeeded') {
-            billing.status = BILLING_STATUS.PAID;
-            billing.stripePaymentIntentId = paymentIntent.id;
-            billing.paidAt = new Date();
-            billing.paymentMethod = paymentIntent.payment_method_types[0] || 'card';
-            await billing.save();
+          // Finalize the invoice (required before payment)
+          const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
 
-            console.log(`Auto-charged €${billing.total} for student ${subscription.studentId}`);
+          // Store the invoice ID and URL immediately
+          billing.stripeInvoiceId = finalizedInvoice.id;
+          billing.invoiceUrl = finalizedInvoice.hosted_invoice_url || finalizedInvoice.invoice_pdf || undefined;
+
+          // Try to pay the invoice
+          try {
+            const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id);
+
+            if (paidInvoice.status === 'paid') {
+              billing.status = BILLING_STATUS.PAID;
+              billing.paidAt = new Date();
+              billing.paymentMethod = 'card';
+              // Update invoice URL after payment (may have changed)
+              billing.invoiceUrl = paidInvoice.hosted_invoice_url || paidInvoice.invoice_pdf || billing.invoiceUrl;
+              console.log(`Auto-charged €${billing.total} for student ${studentId}`);
+            }
+          } catch (paymentError: any) {
+            // Payment failed but invoice is still created - student can pay later
+            console.error(`Payment failed for student ${studentId}:`, paymentError.message);
+            billing.status = BILLING_STATUS.FAILED;
+            billing.failureReason = paymentError.message;
           }
-        } catch (paymentError: any) {
-          console.error(`Payment failed for student ${subscription.studentId}:`, paymentError.message);
-          billing.status = BILLING_STATUS.FAILED;
-          billing.failureReason = paymentError.message;
+
           await billing.save();
 
-          // TODO: Send payment failure notification email
+        } catch (invoiceError: any) {
+          console.error(`Invoice creation failed for student ${studentId}:`, invoiceError.message);
+          billing.status = BILLING_STATUS.FAILED;
+          billing.failureReason = invoiceError.message;
+          await billing.save();
         }
       }
-
-      // TODO: Send invoice email
-      // await sendEmail({
-      //   to: student.email,
-      //   subject: `Your Invoice for ${month}/${year}`,
-      //   template: 'monthly-invoice',
-      //   data: { billing, student }
-      // });
     } catch (error: any) {
       // Log error but continue with other billings
       console.error(
