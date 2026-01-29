@@ -688,11 +688,23 @@ const acceptSessionRequest = async (
     );
   }
 
-  // Create chat between student and tutor
-  const chat = await Chat.create({
-    participants: [request.studentId, new Types.ObjectId(tutorId)],
-    sessionRequestId: request._id, // Link chat to session request
+  // Check if chat already exists between tutor and student (to avoid duplicate chats)
+  const chatParticipants = [request.studentId, new Types.ObjectId(tutorId)];
+  let chat = await Chat.findOne({
+    participants: { $all: chatParticipants },
   });
+
+  if (chat) {
+    // Reuse existing chat, update session request reference
+    chat.sessionRequestId = request._id;
+    await chat.save();
+  } else {
+    // Create new chat only if none exists
+    chat = await Chat.create({
+      participants: chatParticipants,
+      sessionRequestId: request._id,
+    });
+  }
 
   // Send introductory message if provided
   if (introductoryMessage && introductoryMessage.trim()) {
@@ -873,10 +885,94 @@ const expireOldRequests = async (): Promise<number> => {
   return result.modifiedCount;
 };
 
+/**
+ * Get tutor's accepted requests (UNIFIED: Trial + Session)
+ * Returns both trial and session requests accepted by this tutor
+ */
+const getMyAcceptedRequests = async (
+  tutorId: string,
+  query: Record<string, unknown>
+) => {
+  const tutorObjectId = new Types.ObjectId(tutorId);
+
+  // Verify tutor exists
+  const tutor = await User.findById(tutorId);
+  if (!tutor || tutor.role !== USER_ROLES.TUTOR) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only tutors can access this endpoint');
+  }
+
+  // Pagination params
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  // Match conditions
+  const sessionMatchConditions = { acceptedTutorId: tutorObjectId };
+  const trialMatchConditions = { acceptedTutorId: tutorObjectId };
+
+  // Unified query: both session and trial requests
+  const pipeline: Parameters<typeof SessionRequest.aggregate>[0] = [
+    { $match: sessionMatchConditions },
+    { $addFields: { requestType: 'SESSION' } },
+    {
+      $unionWith: {
+        coll: 'trialrequests',
+        pipeline: [
+          { $match: trialMatchConditions },
+          { $addFields: { requestType: 'TRIAL' } },
+        ],
+      },
+    },
+    { $sort: { createdAt: -1 } },
+    { $skip: skip },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'studentId',
+        foreignField: '_id',
+        as: 'studentId',
+        pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1, studentProfile: 1 } }],
+      },
+    },
+    { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'subjects',
+        localField: 'subject',
+        foreignField: '_id',
+        as: 'subject',
+        pipeline: [{ $project: { name: 1, icon: 1 } }],
+      },
+    },
+    { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+  ];
+
+  const result = await SessionRequest.aggregate(pipeline);
+
+  // Get total count for pagination
+  const [sessionCount, trialCount] = await Promise.all([
+    SessionRequest.countDocuments(sessionMatchConditions),
+    TrialRequest.countDocuments(trialMatchConditions),
+  ]);
+  const totalCount = sessionCount + trialCount;
+
+  return {
+    meta: {
+      total: totalCount,
+      limit,
+      page,
+      totalPage: Math.ceil(totalCount / limit),
+    },
+    data: result,
+  };
+};
+
 export const SessionRequestService = {
   createSessionRequest,
   getMatchingSessionRequests,
   getMySessionRequests,
+  getMyAcceptedRequests,
   getAllSessionRequests,
   getSingleSessionRequest,
   acceptSessionRequest,

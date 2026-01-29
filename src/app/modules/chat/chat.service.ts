@@ -35,7 +35,15 @@ const getChatFromDB = async (user: any, search: string): Promise<IChat[]> => {
         select: 'name',
       },
     })
-    .select('participants status updatedAt trialRequestId');
+    .populate({
+      path: 'sessionRequestId',
+      select: 'subject',
+      populate: {
+        path: 'subject',
+        select: 'name',
+      },
+    })
+    .select('participants status updatedAt trialRequestId sessionRequestId');
 
   // Filter out chats where no participants match the search (empty participants)
   const filteredChats = chats?.filter(
@@ -87,8 +95,9 @@ const getChatFromDB = async (user: any, search: string): Promise<IChat[]> => {
       }
 
 
-      // Extract subject from trialRequest if available
-      const subject = data?.trialRequestId?.subject?.name || null;
+      // Extract subject from sessionRequest first (latest), then trialRequest as fallback
+      // Session request takes priority because it comes after trial in user flow
+      const subject = data?.sessionRequestId?.subject?.name || data?.trialRequestId?.subject?.name || null;
 
       return {
         ...data,

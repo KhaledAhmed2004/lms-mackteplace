@@ -41,6 +41,12 @@ router.get(
   SessionRequestController.getMatchingSessionRequests
 );
 
+router.get(
+  '/my-accepted',
+  auth(USER_ROLES.TUTOR),
+  SessionRequestController.getMyAcceptedRequests
+);
+
 router.patch(
   '/:id/accept',
   auth(USER_ROLES.TUTOR),

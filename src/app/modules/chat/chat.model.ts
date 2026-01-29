@@ -17,6 +17,10 @@ const chatSchema = new Schema<IChat, ChatModel>(
       type: Schema.Types.ObjectId,
       ref: 'TrialRequest',
     },
+    sessionRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SessionRequest',
+    },
   },
   {
     timestamps: true,

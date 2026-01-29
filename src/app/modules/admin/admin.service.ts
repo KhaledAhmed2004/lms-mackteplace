@@ -897,6 +897,7 @@ const getUnifiedSessions = async (
 
 /**
  * Get session stats for admin dashboard
+ * Includes both Session records and TrialRequest records for accurate counts
  */
 const getSessionStats = async (): Promise<{
   totalSessions: number;
@@ -904,18 +905,55 @@ const getSessionStats = async (): Promise<{
   completedSessions: number;
   trialSessions: number;
 }> => {
-  const now = new Date();
+  // Get trial request IDs that already have sessions created (to avoid double counting)
+  const trialRequestIdsWithSessions = await Session.distinct('trialRequestId', {
+    trialRequestId: { $ne: null },
+  });
 
-  const [totalSessions, pendingSessions, completedSessions, trialSessions] =
-    await Promise.all([
-      Session.countDocuments(),
-      Session.countDocuments({
-        status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON] },
-        startTime: { $gte: now },
+  const [
+    // Session counts
+    sessionTotal,
+    sessionPending,
+    sessionCompleted,
+    sessionTrial,
+    // TrialRequest counts (ONLY those WITHOUT sessions - to avoid double counting)
+    trialRequestPending,
+    trialRequestAccepted,
+  ] = await Promise.all([
+    // Sessions
+    Session.countDocuments(),
+    Session.countDocuments({
+      status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON, SESSION_STATUS.ACCEPTED] },
+    }),
+    Session.countDocuments({ status: SESSION_STATUS.COMPLETED }),
+    Session.countDocuments({ isTrial: true }),
+    // TrialRequests (pending = not yet matched with tutor, excluding those with sessions)
+    TrialRequest.countDocuments({
+      status: TRIAL_REQUEST_STATUS.PENDING,
+      ...(trialRequestIdsWithSessions.length > 0 && {
+        _id: { $nin: trialRequestIdsWithSessions },
       }),
-      Session.countDocuments({ status: SESSION_STATUS.COMPLETED }),
-      Session.countDocuments({ isTrial: true }),
-    ]);
+    }),
+    // TrialRequests (accepted = matched but session not yet created/scheduled, excluding those with sessions)
+    TrialRequest.countDocuments({
+      status: TRIAL_REQUEST_STATUS.ACCEPTED,
+      ...(trialRequestIdsWithSessions.length > 0 && {
+        _id: { $nin: trialRequestIdsWithSessions },
+      }),
+    }),
+  ]);
+
+  // Total = Sessions + Pending/Accepted TrialRequests (without sessions)
+  const totalSessions = sessionTotal + trialRequestPending + trialRequestAccepted;
+
+  // Pending = Session pending + TrialRequest pending/accepted (without sessions)
+  const pendingSessions = sessionPending + trialRequestPending + trialRequestAccepted;
+
+  // Completed = Only completed sessions
+  const completedSessions = sessionCompleted;
+
+  // Trial = Session trials + TrialRequests (without sessions)
+  const trialSessions = sessionTrial + trialRequestPending + trialRequestAccepted;
 
   return {
     totalSessions,

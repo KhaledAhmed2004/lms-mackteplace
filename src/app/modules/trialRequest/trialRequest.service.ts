@@ -458,11 +458,22 @@ const acceptTrialRequest = async (
     ? [request.studentId, new Types.ObjectId(tutorId)]
     : [new Types.ObjectId(tutorId)];
 
-  // Create chat between student and tutor
-  const chat = await Chat.create({
-    participants: chatParticipants,
-    trialRequestId: request._id, // Link chat to trial request
+  // Check if chat already exists between tutor and student (to avoid duplicate chats)
+  let chat = await Chat.findOne({
+    participants: { $all: chatParticipants },
   });
+
+  if (chat) {
+    // Reuse existing chat, update trial request reference
+    chat.trialRequestId = request._id;
+    await chat.save();
+  } else {
+    // Create new chat only if none exists
+    chat = await Chat.create({
+      participants: chatParticipants,
+      trialRequestId: request._id,
+    });
+  }
 
   // Send introductory message if provided
   if (introductoryMessage && introductoryMessage.trim()) {
