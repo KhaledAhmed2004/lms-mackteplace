@@ -185,21 +185,13 @@ const generateMonthlyBillings = async (
       const student = subscription.studentId as any;
       if (subscription.stripeCustomerId && billing.total > 0) {
         try {
-          // Create invoice items for each session
-          for (const item of lineItems) {
-            await stripe.invoiceItems.create({
-              customer: subscription.stripeCustomerId,
-              amount: Math.round(item.amount * 100), // Convert to cents
-              currency: 'eur',
-              description: `${item.subject} session with ${item.tutorName} (${new Date(item.date).toLocaleDateString()})`,
-            });
-          }
-
-          // Create the invoice
+          // Create the invoice first, then attach items directly to it
           const invoice = await stripe.invoices.create({
             customer: subscription.stripeCustomerId,
-            auto_advance: true, // Auto-finalize the invoice
+            currency: 'eur',  // Must match invoice items currency
+            auto_advance: true,
             collection_method: 'charge_automatically',
+            pending_invoice_items_behavior: 'exclude',
             metadata: {
               billingId: billing._id.toString(),
               studentId: studentId.toString(),
@@ -207,6 +199,17 @@ const generateMonthlyBillings = async (
               billingYear: year.toString(),
             },
           });
+
+          // Create invoice items attached directly to the invoice
+          for (const item of lineItems) {
+            await stripe.invoiceItems.create({
+              customer: subscription.stripeCustomerId,
+              invoice: invoice.id,
+              amount: Math.round(item.amount * 100), // Convert to cents
+              currency: 'eur',
+              description: `${item.subject} session with ${item.tutorName} (${new Date(item.date).toLocaleDateString()})`,
+            });
+          }
 
           // Finalize the invoice (required before payment)
           const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
@@ -228,10 +231,21 @@ const generateMonthlyBillings = async (
               console.log(`Auto-charged €${billing.total} for student ${studentId}`);
             }
           } catch (paymentError: any) {
-            // Payment failed but invoice is still created - student can pay later
-            console.error(`Payment failed for student ${studentId}:`, paymentError.message);
-            billing.status = BILLING_STATUS.FAILED;
-            billing.failureReason = paymentError.message;
+            // Stripe auto-collects on finalize (auto_advance + charge_automatically),
+            // so .pay() may throw "Invoice is already paid" — that's actually a success
+            if (paymentError.message?.includes('already paid')) {
+              const invoice = await stripe.invoices.retrieve(finalizedInvoice.id);
+              billing.status = BILLING_STATUS.PAID;
+              billing.paidAt = new Date();
+              billing.paymentMethod = 'card';
+              billing.invoiceUrl = invoice.hosted_invoice_url || invoice.invoice_pdf || billing.invoiceUrl;
+              console.log(`Invoice already auto-paid for student ${studentId} — marked as PAID`);
+            } else {
+              // Actual payment failure - student can pay later
+              console.error(`Payment failed for student ${studentId}:`, paymentError.message);
+              billing.status = BILLING_STATUS.FAILED;
+              billing.failureReason = paymentError.message;
+            }
           }
 
           await billing.save();

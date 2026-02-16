@@ -697,6 +697,7 @@ const acceptSessionRequest = async (
   if (chat) {
     // Reuse existing chat, update session request reference
     chat.sessionRequestId = request._id;
+    chat.trialRequestId = undefined; // Clear trial reference so new sessions aren't marked as trial
     await chat.save();
   } else {
     // Create new chat only if none exists

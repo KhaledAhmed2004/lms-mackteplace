@@ -9,6 +9,9 @@ import { User } from '../user/user.model';
 import { USER_ROLES } from '../../../enums/user';
 import { TUTOR_LEVEL } from '../user/user.interface';
 import QueryBuilder from '../../builder/QueryBuilder';
+import { stripe } from '../../../config/stripe';
+import { StripeAccount } from '../payment/payment.model';
+import { emailHelper } from '../../../helpers/emailHelper';
 
 // Level configuration
 const LEVEL_CONFIG = {
@@ -69,6 +72,7 @@ const generateTutorEarnings = async (
     const sessions = await Session.find({
       tutorId: tutor._id,
       teacherCompletionStatus: COMPLETION_STATUS.COMPLETED,
+      isTrial: false,  // Exclude free trial sessions - teacher doesn't get paid for trials
       teacherCompletedAt: { $gte: periodStart, $lte: periodEnd },
     }).populate('studentId', 'name');
 
@@ -186,21 +190,38 @@ const initiatePayout = async (
     );
   }
 
-  // TODO: Integrate Stripe Connect transfer
-  // const tutor = earning.tutorId as any;
-  // const transfer = await stripe.transfers.create({
-  //   amount: Math.round(earning.netEarnings * 100), // Convert to cents
-  //   currency: 'eur',
-  //   destination: tutor.stripeConnectAccountId,
-  //   transfer_group: earning.payoutReference,
-  //   metadata: {
-  //     tutorId: tutor._id.toString(),
-  //     payoutMonth: earning.payoutMonth,
-  //     payoutYear: earning.payoutYear,
-  //   },
-  // });
+  const tutor = earning.tutorId as any;
 
-  // earning.stripeTransferId = transfer.id;
+  // Look up tutor's Stripe Connect account
+  const stripeAccount = await StripeAccount.findOne({ userId: tutor._id });
+  if (!stripeAccount || !stripeAccount.onboardingCompleted) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Tutor has not completed Stripe onboarding. Cannot initiate payout.'
+    );
+  }
+
+  if (!stripeAccount.payoutsEnabled) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Tutor Stripe account does not have payouts enabled yet.'
+    );
+  }
+
+  // Create Stripe Connect transfer
+  const transfer = await stripe.transfers.create({
+    amount: Math.round(earning.netEarnings * 100), // Convert to cents
+    currency: 'eur',
+    destination: stripeAccount.stripeAccountId,
+    transfer_group: earning.payoutReference,
+    metadata: {
+      tutorId: tutor._id.toString(),
+      payoutMonth: String(earning.payoutMonth),
+      payoutYear: String(earning.payoutYear),
+    },
+  });
+
+  earning.stripeTransferId = transfer.id;
   earning.status = PAYOUT_STATUS.PROCESSING;
   if (payload.notes) {
     earning.notes = payload.notes;
@@ -240,13 +261,30 @@ const markAsPaid = async (
 
   await earning.save();
 
-  // TODO: Send email notification to tutor
-  // await sendEmail({
-  //   to: tutor.email,
-  //   subject: 'Payout Completed',
-  //   template: 'payout-completed',
-  //   data: { earning },
-  // });
+  // Send email notification to tutor
+  const tutor = await User.findById(earning.tutorId);
+  if (tutor?.email) {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    await emailHelper.sendEmail({
+      to: tutor.email,
+      subject: 'Payout Completed - ' + monthNames[earning.payoutMonth - 1] + ' ' + earning.payoutYear,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1a1a1a;">Payout Completed</h2>
+          <p>Hi ${tutor.name},</p>
+          <p>Your payout has been successfully processed.</p>
+          <div style="background: #e8f5e9; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><strong>Period:</strong> ${monthNames[earning.payoutMonth - 1]} ${earning.payoutYear}</p>
+            <p style="margin: 4px 0;"><strong>Sessions:</strong> ${earning.totalSessions}</p>
+            <p style="margin: 4px 0;"><strong>Amount:</strong> €${earning.netEarnings.toFixed(2)}</p>
+            <p style="margin: 4px 0;"><strong>Reference:</strong> ${earning.payoutReference}</p>
+          </div>
+          <p>The funds should appear in your bank account within 2-3 business days.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+        </div>
+      `,
+    }).catch(err => console.error('Failed to send payout email:', err));
+  }
 
   return earning;
 };
@@ -269,13 +307,30 @@ const markAsFailed = async (
 
   await earning.save();
 
-  // TODO: Send email notification to tutor
-  // await sendEmail({
-  //   to: tutor.email,
-  //   subject: 'Payout Failed',
-  //   template: 'payout-failed',
-  //   data: { earning, failureReason },
-  // });
+  // Send email notification to tutor
+  const tutor = await User.findById(earning.tutorId);
+  if (tutor?.email) {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    await emailHelper.sendEmail({
+      to: tutor.email,
+      subject: 'Payout Failed - Action Required',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #d32f2f;">Payout Failed</h2>
+          <p>Hi ${tutor.name},</p>
+          <p>Unfortunately, your payout could not be processed.</p>
+          <div style="background: #fce4ec; border: 1px solid #ef9a9a; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><strong>Period:</strong> ${monthNames[earning.payoutMonth - 1]} ${earning.payoutYear}</p>
+            <p style="margin: 4px 0;"><strong>Amount:</strong> €${earning.netEarnings.toFixed(2)}</p>
+            <p style="margin: 4px 0;"><strong>Reason:</strong> ${failureReason}</p>
+          </div>
+          <p>Please check your Stripe account settings and ensure your bank details are correct. Our team will retry the payout once the issue is resolved.</p>
+          <p>If you need help, please contact support.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+        </div>
+      `,
+    }).catch(err => console.error('Failed to send payout failure email:', err));
+  }
 
   return earning;
 };

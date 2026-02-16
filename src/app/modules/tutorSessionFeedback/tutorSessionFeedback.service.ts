@@ -11,6 +11,8 @@ import {
   FEEDBACK_TYPE,
 } from './tutorSessionFeedback.interface';
 import QueryBuilder from '../../builder/QueryBuilder';
+import { emailHelper } from '../../../helpers/emailHelper';
+import { format } from 'date-fns';
 
 // Helper to calculate due date (3rd of next month)
 const calculateDueDate = (sessionDate: Date): Date => {
@@ -476,16 +478,49 @@ const getForfeitedPaymentsSummary = async (query?: {
  */
 const sendDeadlineReminders = async (): Promise<number> => {
   const feedbacksDueSoon = await getFeedbacksDueSoon(3); // Due within 3 days
+  let sent = 0;
 
-  // Here you would send emails/notifications to tutors
-  // For now, just log
   for (const feedback of feedbacksDueSoon) {
-    console.log(
-      `Reminder: Feedback due for session ${feedback.sessionId}, Tutor: ${(feedback.tutorId as any)?.email}`
-    );
+    const tutor = feedback.tutorId as any;
+    const session = feedback.sessionId as any;
+    if (!tutor?.email) continue;
+
+    const dueDate = format(new Date(feedback.dueDate), 'MMMM d, yyyy');
+    const sessionSubject = session?.subject || 'N/A';
+    const sessionDate = session?.startTime
+      ? format(new Date(session.startTime), 'MMMM d, yyyy')
+      : 'N/A';
+
+    try {
+      await emailHelper.sendEmail({
+        to: tutor.email,
+        subject: 'Feedback Reminder - Submit by ' + dueDate,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1a1a1a;">Feedback Reminder</h2>
+            <p>Hi ${tutor.name},</p>
+            <p>This is a reminder that your session feedback is due soon.</p>
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <p style="margin: 4px 0;"><strong>Session:</strong> ${sessionSubject}</p>
+              <p style="margin: 4px 0;"><strong>Session Date:</strong> ${sessionDate}</p>
+              <p style="margin: 4px 0;"><strong>Feedback Deadline:</strong> ${dueDate}</p>
+            </div>
+            <p style="color: #e65100;"><strong>Please submit your feedback before the deadline to receive your payment for this session.</strong></p>
+            <p>If you miss the deadline, the payment for this session will be forfeited.</p>
+            <a href="${process.env.FRONTEND_URL}/teacher/overview" style="display: inline-block; background: #0B31BD; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 12px;">Submit Feedback</a>
+            <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+          </div>
+        `,
+      });
+      sent++;
+      console.log(`Reminder sent to ${tutor.email} for session ${session?._id}`);
+    } catch (error) {
+      console.error(`Failed to send reminder to ${tutor.email}:`, error);
+    }
   }
 
-  return feedbacksDueSoon.length;
+  console.log(`Sent ${sent}/${feedbacksDueSoon.length} deadline reminders`);
+  return sent;
 };
 
 /**
@@ -494,15 +529,69 @@ const sendDeadlineReminders = async (): Promise<number> => {
  */
 const sendFinalReminders = async (): Promise<number> => {
   const feedbacksDueSoon = await getFeedbacksDueSoon(1); // Due within 1 day
+  let sent = 0;
 
-  // Here you would send urgent emails/notifications
   for (const feedback of feedbacksDueSoon) {
-    console.log(
-      `FINAL REMINDER: Feedback due TOMORROW for session ${feedback.sessionId}, Tutor: ${(feedback.tutorId as any)?.email}`
-    );
+    const tutor = feedback.tutorId as any;
+    const session = feedback.sessionId as any;
+    if (!tutor?.email) continue;
+
+    const dueDate = format(new Date(feedback.dueDate), 'MMMM d, yyyy');
+    const sessionSubject = session?.subject || 'N/A';
+    const forfeitAmount = (session as any)?.totalPrice || 0;
+
+    try {
+      await emailHelper.sendEmail({
+        to: tutor.email,
+        subject: 'URGENT: Feedback Due Tomorrow - Payment at Risk',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #d32f2f;">Urgent: Feedback Due Tomorrow</h2>
+            <p>Hi ${tutor.name},</p>
+            <p><strong>Your feedback deadline is tomorrow (${dueDate}).</strong></p>
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <p style="margin: 4px 0;"><strong>Session:</strong> ${sessionSubject}</p>
+              <p style="margin: 4px 0;"><strong>Deadline:</strong> ${dueDate}</p>
+              <p style="margin: 4px 0; color: #d32f2f;"><strong>Amount at risk: €${forfeitAmount}</strong></p>
+            </div>
+            <p style="color: #d32f2f;"><strong>If you do not submit your feedback by the deadline, the payment of €${forfeitAmount} will be forfeited and you will not be able to recover it.</strong></p>
+            <a href="${process.env.FRONTEND_URL}/teacher/overview" style="display: inline-block; background: #d32f2f; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 12px;">Submit Feedback Now</a>
+            <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+          </div>
+        `,
+      });
+      sent++;
+      console.log(`FINAL reminder sent to ${tutor.email} for session ${session?._id}`);
+    } catch (error) {
+      console.error(`Failed to send final reminder to ${tutor.email}:`, error);
+    }
   }
 
-  return feedbacksDueSoon.length;
+  console.log(`Sent ${sent}/${feedbacksDueSoon.length} final reminders`);
+  return sent;
+};
+
+/**
+ * Get list of forfeited feedbacks with details (for admin dashboard)
+ */
+const getForfeitedFeedbacksList = async (query: Record<string, unknown>) => {
+  const feedbackQuery = new QueryBuilder(
+    TutorSessionFeedback.find({
+      paymentForfeited: true,
+    })
+      .populate('tutorId', 'name email profilePicture')
+      .populate('studentId', 'name email')
+      .populate('sessionId', 'subject startTime endTime totalPrice'),
+    query
+  )
+    .sort()
+    .paginate()
+    .fields();
+
+  const data = await feedbackQuery.modelQuery;
+  const meta = await feedbackQuery.getPaginationInfo();
+
+  return { data, meta };
 };
 
 export const TutorSessionFeedbackService = {
@@ -517,6 +606,7 @@ export const TutorSessionFeedbackService = {
   getOverdueFeedbacks,
   processForfeitedFeedbacks,
   getForfeitedPaymentsSummary,
+  getForfeitedFeedbacksList,
   sendDeadlineReminders,
   sendFinalReminders,
 };

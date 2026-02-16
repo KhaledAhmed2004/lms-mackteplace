@@ -42,7 +42,7 @@ interface CloudProvider {
 // ===============================
 const allowedTypes: Record<IFolderName, string[]> = {
   images: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
-  media: ['video/mp4', 'video/webm', 'audio/mpeg', 'audio/ogg', 'audio/wav'],
+  media: ['video/mp4', 'video/webm', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm'],
   documents: ['application/pdf'],
 };
 

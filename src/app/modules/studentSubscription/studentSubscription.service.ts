@@ -554,6 +554,7 @@ const createSubscriptionPaymentIntent = async (
     amount: amountInCents,
     currency: 'eur',
     customer: stripeCustomerId,
+    setup_future_usage: 'off_session', // Attach payment method to customer for future charges
     metadata: {
       subscriptionId: subscription._id.toString(),
       studentId,
