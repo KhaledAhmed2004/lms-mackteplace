@@ -86,8 +86,8 @@ const monthlyBillingSchema = new mongoose_1.Schema({
     },
     subtotal: {
         type: Number,
-        required: [true, 'Subtotal is required'],
         default: 0,
+        // Auto-calculated in pre-save hook
     },
     tax: {
         type: Number,
@@ -95,8 +95,8 @@ const monthlyBillingSchema = new mongoose_1.Schema({
     },
     total: {
         type: Number,
-        required: [true, 'Total is required'],
         default: 0,
+        // Auto-calculated in pre-save hook
     },
     status: {
         type: String,
@@ -120,8 +120,8 @@ const monthlyBillingSchema = new mongoose_1.Schema({
     },
     invoiceNumber: {
         type: String,
-        required: [true, 'Invoice number is required'],
         unique: true,
+        // Not required - auto-generated in pre-save hook
     },
     notes: {
         type: String,

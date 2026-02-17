@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userIdToAgoraUid = exports.generateSessionChannelName = exports.generateChannelName = exports.generateRtcToken = void 0;
 const agora_token_1 = require("agora-token");
-const uuid_1 = require("uuid");
+const crypto_1 = require("crypto");
 const config_1 = __importDefault(require("../../../config"));
 /**
  * RTC Token Generate করে (Video/Voice Call এর জন্য)
@@ -25,7 +25,7 @@ const generateRtcToken = (channelName, uid, role = 'publisher', tokenExpirationI
 exports.generateRtcToken = generateRtcToken;
 // Unique Channel Name Generate করে
 const generateChannelName = () => {
-    return `call_${(0, uuid_1.v4)().replace(/-/g, '').substring(0, 16)}`;
+    return `call_${(0, crypto_1.randomUUID)().replace(/-/g, '').substring(0, 16)}`;
 };
 exports.generateChannelName = generateChannelName;
 /**

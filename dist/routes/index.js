@@ -30,6 +30,7 @@ const paymentMethod_route_1 = require("../app/modules/paymentMethod/paymentMetho
 const legalPolicy_route_1 = require("../app/modules/legalPolicy/legalPolicy.route");
 const oerResource_route_1 = require("../app/modules/oerResource/oerResource.route");
 const supportTicket_route_1 = require("../app/modules/supportTicket/supportTicket.route");
+const pricingConfig_route_1 = require("../app/modules/pricingConfig/pricingConfig.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -135,6 +136,10 @@ const apiRoutes = [
     {
         path: '/support-tickets',
         route: supportTicket_route_1.SupportTicketRoutes,
+    },
+    {
+        path: '/pricing',
+        route: pricingConfig_route_1.PricingConfigRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

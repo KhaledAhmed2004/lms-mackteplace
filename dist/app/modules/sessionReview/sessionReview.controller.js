@@ -74,6 +74,19 @@ const getSingleReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
     });
 }));
 /**
+ * Get review by session ID
+ */
+const getReviewBySession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { sessionId } = req.params;
+    const result = yield sessionReview_service_1.SessionReviewService.getReviewBySession(sessionId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: result ? 'Review retrieved successfully' : 'No review found for this session',
+        data: result,
+    });
+}));
+/**
  * Update review
  */
 const updateReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -183,6 +196,7 @@ exports.SessionReviewController = {
     getMyReviews,
     getTutorReviews,
     getSingleReview,
+    getReviewBySession,
     updateReview,
     deleteReview,
     getTutorStats,

@@ -171,7 +171,7 @@ const createTrialRequest = async (
   let accessToken: string | undefined;
   let refreshToken: string | undefined;
   let userInfo: CreateTrialRequestResponse['user'] | undefined;
-  let trialRequest: ITrialRequest;
+  let trialRequest: ITrialRequest & { _id: Types.ObjectId };
 
   if (!studentId && payload.studentInfo) {
     // Determine email and password based on age

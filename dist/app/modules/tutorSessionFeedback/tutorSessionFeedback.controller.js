@@ -76,10 +76,37 @@ const getMyReceivedFeedbacks = (0, catchAsync_1.default)((req, res) => __awaiter
         pagination: result.meta,
     });
 }));
+// Admin: Get forfeited payments summary
+const getForfeitedPaymentsSummary = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { month, year } = req.query;
+    const result = yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.getForfeitedPaymentsSummary({
+        month: month ? Number(month) : undefined,
+        year: year ? Number(year) : undefined,
+    });
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Forfeited payments summary retrieved successfully',
+        data: result,
+    });
+}));
+// Admin: Get list of forfeited feedbacks
+const getForfeitedFeedbacksList = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield tutorSessionFeedback_service_1.TutorSessionFeedbackService.getForfeitedFeedbacksList(req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Forfeited feedbacks list retrieved successfully',
+        data: result.data,
+        pagination: result.meta,
+    });
+}));
 exports.TutorSessionFeedbackController = {
     submitFeedback,
     getPendingFeedbacks,
     getTutorFeedbacks,
     getFeedbackBySession,
     getMyReceivedFeedbacks,
+    getForfeitedPaymentsSummary,
+    getForfeitedFeedbacksList,
 };

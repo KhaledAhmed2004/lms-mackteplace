@@ -212,7 +212,7 @@ const generateMonthlyBillings = async (
           }
 
           // Finalize the invoice (required before payment)
-          const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+          const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id!);
 
           // Store the invoice ID and URL immediately
           billing.stripeInvoiceId = finalizedInvoice.id;
@@ -220,7 +220,7 @@ const generateMonthlyBillings = async (
 
           // Try to pay the invoice
           try {
-            const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id);
+            const paidInvoice = await stripe.invoices.pay(finalizedInvoice.id!);
 
             if (paidInvoice.status === 'paid') {
               billing.status = BILLING_STATUS.PAID;
@@ -234,7 +234,7 @@ const generateMonthlyBillings = async (
             // Stripe auto-collects on finalize (auto_advance + charge_automatically),
             // so .pay() may throw "Invoice is already paid" — that's actually a success
             if (paymentError.message?.includes('already paid')) {
-              const invoice = await stripe.invoices.retrieve(finalizedInvoice.id);
+              const invoice = await stripe.invoices.retrieve(finalizedInvoice.id!);
               billing.status = BILLING_STATUS.PAID;
               billing.paidAt = new Date();
               billing.paymentMethod = 'card';

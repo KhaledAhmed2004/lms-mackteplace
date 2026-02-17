@@ -24,6 +24,9 @@ const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
 const user_interface_1 = require("../user/user.interface");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
+const stripe_1 = require("../../../config/stripe");
+const payment_model_1 = require("../payment/payment.model");
+const emailHelper_1 = require("../../../helpers/emailHelper");
 // Level configuration
 const LEVEL_CONFIG = {
     [user_interface_1.TUTOR_LEVEL.STARTER]: { minSessions: 0, maxSessions: 20, hourlyRate: 15, levelNumber: 1 },
@@ -73,6 +76,7 @@ const generateTutorEarnings = (month_1, year_1, ...args_1) => __awaiter(void 0, 
         const sessions = yield session_model_1.Session.find({
             tutorId: tutor._id,
             teacherCompletionStatus: session_interface_1.COMPLETION_STATUS.COMPLETED,
+            isTrial: false, // Exclude free trial sessions - teacher doesn't get paid for trials
             teacherCompletedAt: { $gte: periodStart, $lte: periodEnd },
         }).populate('studentId', 'name');
         if (sessions.length === 0) {
@@ -156,20 +160,28 @@ const initiatePayout = (id, payload) => __awaiter(void 0, void 0, void 0, functi
     if (earning.netEarnings <= 0) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Cannot initiate payout with zero or negative earnings');
     }
-    // TODO: Integrate Stripe Connect transfer
-    // const tutor = earning.tutorId as any;
-    // const transfer = await stripe.transfers.create({
-    //   amount: Math.round(earning.netEarnings * 100), // Convert to cents
-    //   currency: 'eur',
-    //   destination: tutor.stripeConnectAccountId,
-    //   transfer_group: earning.payoutReference,
-    //   metadata: {
-    //     tutorId: tutor._id.toString(),
-    //     payoutMonth: earning.payoutMonth,
-    //     payoutYear: earning.payoutYear,
-    //   },
-    // });
-    // earning.stripeTransferId = transfer.id;
+    const tutor = earning.tutorId;
+    // Look up tutor's Stripe Connect account
+    const stripeAccount = yield payment_model_1.StripeAccount.findOne({ userId: tutor._id });
+    if (!stripeAccount || !stripeAccount.onboardingCompleted) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Tutor has not completed Stripe onboarding. Cannot initiate payout.');
+    }
+    if (!stripeAccount.payoutsEnabled) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Tutor Stripe account does not have payouts enabled yet.');
+    }
+    // Create Stripe Connect transfer
+    const transfer = yield stripe_1.stripe.transfers.create({
+        amount: Math.round(earning.netEarnings * 100), // Convert to cents
+        currency: 'eur',
+        destination: stripeAccount.stripeAccountId,
+        transfer_group: earning.payoutReference,
+        metadata: {
+            tutorId: tutor._id.toString(),
+            payoutMonth: String(earning.payoutMonth),
+            payoutYear: String(earning.payoutYear),
+        },
+    });
+    earning.stripeTransferId = transfer.id;
     earning.status = tutorEarnings_interface_1.PAYOUT_STATUS.PROCESSING;
     if (payload.notes) {
         earning.notes = payload.notes;
@@ -194,13 +206,30 @@ const markAsPaid = (id, payload) => __awaiter(void 0, void 0, void 0, function* 
         earning.paymentMethod = payload.paymentMethod;
     }
     yield earning.save();
-    // TODO: Send email notification to tutor
-    // await sendEmail({
-    //   to: tutor.email,
-    //   subject: 'Payout Completed',
-    //   template: 'payout-completed',
-    //   data: { earning },
-    // });
+    // Send email notification to tutor
+    const tutor = yield user_model_1.User.findById(earning.tutorId);
+    if (tutor === null || tutor === void 0 ? void 0 : tutor.email) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        yield emailHelper_1.emailHelper.sendEmail({
+            to: tutor.email,
+            subject: 'Payout Completed - ' + monthNames[earning.payoutMonth - 1] + ' ' + earning.payoutYear,
+            html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1a1a1a;">Payout Completed</h2>
+          <p>Hi ${tutor.name},</p>
+          <p>Your payout has been successfully processed.</p>
+          <div style="background: #e8f5e9; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><strong>Period:</strong> ${monthNames[earning.payoutMonth - 1]} ${earning.payoutYear}</p>
+            <p style="margin: 4px 0;"><strong>Sessions:</strong> ${earning.totalSessions}</p>
+            <p style="margin: 4px 0;"><strong>Amount:</strong> €${earning.netEarnings.toFixed(2)}</p>
+            <p style="margin: 4px 0;"><strong>Reference:</strong> ${earning.payoutReference}</p>
+          </div>
+          <p>The funds should appear in your bank account within 2-3 business days.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+        </div>
+      `,
+        }).catch(err => console.error('Failed to send payout email:', err));
+    }
     return earning;
 });
 /**
@@ -214,13 +243,30 @@ const markAsFailed = (id, failureReason) => __awaiter(void 0, void 0, void 0, fu
     earning.status = tutorEarnings_interface_1.PAYOUT_STATUS.FAILED;
     earning.failureReason = failureReason;
     yield earning.save();
-    // TODO: Send email notification to tutor
-    // await sendEmail({
-    //   to: tutor.email,
-    //   subject: 'Payout Failed',
-    //   template: 'payout-failed',
-    //   data: { earning, failureReason },
-    // });
+    // Send email notification to tutor
+    const tutor = yield user_model_1.User.findById(earning.tutorId);
+    if (tutor === null || tutor === void 0 ? void 0 : tutor.email) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        yield emailHelper_1.emailHelper.sendEmail({
+            to: tutor.email,
+            subject: 'Payout Failed - Action Required',
+            html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #d32f2f;">Payout Failed</h2>
+          <p>Hi ${tutor.name},</p>
+          <p>Unfortunately, your payout could not be processed.</p>
+          <div style="background: #fce4ec; border: 1px solid #ef9a9a; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><strong>Period:</strong> ${monthNames[earning.payoutMonth - 1]} ${earning.payoutYear}</p>
+            <p style="margin: 4px 0;"><strong>Amount:</strong> €${earning.netEarnings.toFixed(2)}</p>
+            <p style="margin: 4px 0;"><strong>Reason:</strong> ${failureReason}</p>
+          </div>
+          <p>Please check your Stripe account settings and ensure your bank details are correct. Our team will retry the payout once the issue is resolved.</p>
+          <p>If you need help, please contact support.</p>
+          <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+        </div>
+      `,
+        }).catch(err => console.error('Failed to send payout failure email:', err));
+    }
     return earning;
 });
 // ============ PAYOUT SETTINGS ============

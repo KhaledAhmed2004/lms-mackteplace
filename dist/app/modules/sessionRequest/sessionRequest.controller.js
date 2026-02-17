@@ -189,10 +189,31 @@ const expireOldRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void
         data: { expiredCount },
     });
 }));
+// Get my accepted requests - unified trial + session (Tutor)
+const getMyAcceptedRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const tutorId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    if (!tutorId) {
+        return (0, sendResponse_1.default)(res, {
+            success: false,
+            statusCode: http_status_codes_1.StatusCodes.UNAUTHORIZED,
+            message: 'Unauthorized',
+        });
+    }
+    const result = yield sessionRequest_service_1.SessionRequestService.getMyAcceptedRequests(tutorId, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Accepted requests retrieved successfully',
+        data: result.data,
+        pagination: result.meta,
+    });
+}));
 exports.SessionRequestController = {
     createSessionRequest,
     getMatchingSessionRequests,
     getMySessionRequests,
+    getMyAcceptedRequests,
     getAllSessionRequests,
     getSingleSessionRequest,
     acceptSessionRequest,

@@ -54,6 +54,12 @@ router.get('/tutor/:tutorId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, use
  */
 router.get('/tutor/:tutorId/stats', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.getTutorStats);
 /**
+ * @route   GET /api/v1/reviews/session/:sessionId
+ * @desc    Get review for a specific session
+ * @access  Student or Tutor (session participants)
+ */
+router.get('/session/:sessionId', (0, auth_1.default)(user_1.USER_ROLES.STUDENT, user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.SUPER_ADMIN), sessionReview_controller_1.SessionReviewController.getReviewBySession);
+/**
  * @route   GET /api/v1/reviews/:id
  * @desc    Get single review details
  * @access  Student (own) or Admin

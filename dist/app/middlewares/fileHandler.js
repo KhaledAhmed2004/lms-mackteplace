@@ -26,7 +26,7 @@ const cloudinary_1 = __importDefault(require("cloudinary"));
 // ===============================
 const allowedTypes = {
     images: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
-    media: ['video/mp4', 'video/webm', 'audio/mpeg', 'audio/ogg', 'audio/wav'],
+    media: ['video/mp4', 'video/webm', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm'],
     documents: ['application/pdf'],
 };
 // ===============================

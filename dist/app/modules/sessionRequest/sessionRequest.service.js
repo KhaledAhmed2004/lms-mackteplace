@@ -562,11 +562,24 @@ const acceptSessionRequest = (requestId, tutorId, introductoryMessage) => __awai
     if (!tutorSubjectIds.includes(requestSubjectId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You do not teach this subject');
     }
-    // Create chat between student and tutor
-    const chat = yield chat_model_1.Chat.create({
-        participants: [request.studentId, new mongoose_1.Types.ObjectId(tutorId)],
-        sessionRequestId: request._id, // Link chat to session request
+    // Check if chat already exists between tutor and student (to avoid duplicate chats)
+    const chatParticipants = [request.studentId, new mongoose_1.Types.ObjectId(tutorId)];
+    let chat = yield chat_model_1.Chat.findOne({
+        participants: { $all: chatParticipants },
     });
+    if (chat) {
+        // Reuse existing chat, update session request reference
+        chat.sessionRequestId = request._id;
+        chat.trialRequestId = undefined; // Clear trial reference so new sessions aren't marked as trial
+        yield chat.save();
+    }
+    else {
+        // Create new chat only if none exists
+        chat = yield chat_model_1.Chat.create({
+            participants: chatParticipants,
+            sessionRequestId: request._id,
+        });
+    }
     // Send introductory message if provided
     if (introductoryMessage && introductoryMessage.trim()) {
         yield message_model_1.Message.create({
@@ -689,10 +702,83 @@ const expireOldRequests = () => __awaiter(void 0, void 0, void 0, function* () {
     });
     return result.modifiedCount;
 });
+/**
+ * Get tutor's accepted requests (UNIFIED: Trial + Session)
+ * Returns both trial and session requests accepted by this tutor
+ */
+const getMyAcceptedRequests = (tutorId, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const tutorObjectId = new mongoose_1.Types.ObjectId(tutorId);
+    // Verify tutor exists
+    const tutor = yield user_model_1.User.findById(tutorId);
+    if (!tutor || tutor.role !== user_1.USER_ROLES.TUTOR) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only tutors can access this endpoint');
+    }
+    // Pagination params
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    // Match conditions
+    const sessionMatchConditions = { acceptedTutorId: tutorObjectId };
+    const trialMatchConditions = { acceptedTutorId: tutorObjectId };
+    // Unified query: both session and trial requests
+    const pipeline = [
+        { $match: sessionMatchConditions },
+        { $addFields: { requestType: 'SESSION' } },
+        {
+            $unionWith: {
+                coll: 'trialrequests',
+                pipeline: [
+                    { $match: trialMatchConditions },
+                    { $addFields: { requestType: 'TRIAL' } },
+                ],
+            },
+        },
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'studentId',
+                foreignField: '_id',
+                as: 'studentId',
+                pipeline: [{ $project: { name: 1, email: 1, profilePicture: 1, studentProfile: 1 } }],
+            },
+        },
+        { $unwind: { path: '$studentId', preserveNullAndEmptyArrays: true } },
+        {
+            $lookup: {
+                from: 'subjects',
+                localField: 'subject',
+                foreignField: '_id',
+                as: 'subject',
+                pipeline: [{ $project: { name: 1, icon: 1 } }],
+            },
+        },
+        { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+    ];
+    const result = yield sessionRequest_model_1.SessionRequest.aggregate(pipeline);
+    // Get total count for pagination
+    const [sessionCount, trialCount] = yield Promise.all([
+        sessionRequest_model_1.SessionRequest.countDocuments(sessionMatchConditions),
+        trialRequest_model_1.TrialRequest.countDocuments(trialMatchConditions),
+    ]);
+    const totalCount = sessionCount + trialCount;
+    return {
+        meta: {
+            total: totalCount,
+            limit,
+            page,
+            totalPage: Math.ceil(totalCount / limit),
+        },
+        data: result,
+    };
+});
 exports.SessionRequestService = {
     createSessionRequest,
     getMatchingSessionRequests,
     getMySessionRequests,
+    getMyAcceptedRequests,
     getAllSessionRequests,
     getSingleSessionRequest,
     acceptSessionRequest,

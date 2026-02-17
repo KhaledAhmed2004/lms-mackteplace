@@ -596,18 +596,31 @@ const getUnifiedSessions = (query) => __awaiter(void 0, void 0, void 0, function
     const sessions = yield session_model_1.Session.find()
         .populate('studentId', 'name email phone profilePicture')
         .populate('tutorId', 'name email phone profilePicture')
-        .lean();
-    // Get pending/accepted trial requests (not yet converted to session or waiting)
-    const pendingTrialRequests = yield trialRequest_model_1.TrialRequest.find({
-        status: { $in: [trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING, trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED] },
+        .populate({
+        path: 'trialRequestId',
+        select: 'subject',
+        populate: {
+            path: 'subject',
+            select: 'name',
+        },
     })
+        .lean();
+    // Get trialRequestIds that already have sessions created (to avoid duplicates)
+    // Note: trialRequestId is now populated, so we need to get _id from the object
+    const trialRequestIdsWithSessions = sessions
+        .filter((s) => s.trialRequestId)
+        .map((s) => { var _a; return ((_a = s.trialRequestId._id) === null || _a === void 0 ? void 0 : _a.toString()) || s.trialRequestId.toString(); });
+    // Get pending/accepted trial requests (excluding those that already have sessions)
+    const pendingTrialRequests = yield trialRequest_model_1.TrialRequest.find(Object.assign({ status: { $in: [trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING, trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED] } }, (trialRequestIdsWithSessions.length > 0 && {
+        _id: { $nin: trialRequestIdsWithSessions },
+    })))
         .populate('studentId', 'name email phone profilePicture')
         .populate('acceptedTutorId', 'name email phone profilePicture')
         .populate('subject', 'name')
         .lean();
     // Transform sessions to unified format
     const unifiedSessions = sessions.map((s) => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         return ({
             _id: s._id.toString(),
             type: 'SESSION',
@@ -617,7 +630,10 @@ const getUnifiedSessions = (query) => __awaiter(void 0, void 0, void 0, function
             tutorName: (_d = s.tutorId) === null || _d === void 0 ? void 0 : _d.name,
             tutorEmail: (_e = s.tutorId) === null || _e === void 0 ? void 0 : _e.email,
             tutorPhone: (_f = s.tutorId) === null || _f === void 0 ? void 0 : _f.phone,
-            subject: s.subject,
+            // Use trialRequest subject if session subject is generic "Tutoring Session"
+            subject: (s.subject === 'Tutoring Session' && ((_h = (_g = s.trialRequestId) === null || _g === void 0 ? void 0 : _g.subject) === null || _h === void 0 ? void 0 : _h.name))
+                ? s.trialRequestId.subject.name
+                : s.subject,
             status: s.status,
             paymentStatus: s.isTrial ? 'FREE_TRIAL' : s.paymentStatus || session_interface_1.PAYMENT_STATUS.PENDING,
             startTime: s.startTime,
@@ -710,18 +726,42 @@ const getUnifiedSessions = (query) => __awaiter(void 0, void 0, void 0, function
 });
 /**
  * Get session stats for admin dashboard
+ * Includes both Session records and TrialRequest records for accurate counts
  */
 const getSessionStats = () => __awaiter(void 0, void 0, void 0, function* () {
-    const now = new Date();
-    const [totalSessions, pendingSessions, completedSessions, trialSessions] = yield Promise.all([
+    // Get trial request IDs that already have sessions created (to avoid double counting)
+    const trialRequestIdsWithSessions = yield session_model_1.Session.distinct('trialRequestId', {
+        trialRequestId: { $ne: null },
+    });
+    const [
+    // Session counts
+    sessionTotal, sessionPending, sessionCompleted, sessionTrial, 
+    // TrialRequest counts (ONLY those WITHOUT sessions - to avoid double counting)
+    trialRequestPending, trialRequestAccepted,] = yield Promise.all([
+        // Sessions
         session_model_1.Session.countDocuments(),
         session_model_1.Session.countDocuments({
-            status: { $in: [session_interface_1.SESSION_STATUS.SCHEDULED, session_interface_1.SESSION_STATUS.STARTING_SOON] },
-            startTime: { $gte: now },
+            status: { $in: [session_interface_1.SESSION_STATUS.SCHEDULED, session_interface_1.SESSION_STATUS.STARTING_SOON, session_interface_1.SESSION_STATUS.AWAITING_RESPONSE] },
         }),
         session_model_1.Session.countDocuments({ status: session_interface_1.SESSION_STATUS.COMPLETED }),
         session_model_1.Session.countDocuments({ isTrial: true }),
+        // TrialRequests (pending = not yet matched with tutor, excluding those with sessions)
+        trialRequest_model_1.TrialRequest.countDocuments(Object.assign({ status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.PENDING }, (trialRequestIdsWithSessions.length > 0 && {
+            _id: { $nin: trialRequestIdsWithSessions },
+        }))),
+        // TrialRequests (accepted = matched but session not yet created/scheduled, excluding those with sessions)
+        trialRequest_model_1.TrialRequest.countDocuments(Object.assign({ status: trialRequest_interface_1.TRIAL_REQUEST_STATUS.ACCEPTED }, (trialRequestIdsWithSessions.length > 0 && {
+            _id: { $nin: trialRequestIdsWithSessions },
+        }))),
     ]);
+    // Total = Sessions + Pending/Accepted TrialRequests (without sessions)
+    const totalSessions = sessionTotal + trialRequestPending + trialRequestAccepted;
+    // Pending = Session pending + TrialRequest pending/accepted (without sessions)
+    const pendingSessions = sessionPending + trialRequestPending + trialRequestAccepted;
+    // Completed = Only completed sessions
+    const completedSessions = sessionCompleted;
+    // Trial = Session trials + TrialRequests (without sessions)
+    const trialSessions = sessionTrial + trialRequestPending + trialRequestAccepted;
     return {
         totalSessions,
         pendingSessions,

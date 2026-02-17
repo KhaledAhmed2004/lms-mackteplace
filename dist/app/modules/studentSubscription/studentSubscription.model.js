@@ -46,6 +46,10 @@ const studentSubscriptionSchema = new mongoose_1.Schema({
         type: Number,
         default: 0,
     },
+    prepaidHoursUsed: {
+        type: Number,
+        default: 0, // Hours already covered by upfront payment
+    },
     stripeCustomerId: {
         type: String,
     },

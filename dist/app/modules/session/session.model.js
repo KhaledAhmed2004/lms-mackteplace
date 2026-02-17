@@ -227,6 +227,18 @@ const sessionSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    // Billing tracking (for monthly invoicing)
+    isPaidUpfront: {
+        type: Boolean,
+        default: false, // True if covered by subscription upfront payment
+    },
+    billingId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'MonthlyBilling',
+    },
+    billedAt: {
+        type: Date,
+    },
 }, { timestamps: true });
 // Indexes for performance
 sessionSchema.index({ studentId: 1, createdAt: -1 });
@@ -244,6 +256,8 @@ sessionSchema.index({ callId: 1 });
 // Indexes for completion status queries (billing/earnings)
 sessionSchema.index({ studentCompletionStatus: 1, studentCompletedAt: 1 });
 sessionSchema.index({ teacherCompletionStatus: 1, teacherCompletedAt: 1 });
+// Index for billing queries (sessions not yet billed)
+sessionSchema.index({ isPaidUpfront: 1, billingId: 1, studentCompletionStatus: 1 });
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {
     if (this.endTime <= this.startTime) {
@@ -252,9 +266,11 @@ sessionSchema.pre('save', function (next) {
     next();
 });
 // Calculate total price if not provided
+// Fixed price per session (not based on duration)
+// 1 session = 1 session price, regardless of duration
 sessionSchema.pre('save', function (next) {
     if (!this.totalPrice && this.pricePerHour && this.duration) {
-        this.totalPrice = (this.pricePerHour * this.duration) / 60;
+        this.totalPrice = this.pricePerHour;
     }
     // Calculate buffer price
     if (!this.bufferPrice && this.pricePerHour && this.bufferMinutes) {

@@ -22,6 +22,8 @@ const user_model_1 = require("../user/user.model");
 const tutorSessionFeedback_model_1 = require("./tutorSessionFeedback.model");
 const tutorSessionFeedback_interface_1 = require("./tutorSessionFeedback.interface");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
+const emailHelper_1 = require("../../../helpers/emailHelper");
+const date_fns_1 = require("date-fns");
 // Helper to calculate due date (3rd of next month)
 const calculateDueDate = (sessionDate) => {
     const dueDate = new Date(sessionDate);
@@ -140,6 +142,25 @@ const submitFeedback = (tutorId, payload) => __awaiter(void 0, void 0, void 0, f
     });
     // Update tutor's average rating
     yield updateTutorRating(tutorId);
+    // Emit socket event for real-time update
+    const io = global.io;
+    if (io && session.chatId) {
+        const chatIdStr = String(session.chatId);
+        const feedbackPayload = {
+            sessionId,
+            chatId: chatIdStr,
+            feedbackId: feedback._id,
+            status: 'SUBMITTED',
+            rating: feedback.rating,
+            feedbackType: feedback.feedbackType,
+            feedbackText: feedback.feedbackText,
+        };
+        // Emit to chat room and both users
+        io.to(`chat::${chatIdStr}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+        io.to(`user::${String(session.studentId)}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+        io.to(`user::${tutorId}`).emit('FEEDBACK_SUBMITTED', feedbackPayload);
+        console.log(`[Socket Emit] FEEDBACK_SUBMITTED sent for session ${sessionId}`);
+    }
     return feedback;
 });
 // Update tutor's average rating based on their feedback ratings
@@ -344,27 +365,110 @@ const getForfeitedPaymentsSummary = (query) => __awaiter(void 0, void 0, void 0,
  * Called by cron on 1st of month at 10:00 AM
  */
 const sendDeadlineReminders = () => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const feedbacksDueSoon = yield getFeedbacksDueSoon(3); // Due within 3 days
-    // Here you would send emails/notifications to tutors
-    // For now, just log
+    let sent = 0;
     for (const feedback of feedbacksDueSoon) {
-        console.log(`Reminder: Feedback due for session ${feedback.sessionId}, Tutor: ${(_a = feedback.tutorId) === null || _a === void 0 ? void 0 : _a.email}`);
+        const tutor = feedback.tutorId;
+        const session = feedback.sessionId;
+        if (!(tutor === null || tutor === void 0 ? void 0 : tutor.email))
+            continue;
+        const dueDate = (0, date_fns_1.format)(new Date(feedback.dueDate), 'MMMM d, yyyy');
+        const sessionSubject = (session === null || session === void 0 ? void 0 : session.subject) || 'N/A';
+        const sessionDate = (session === null || session === void 0 ? void 0 : session.startTime)
+            ? (0, date_fns_1.format)(new Date(session.startTime), 'MMMM d, yyyy')
+            : 'N/A';
+        try {
+            yield emailHelper_1.emailHelper.sendEmail({
+                to: tutor.email,
+                subject: 'Feedback Reminder - Submit by ' + dueDate,
+                html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1a1a1a;">Feedback Reminder</h2>
+            <p>Hi ${tutor.name},</p>
+            <p>This is a reminder that your session feedback is due soon.</p>
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <p style="margin: 4px 0;"><strong>Session:</strong> ${sessionSubject}</p>
+              <p style="margin: 4px 0;"><strong>Session Date:</strong> ${sessionDate}</p>
+              <p style="margin: 4px 0;"><strong>Feedback Deadline:</strong> ${dueDate}</p>
+            </div>
+            <p style="color: #e65100;"><strong>Please submit your feedback before the deadline to receive your payment for this session.</strong></p>
+            <p>If you miss the deadline, the payment for this session will be forfeited.</p>
+            <a href="${process.env.FRONTEND_URL}/teacher/overview" style="display: inline-block; background: #0B31BD; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 12px;">Submit Feedback</a>
+            <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+          </div>
+        `,
+            });
+            sent++;
+            console.log(`Reminder sent to ${tutor.email} for session ${session === null || session === void 0 ? void 0 : session._id}`);
+        }
+        catch (error) {
+            console.error(`Failed to send reminder to ${tutor.email}:`, error);
+        }
     }
-    return feedbacksDueSoon.length;
+    console.log(`Sent ${sent}/${feedbacksDueSoon.length} deadline reminders`);
+    return sent;
 });
 /**
  * Send final reminders to tutors (last day warning)
  * Called by cron on 2nd of month at 10:00 AM
  */
 const sendFinalReminders = () => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const feedbacksDueSoon = yield getFeedbacksDueSoon(1); // Due within 1 day
-    // Here you would send urgent emails/notifications
+    let sent = 0;
     for (const feedback of feedbacksDueSoon) {
-        console.log(`FINAL REMINDER: Feedback due TOMORROW for session ${feedback.sessionId}, Tutor: ${(_a = feedback.tutorId) === null || _a === void 0 ? void 0 : _a.email}`);
+        const tutor = feedback.tutorId;
+        const session = feedback.sessionId;
+        if (!(tutor === null || tutor === void 0 ? void 0 : tutor.email))
+            continue;
+        const dueDate = (0, date_fns_1.format)(new Date(feedback.dueDate), 'MMMM d, yyyy');
+        const sessionSubject = (session === null || session === void 0 ? void 0 : session.subject) || 'N/A';
+        const forfeitAmount = (session === null || session === void 0 ? void 0 : session.totalPrice) || 0;
+        try {
+            yield emailHelper_1.emailHelper.sendEmail({
+                to: tutor.email,
+                subject: 'URGENT: Feedback Due Tomorrow - Payment at Risk',
+                html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #d32f2f;">Urgent: Feedback Due Tomorrow</h2>
+            <p>Hi ${tutor.name},</p>
+            <p><strong>Your feedback deadline is tomorrow (${dueDate}).</strong></p>
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 8px; padding: 16px; margin: 16px 0;">
+              <p style="margin: 4px 0;"><strong>Session:</strong> ${sessionSubject}</p>
+              <p style="margin: 4px 0;"><strong>Deadline:</strong> ${dueDate}</p>
+              <p style="margin: 4px 0; color: #d32f2f;"><strong>Amount at risk: €${forfeitAmount}</strong></p>
+            </div>
+            <p style="color: #d32f2f;"><strong>If you do not submit your feedback by the deadline, the payment of €${forfeitAmount} will be forfeited and you will not be able to recover it.</strong></p>
+            <a href="${process.env.FRONTEND_URL}/teacher/overview" style="display: inline-block; background: #d32f2f; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin-top: 12px;">Submit Feedback Now</a>
+            <p style="color: #666; font-size: 12px; margin-top: 24px;">Schaefer Tutoring</p>
+          </div>
+        `,
+            });
+            sent++;
+            console.log(`FINAL reminder sent to ${tutor.email} for session ${session === null || session === void 0 ? void 0 : session._id}`);
+        }
+        catch (error) {
+            console.error(`Failed to send final reminder to ${tutor.email}:`, error);
+        }
     }
-    return feedbacksDueSoon.length;
+    console.log(`Sent ${sent}/${feedbacksDueSoon.length} final reminders`);
+    return sent;
+});
+/**
+ * Get list of forfeited feedbacks with details (for admin dashboard)
+ */
+const getForfeitedFeedbacksList = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const feedbackQuery = new QueryBuilder_1.default(tutorSessionFeedback_model_1.TutorSessionFeedback.find({
+        paymentForfeited: true,
+    })
+        .populate('tutorId', 'name email profilePicture')
+        .populate('studentId', 'name email')
+        .populate('sessionId', 'subject startTime endTime totalPrice'), query)
+        .sort()
+        .paginate()
+        .fields();
+    const data = yield feedbackQuery.modelQuery;
+    const meta = yield feedbackQuery.getPaginationInfo();
+    return { data, meta };
 });
 exports.TutorSessionFeedbackService = {
     createPendingFeedback,
@@ -378,6 +482,7 @@ exports.TutorSessionFeedbackService = {
     getOverdueFeedbacks,
     processForfeitedFeedbacks,
     getForfeitedPaymentsSummary,
+    getForfeitedFeedbacksList,
     sendDeadlineReminders,
     sendFinalReminders,
 };

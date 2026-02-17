@@ -46,7 +46,7 @@ const SessionProposalSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
+        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'STARTING_SOON', 'IN_PROGRESS'],
         default: 'PROPOSED',
     },
     sessionId: {
@@ -68,6 +68,10 @@ const SessionProposalSchema = new mongoose_1.Schema({
     counterProposalReason: {
         type: String,
         trim: true,
+    },
+    noShowBy: {
+        type: String,
+        enum: ['tutor', 'student'],
     },
 }, { _id: false });
 // Message Schema

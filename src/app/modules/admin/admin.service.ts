@@ -923,7 +923,7 @@ const getSessionStats = async (): Promise<{
     // Sessions
     Session.countDocuments(),
     Session.countDocuments({
-      status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON, SESSION_STATUS.ACCEPTED] },
+      status: { $in: [SESSION_STATUS.SCHEDULED, SESSION_STATUS.STARTING_SOON, SESSION_STATUS.AWAITING_RESPONSE] },
     }),
     Session.countDocuments({ status: SESSION_STATUS.COMPLETED }),
     Session.countDocuments({ isTrial: true }),

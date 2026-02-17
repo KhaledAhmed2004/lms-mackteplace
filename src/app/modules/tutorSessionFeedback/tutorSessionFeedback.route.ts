@@ -11,13 +11,13 @@ const router = express.Router();
 // Admin routes (must be before parameterized routes)
 router.get(
   '/admin/forfeited-summary',
-  auth(USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   TutorSessionFeedbackController.getForfeitedPaymentsSummary
 );
 
 router.get(
   '/admin/forfeited-list',
-  auth(USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   TutorSessionFeedbackController.getForfeitedFeedbacksList
 );
 

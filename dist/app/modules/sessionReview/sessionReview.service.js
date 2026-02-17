@@ -72,6 +72,22 @@ const createReview = (studentId, payload) => __awaiter(void 0, void 0, void 0, f
     yield session_model_1.Session.findByIdAndUpdate(payload.sessionId, {
         reviewId: review._id,
     });
+    // Emit socket event for real-time update
+    const io = global.io;
+    if (io && session.chatId) {
+        const chatIdStr = String(session.chatId);
+        const reviewPayload = {
+            sessionId: payload.sessionId,
+            chatId: chatIdStr,
+            reviewId: review._id,
+            rating: review.overallRating,
+        };
+        // Emit to chat room and both users
+        io.to(`chat::${chatIdStr}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+        io.to(`user::${studentId}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+        io.to(`user::${String(session.tutorId)}`).emit('STUDENT_REVIEW_SUBMITTED', reviewPayload);
+        console.log(`[Socket Emit] STUDENT_REVIEW_SUBMITTED sent for session ${payload.sessionId}`);
+    }
     return review;
 });
 /**
@@ -106,6 +122,16 @@ const getTutorReviews = (tutorId_1, query_1, ...args_1) => __awaiter(void 0, [tu
     const result = yield reviewQuery.modelQuery;
     const meta = yield reviewQuery.getPaginationInfo();
     return { data: result, meta };
+});
+/**
+ * Get review by session ID
+ */
+const getReviewBySession = (sessionId) => __awaiter(void 0, void 0, void 0, function* () {
+    const review = yield sessionReview_model_1.SessionReview.findOne({ sessionId })
+        .populate('studentId', 'name email')
+        .populate('tutorId', 'name email')
+        .populate('sessionId', 'subject startTime endTime');
+    return review;
 });
 /**
  * Get single review
@@ -301,6 +327,7 @@ exports.SessionReviewService = {
     getMyReviews,
     getTutorReviews,
     getSingleReview,
+    getReviewBySession,
     updateReview,
     deleteReview,
     getTutorStats,
