@@ -3,6 +3,10 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import ApiError from '../../../errors/ApiError';
 import { ISubject } from './subject.interface';
 import { Subject } from './subject.model';
+import { TrialRequest } from '../trialRequest/trialRequest.model';
+import { SessionRequest } from '../sessionRequest/sessionRequest.model';
+import { User } from '../user/user.model';
+import { TutorApplication } from '../tutorApplication/tutorApplication.model';
 
 const createSubject = async (payload: ISubject): Promise<ISubject> => {
   // Check if subject with the same name already exists
@@ -77,20 +81,51 @@ const updateSubject = async (
   return result;
 };
 
-// Delete subject (soft delete by setting isActive to false)
+// Hard delete subject (permanently removes from database)
 const deleteSubject = async (id: string): Promise<ISubject | null> => {
   const subject = await Subject.findById(id);
   if (!subject) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Subject not found');
   }
 
-  // Soft delete
-  const result = await Subject.findByIdAndUpdate(
-    id,
-    { isActive: false },
-    { new: true }
+  // Check for active trial requests using this subject
+  const activeTrialRequests = await TrialRequest.countDocuments({
+    subject: id,
+    status: { $in: ['PENDING', 'ACCEPTED'] },
+  });
+  if (activeTrialRequests > 0) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Cannot delete: ${activeTrialRequests} active trial request(s) use this subject. Deactivate it instead.`
+    );
+  }
+
+  // Check for active session requests using this subject
+  const activeSessionRequests = await SessionRequest.countDocuments({
+    subject: id,
+    status: { $in: ['PENDING', 'ACCEPTED'] },
+  });
+  if (activeSessionRequests > 0) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Cannot delete: ${activeSessionRequests} active session request(s) use this subject. Deactivate it instead.`
+    );
+  }
+
+  // Remove subject reference from tutors' subject arrays
+  await User.updateMany(
+    { subjects: id },
+    { $pull: { subjects: id } }
   );
 
+  // Remove subject reference from tutor applications
+  await TutorApplication.updateMany(
+    { subjects: id },
+    { $pull: { subjects: id } }
+  );
+
+  // Hard delete
+  const result = await Subject.findByIdAndDelete(id);
   return result;
 };
 

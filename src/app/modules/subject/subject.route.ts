@@ -61,7 +61,7 @@ router.patch(
 
 /**
  * @route   DELETE /api/v1/subjects/:subjectId
- * @desc    Delete subject (soft delete - sets isActive to false)
+ * @desc    Permanently delete subject (hard delete). Blocked if active requests exist.
  * @access  Admin only
  */
 router.delete(
