@@ -48,7 +48,7 @@ router.post('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validat
 router.patch('/:subjectId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(subject_validation_1.SubjectValidation.updateSubjectZodSchema), subject_controller_1.SubjectController.updateSubject);
 /**
  * @route   DELETE /api/v1/subjects/:subjectId
- * @desc    Delete subject (soft delete - sets isActive to false)
+ * @desc    Permanently delete subject (hard delete). Blocked if active requests exist.
  * @access  Admin only
  */
 router.delete('/:subjectId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), subject_controller_1.SubjectController.deleteSubject);

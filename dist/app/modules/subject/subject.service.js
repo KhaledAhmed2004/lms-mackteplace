@@ -17,6 +17,10 @@ const http_status_codes_1 = require("http-status-codes");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const subject_model_1 = require("./subject.model");
+const trialRequest_model_1 = require("../trialRequest/trialRequest.model");
+const sessionRequest_model_1 = require("../sessionRequest/sessionRequest.model");
+const user_model_1 = require("../user/user.model");
+const tutorApplication_model_1 = require("../tutorApplication/tutorApplication.model");
 const createSubject = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     // Check if subject with the same name already exists
     const existingSubject = yield subject_model_1.Subject.findOne({ name: payload.name });
@@ -69,14 +73,34 @@ const updateSubject = (id, payload) => __awaiter(void 0, void 0, void 0, functio
     });
     return result;
 });
-// Delete subject (soft delete by setting isActive to false)
+// Hard delete subject (permanently removes from database)
 const deleteSubject = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const subject = yield subject_model_1.Subject.findById(id);
     if (!subject) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Subject not found');
     }
-    // Soft delete
-    const result = yield subject_model_1.Subject.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    // Check for active trial requests using this subject
+    const activeTrialRequests = yield trialRequest_model_1.TrialRequest.countDocuments({
+        subject: id,
+        status: { $in: ['PENDING', 'ACCEPTED'] },
+    });
+    if (activeTrialRequests > 0) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Cannot delete: ${activeTrialRequests} active trial request(s) use this subject. Deactivate it instead.`);
+    }
+    // Check for active session requests using this subject
+    const activeSessionRequests = yield sessionRequest_model_1.SessionRequest.countDocuments({
+        subject: id,
+        status: { $in: ['PENDING', 'ACCEPTED'] },
+    });
+    if (activeSessionRequests > 0) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Cannot delete: ${activeSessionRequests} active session request(s) use this subject. Deactivate it instead.`);
+    }
+    // Remove subject reference from tutors' subject arrays
+    yield user_model_1.User.updateMany({ subjects: id }, { $pull: { subjects: id } });
+    // Remove subject reference from tutor applications
+    yield tutorApplication_model_1.TutorApplication.updateMany({ subjects: id }, { $pull: { subjects: id } });
+    // Hard delete
+    const result = yield subject_model_1.Subject.findByIdAndDelete(id);
     return result;
 });
 const getActiveSubjects = () => __awaiter(void 0, void 0, void 0, function* () {
