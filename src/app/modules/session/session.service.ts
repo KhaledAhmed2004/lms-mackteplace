@@ -653,8 +653,9 @@ const markAsCompleted = async (sessionId: string): Promise<ISession | null> => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
   }
 
-  if (session.status === SESSION_STATUS.COMPLETED) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Session is already completed');
+  const terminalStatuses = [SESSION_STATUS.COMPLETED, SESSION_STATUS.CANCELLED, SESSION_STATUS.EXPIRED, SESSION_STATUS.NO_SHOW];
+  if (terminalStatuses.includes(session.status)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot complete session with status: ${session.status}`);
   }
 
   // Update session
@@ -1275,8 +1276,9 @@ const markAsCompletedEnhanced = async (sessionId: string): Promise<ISession | nu
     throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
   }
 
-  if (session.status === SESSION_STATUS.COMPLETED) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Session is already completed');
+  const terminalStatuses = [SESSION_STATUS.COMPLETED, SESSION_STATUS.CANCELLED, SESSION_STATUS.EXPIRED, SESSION_STATUS.NO_SHOW];
+  if (terminalStatuses.includes(session.status)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Cannot complete session with status: ${session.status}`);
   }
 
   // Update session
@@ -1528,6 +1530,13 @@ const completeSessionWithAttendanceCheck = async (
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Session not found');
+  }
+
+  // Guard: skip if session is already in a terminal state
+  const terminalStatuses = [SESSION_STATUS.COMPLETED, SESSION_STATUS.CANCELLED, SESSION_STATUS.EXPIRED, SESSION_STATUS.NO_SHOW];
+  if (terminalStatuses.includes(session.status)) {
+    const attendanceCheck = checkAttendanceRequirement(session);
+    return { session, attendanceCheck };
   }
 
   const now = new Date();

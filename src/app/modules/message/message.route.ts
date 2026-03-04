@@ -8,6 +8,9 @@ import { JwtPayload } from 'jsonwebtoken';
 
 const router = express.Router();
 
+// ============ SEND & RETRIEVE MESSAGES ============
+
+// Send a message with optional file attachments
 router.post(
   '/',
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
@@ -68,11 +71,14 @@ router.post(
   MessageController.sendMessage
 );
 
+// Get a single message by ID
 router.get(
   '/:id',
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   MessageController.getMessage
 );
+
+// ============ CHAT-LEVEL OPERATIONS ============
 
 // Get all messages in a chat (alias route for frontend compatibility)
 router.get(

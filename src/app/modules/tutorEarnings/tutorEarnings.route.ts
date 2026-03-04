@@ -9,58 +9,35 @@ const router = express.Router();
 
 // ============ TUTOR ROUTES ============
 
-/**
- * @route   GET /api/v1/earnings/my-stats
- * @desc    Get tutor's comprehensive stats including level progress
- * @access  Tutor only
- */
+// Get tutor's comprehensive stats including level progress
 router.get(
   '/my-stats',
   auth(USER_ROLES.TUTOR),
   TutorEarningsController.getMyStats
 );
 
-/**
- * @route   GET /api/v1/earnings/my-earnings
- * @desc    Get tutor's earnings history
- * @access  Tutor only
- * @query   ?status=PAID&page=1&limit=10&sort=-payoutYear,-payoutMonth
- */
+// Get tutor's earnings history
 router.get(
   '/my-earnings',
   auth(USER_ROLES.TUTOR),
   TutorEarningsController.getMyEarnings
 );
 
-/**
- * @route   GET /api/v1/earnings/history
- * @desc    Get tutor's formatted earnings history for frontend
- * @access  Tutor only
- * @query   ?page=1&limit=10
- */
+// Get tutor's formatted earnings history for frontend
 router.get(
   '/history',
   auth(USER_ROLES.TUTOR),
   TutorEarningsController.getEarningsHistory
 );
 
-/**
- * @route   GET /api/v1/earnings/payout-settings
- * @desc    Get tutor's payout settings (IBAN, recipient)
- * @access  Tutor only
- */
+// Get tutor's payout settings (IBAN, recipient)
 router.get(
   '/payout-settings',
   auth(USER_ROLES.TUTOR),
   TutorEarningsController.getPayoutSettings
 );
 
-/**
- * @route   PATCH /api/v1/earnings/payout-settings
- * @desc    Update tutor's payout settings
- * @access  Tutor only
- * @body    { recipient: string, iban: string }
- */
+// Update tutor's payout settings
 router.patch(
   '/payout-settings',
   auth(USER_ROLES.TUTOR),
@@ -68,11 +45,7 @@ router.patch(
   TutorEarningsController.updatePayoutSettings
 );
 
-/**
- * @route   GET /api/v1/earnings/:id
- * @desc    Get single earnings record
- * @access  Tutor (own earnings) or Admin
- */
+// Get single earnings record
 router.get(
   '/:id',
   auth(USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
@@ -81,15 +54,7 @@ router.get(
 
 // ============ ADMIN ROUTES ============
 
-/**
- * @route   POST /api/v1/earnings/generate
- * @desc    Generate tutor earnings for all tutors
- * @access  Admin only
- * @body    { month: number, year: number, commissionRate?: number }
- * @note    Called by cron job at month-end (after billing generation)
- * @note    Calculates platform commission and tutor net earnings
- * @note    Prevents duplicate payouts (unique index on tutorId + month + year)
- */
+// Generate tutor earnings for all tutors (cron job, month-end)
 router.post(
   '/generate',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -97,25 +62,14 @@ router.post(
   TutorEarningsController.generateTutorEarnings
 );
 
-/**
- * @route   GET /api/v1/earnings
- * @desc    Get all earnings
- * @access  Admin only
- * @query   ?status=PENDING&month=1&year=2024&searchTerm=PAYOUT&page=1&limit=10
- */
+// Get all earnings
 router.get(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
   TutorEarningsController.getAllEarnings
 );
 
-/**
- * @route   PATCH /api/v1/earnings/:id/initiate-payout
- * @desc    Initiate Stripe Connect payout to tutor
- * @access  Admin only
- * @body    { notes?: string }
- * @note    Creates Stripe transfer to tutor's Connect account
- */
+// Initiate Stripe Connect payout to tutor
 router.patch(
   '/:id/initiate-payout',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -123,25 +77,14 @@ router.patch(
   TutorEarningsController.initiatePayout
 );
 
-/**
- * @route   PATCH /api/v1/earnings/:id/mark-paid
- * @desc    Mark payout as paid
- * @access  Admin only
- * @body    { stripePayoutId?: string, paymentMethod?: string }
- * @note    Usually called automatically by Stripe webhook
- */
+// Mark payout as paid
 router.patch(
   '/:id/mark-paid',
   auth(USER_ROLES.SUPER_ADMIN),
   TutorEarningsController.markAsPaid
 );
 
-/**
- * @route   PATCH /api/v1/earnings/:id/mark-failed
- * @desc    Mark payout as failed
- * @access  Admin only
- * @body    { failureReason: string }
- */
+// Mark payout as failed
 router.patch(
   '/:id/mark-failed',
   auth(USER_ROLES.SUPER_ADMIN),

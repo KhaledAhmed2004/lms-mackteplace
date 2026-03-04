@@ -9,6 +9,8 @@ import express from 'express';
 
 const router = express.Router();
 
+// ============ USER PROFILE ROUTES ============
+
 // Create a new user
 router.post(
   '/',
@@ -35,13 +37,7 @@ router.patch(
 
 // ============ TUTOR: STATISTICS ============
 
-/**
- * @route   GET /api/v1/users/my-statistics
- * @desc    Get comprehensive tutor statistics (level, earnings, sessions, students)
- * @access  Tutor only
- * @returns currentLevel, sessionsToNextLevel, totalSessions, completedSessions,
- *          totalHoursTaught, totalStudents, averageRating, totalEarnings, pendingFeedbackCount
- */
+// Get comprehensive tutor statistics (level, earnings, sessions, students)
 router.get(
   '/my-statistics',
   auth(USER_ROLES.TUTOR),
@@ -71,12 +67,7 @@ router.patch(
   UserController.unblockStudent
 );
 
-/**
- * @route   PATCH /api/v1/user/students/:id/profile
- * @desc    Admin: Update student profile (all fields except password)
- * @access  Admin only
- * @body    { name?, email?, phone?, dateOfBirth?, location? }
- */
+// Admin: Update student profile (all fields except password)
 router.patch(
   '/students/:id/profile',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -115,12 +106,7 @@ router.patch(
   UserController.updateTutorSubjects
 );
 
-/**
- * @route   PATCH /api/v1/user/tutors/:id/profile
- * @desc    Admin: Update tutor profile (all fields except password)
- * @access  Admin only
- * @body    { name?, email?, phone?, dateOfBirth?, location?, tutorProfile?: { address?, birthDate?, bio?, subjects? } }
- */
+// Admin: Update tutor profile (all fields except password)
 router.patch(
   '/tutors/:id/profile',
   auth(USER_ROLES.SUPER_ADMIN),

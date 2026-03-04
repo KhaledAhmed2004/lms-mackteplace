@@ -9,32 +9,19 @@ const router = express.Router();
 
 // ============ PUBLIC ROUTES ============
 
-/**
- * @route   GET /api/v1/pricing/plans
- * @desc    Get active pricing plans (for homepage)
- * @access  Public
- */
+// Get active pricing plans (for homepage)
 router.get('/plans', PricingConfigController.getActivePricingPlans);
 
 // ============ ADMIN ROUTES ============
 
-/**
- * @route   GET /api/v1/pricing/config
- * @desc    Get full pricing config
- * @access  Admin only
- */
+// Get full pricing config
 router.get(
   '/config',
   auth(USER_ROLES.SUPER_ADMIN),
   PricingConfigController.getPricingConfig
 );
 
-/**
- * @route   PUT /api/v1/pricing/config
- * @desc    Update full pricing config
- * @access  Admin only
- * @body    { plans: IPricingPlan[] }
- */
+// Update full pricing config
 router.put(
   '/config',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -42,12 +29,7 @@ router.put(
   PricingConfigController.updatePricingConfig
 );
 
-/**
- * @route   PATCH /api/v1/pricing/plans/:tier
- * @desc    Update single plan
- * @access  Admin only
- * @params  tier: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM'
- */
+// Update single plan
 router.patch(
   '/plans/:tier',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -55,11 +37,7 @@ router.patch(
   PricingConfigController.updateSinglePlan
 );
 
-/**
- * @route   POST /api/v1/pricing/reset
- * @desc    Reset to default pricing
- * @access  Admin only
- */
+// Reset to default pricing
 router.post(
   '/reset',
   auth(USER_ROLES.SUPER_ADMIN),

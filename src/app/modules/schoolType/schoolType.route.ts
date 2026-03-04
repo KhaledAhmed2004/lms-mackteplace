@@ -9,36 +9,18 @@ const router = express.Router();
 
 // ============ PUBLIC ROUTES ============
 
-/**
- * @route   GET /api/v1/school-types/active
- * @desc    Get all active school types (for students/tutors to see available school types)
- * @access  Public
- */
+// Get all active school types (for students/tutors to see available school types)
 router.get('/active', SchoolTypeController.getActiveSchoolTypes);
 
-/**
- * @route   GET /api/v1/school-types/:schoolTypeId
- * @desc    Get single school type by ID
- * @access  Public
- */
+// Get single school type by ID
 router.get('/:schoolTypeId', SchoolTypeController.getSingleSchoolType);
 
-/**
- * @route   GET /api/v1/school-types
- * @desc    Get all school types with filtering, searching, pagination
- * @access  Public
- * @query   ?page=1&limit=10&searchTerm=gymnasium&isActive=true
- */
+// Get all school types with filtering, searching, pagination
 router.get('/', SchoolTypeController.getAllSchoolTypes);
 
 // ============ ADMIN ONLY ROUTES ============
 
-/**
- * @route   POST /api/v1/school-types
- * @desc    Create new school type
- * @access  Admin only
- * @body    { name: "Gymnasium", value: "GYMNASIUM", order: 4, isActive?: true }
- */
+// Create new school type
 router.post(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -46,12 +28,7 @@ router.post(
   SchoolTypeController.createSchoolType
 );
 
-/**
- * @route   PATCH /api/v1/school-types/:schoolTypeId
- * @desc    Update school type
- * @access  Admin only
- * @body    { name?, value?, order?, isActive? }
- */
+// Update school type
 router.patch(
   '/:schoolTypeId',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -59,11 +36,7 @@ router.patch(
   SchoolTypeController.updateSchoolType
 );
 
-/**
- * @route   DELETE /api/v1/school-types/:schoolTypeId
- * @desc    Delete school type (soft delete - sets isActive to false)
- * @access  Admin only
- */
+// Delete school type (soft delete - sets isActive to false)
 router.delete(
   '/:schoolTypeId',
   auth(USER_ROLES.SUPER_ADMIN),

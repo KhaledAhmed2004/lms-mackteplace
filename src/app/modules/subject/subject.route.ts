@@ -9,36 +9,18 @@ const router = express.Router();
 
 // ============ PUBLIC ROUTES ============
 
-/**
- * @route   GET /api/v1/subjects/active
- * @desc    Get all active subjects (for students/tutors to see available subjects)
- * @access  Public
- */
+// Get all active subjects (for students/tutors to see available subjects)
 router.get('/active', SubjectController.getActiveSubjects);
 
-/**
- * @route   GET /api/v1/subjects/:subjectId
- * @desc    Get single subject by ID
- * @access  Public
- */
+// Get single subject by ID
 router.get('/:subjectId', SubjectController.getSingleSubject);
 
-/**
- * @route   GET /api/v1/subjects
- * @desc    Get all subjects with filtering, searching, pagination
- * @access  Public
- * @query   ?page=1&limit=10&searchTerm=math&isActive=true
- */
+// Get all subjects with filtering, searching, pagination
 router.get('/', SubjectController.getAllSubjects);
 
 // ============ ADMIN ONLY ROUTES ============
 
-/**
- * @route   POST /api/v1/subjects
- * @desc    Create new subject
- * @access  Admin only
- * @body    { name: "Mathematics", isActive?: true }
- */
+// Create new subject
 router.post(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -46,12 +28,7 @@ router.post(
   SubjectController.createSubject
 );
 
-/**
- * @route   PATCH /api/v1/subjects/:subjectId
- * @desc    Update subject
- * @access  Admin only
- * @body    { name?, isActive? }
- */
+// Update subject
 router.patch(
   '/:subjectId',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -59,11 +36,7 @@ router.patch(
   SubjectController.updateSubject
 );
 
-/**
- * @route   DELETE /api/v1/subjects/:subjectId
- * @desc    Permanently delete subject (hard delete). Blocked if active requests exist.
- * @access  Admin only
- */
+// Delete subject (blocked if active requests exist)
 router.delete(
   '/:subjectId',
   auth(USER_ROLES.SUPER_ADMIN),

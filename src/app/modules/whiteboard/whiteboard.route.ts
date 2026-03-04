@@ -6,6 +6,8 @@ import { WhiteboardValidation } from './whiteboard.validation';
 
 const router = express.Router();
 
+// ============ ROOM MANAGEMENT ============
+
 // Create a new whiteboard room
 router.post(
   '/rooms',
@@ -29,6 +31,8 @@ router.post(
   validateRequest(WhiteboardValidation.getOrCreateForCall),
   WhiteboardController.getOrCreateForCall
 );
+
+// ============ ROOM ACCESS & SNAPSHOTS ============
 
 // Get room token
 router.post(

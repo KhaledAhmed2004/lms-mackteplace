@@ -8,20 +8,25 @@ import { TutorSessionFeedbackValidation } from './tutorSessionFeedback.validatio
 
 const router = express.Router();
 
-// Admin routes (must be before parameterized routes)
+// ============ ADMIN ROUTES (must be before parameterized routes) ============
+
+// Get forfeited payments summary from missed feedback deadlines
 router.get(
   '/admin/forfeited-summary',
   auth(USER_ROLES.SUPER_ADMIN),
   TutorSessionFeedbackController.getForfeitedPaymentsSummary
 );
 
+// Get detailed list of forfeited feedbacks
 router.get(
   '/admin/forfeited-list',
   auth(USER_ROLES.SUPER_ADMIN),
   TutorSessionFeedbackController.getForfeitedFeedbacksList
 );
 
-// Tutor routes
+// ============ TUTOR ROUTES ============
+
+// Submit post-session feedback with optional audio attachment
 router.post(
   '/',
   auth(USER_ROLES.TUTOR),
@@ -30,26 +35,32 @@ router.post(
   TutorSessionFeedbackController.submitFeedback
 );
 
+// Get sessions with pending feedback to submit
 router.get(
   '/pending',
   auth(USER_ROLES.TUTOR),
   TutorSessionFeedbackController.getPendingFeedbacks
 );
 
+// Get all feedbacks submitted by the tutor
 router.get(
   '/my-feedbacks',
   auth(USER_ROLES.TUTOR),
   TutorSessionFeedbackController.getTutorFeedbacks
 );
 
-// Student routes
+// ============ STUDENT ROUTES ============
+
+// Get all session feedbacks received by the student
 router.get(
   '/received',
   auth(USER_ROLES.STUDENT),
   TutorSessionFeedbackController.getMyReceivedFeedbacks
 );
 
-// Shared routes (tutor or student can view feedback for their sessions)
+// ============ SHARED ROUTES ============
+
+// Get feedback for a specific session
 router.get(
   '/session/:sessionId',
   auth(USER_ROLES.TUTOR, USER_ROLES.STUDENT),

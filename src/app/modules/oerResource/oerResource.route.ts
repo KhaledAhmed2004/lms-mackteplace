@@ -5,7 +5,7 @@ import { OERResourceValidation } from './oerResource.validation';
 
 const router = express.Router();
 
-// Public routes - no authentication required
+// ============ PUBLIC ROUTES ============
 
 // Search OER resources
 router.get(

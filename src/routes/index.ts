@@ -26,6 +26,7 @@ import { LegalPolicyRoutes } from '../app/modules/legalPolicy/legalPolicy.route'
 import { OERResourceRoutes } from '../app/modules/oerResource/oerResource.route';
 import { SupportTicketRoutes } from '../app/modules/supportTicket/supportTicket.route';
 import { PricingConfigRoutes } from '../app/modules/pricingConfig/pricingConfig.route';
+import { FAQRoutes } from '../app/modules/faq/faq.route';
 
 const router = express.Router();
 
@@ -137,6 +138,10 @@ const apiRoutes = [
   {
     path: '/pricing',
     route: PricingConfigRoutes,
+  },
+  {
+    path: '/faqs',
+    route: FAQRoutes,
   },
 ];
 

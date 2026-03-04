@@ -6,6 +6,8 @@ import { CallValidation } from './call.validation';
 
 const router = express.Router();
 
+// ============ CALL LIFECYCLE ============
+
 // Initiate a new call
 router.post(
   '/initiate',
@@ -53,6 +55,8 @@ router.post(
   validateRequest(CallValidation.callIdParam),
   CallController.refreshToken
 );
+
+// ============ CALL HISTORY & DETAILS ============
 
 // Get call history
 router.get(

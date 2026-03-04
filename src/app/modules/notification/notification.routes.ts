@@ -4,6 +4,8 @@ import { USER_ROLES } from '../../../enums/user';
 import { NotificationController } from './notification.controller';
 const router = express.Router();
 
+// ============ STUDENT / TUTOR ROUTES ============
+
 // Fetch notifications + unread count
 router.get(
   '/',
@@ -24,6 +26,8 @@ router.patch(
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR),
   NotificationController.readAllNotifications
 );
+
+// ============ ADMIN ROUTES ============
 
 // Fetch admin notifications + unread count
 router.get(
