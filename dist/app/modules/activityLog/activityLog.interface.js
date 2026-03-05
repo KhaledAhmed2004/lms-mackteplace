@@ -16,5 +16,17 @@ exports.ACTION_TYPES = [
     'APPLICATION_REJECTED',
     'APPLICATION_RESUBMITTED',
 ];
-exports.ENTITY_TYPES = ['USER', 'SESSION', 'PAYMENT', 'APPLICATION', 'SUBSCRIPTION', 'TRIAL_REQUEST'];
-exports.ACTIVITY_STATUS = ['success', 'pending', 'warning', 'error'];
+exports.ENTITY_TYPES = [
+    'USER',
+    'SESSION',
+    'PAYMENT',
+    'APPLICATION',
+    'SUBSCRIPTION',
+    'TRIAL_REQUEST',
+];
+exports.ACTIVITY_STATUS = [
+    'success',
+    'pending',
+    'warning',
+    'error',
+];

@@ -41,7 +41,7 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         required: true,
         minlength: 8,
-        select: false, // hide password by default
+        select: false,
     },
     location: {
         type: String,
@@ -199,7 +199,13 @@ const userSchema = new mongoose_1.Schema({
             },
             verificationStatus: {
                 type: String,
-                enum: ['PENDING', 'DOCUMENT_APPROVED', 'INTERVIEW_SCHEDULED', 'APPROVED', 'REJECTED'],
+                enum: [
+                    'PENDING',
+                    'DOCUMENT_APPROVED',
+                    'INTERVIEW_SCHEDULED',
+                    'APPROVED',
+                    'REJECTED',
+                ],
                 default: 'PENDING',
             },
             onboardingPhase: {
@@ -252,7 +258,7 @@ userSchema.pre('save', function (next) {
         //check user - exclude current user from email uniqueness check
         const isExist = yield exports.User.findOne({
             email: this.email,
-            _id: { $ne: this._id } // exclude current user
+            _id: { $ne: this._id }, // exclude current user
         });
         if (isExist) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Email already exist!');

@@ -31,71 +31,53 @@ export enum VERIFICATION_STATUS {
   REJECTED = 'REJECTED',
 }
 
-// Tutor level system based on completed sessions
 export enum TUTOR_LEVEL {
-  STARTER = 'STARTER',           // 0-20 completed sessions
+  STARTER = 'STARTER', // 0-20 completed sessions
   INTERMEDIATE = 'INTERMEDIATE', // 21-50 completed sessions
-  EXPERT = 'EXPERT',             // 51+ completed sessions
+  EXPERT = 'EXPERT', // 51+ completed sessions
 }
 
 export type StudentProfile = {
-  schoolType?: string; // German school types
-  grade?: string; // Which class/grade
-  subjects?: string[]; // Interested subjects
-  preferredGender?: string; // Male/Female/No preference
-  preferredAgeRange?: string; // e.g., "20-30"
-  hasUsedFreeTrial: boolean; // Track free trial usage
-  hasCompletedTrial: boolean; // True after first accepted trial
-  trialRequestsCount: number; // Total trial requests made
-  sessionRequestsCount: number; // Total session requests made (after trial)
+  schoolType?: string;
+  grade?: string;
+  subjects?: string[];
+  preferredGender?: string;
+  preferredAgeRange?: string;
+  hasUsedFreeTrial: boolean;
+  hasCompletedTrial: boolean;
+  trialRequestsCount: number;
+  sessionRequestsCount: number;
   currentPlan?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' | null;
   subscriptionTier?: 'FLEXIBLE' | 'REGULAR' | 'LONG_TERM' | null;
   totalHoursTaken: number;
   totalSpent: number;
-  stripeCustomerId?: string; // Stripe customer ID for payments
+  stripeCustomerId?: string;
 };
 
 export type TutorProfile = {
-  // Basic Info
   address?: string;
   birthDate?: Date;
-
-  // Professional
-  subjects?: string[]; // Teaching subjects
+  subjects?: string[];
   bio?: string;
   languages?: string[];
   teachingExperience?: string;
   education?: string;
-
-  // Documents (URLs from Cloudinary/S3)
   cvUrl?: string;
-  abiturCertificateUrl?: string; // MANDATORY for approval
+  abiturCertificateUrl?: string;
   educationProofUrls?: string[];
-
-  // Stats
   totalSessions: number;
   completedSessions: number;
   totalHoursTaught: number;
-  totalStudents: number; // Unique students taught
-
-  // Level System
+  totalStudents: number;
   level: TUTOR_LEVEL;
   levelUpdatedAt?: Date;
-
-  // Earnings (cached for quick access)
-  totalEarnings: number; // Net earnings after commission
-  pendingFeedbackCount: number; // Number of pending session feedbacks
-
-  // Payout Settings
-  payoutRecipient?: string; // Bank account holder name
-  payoutIban?: string; // IBAN for payouts
-
-  // Verification
+  totalEarnings: number;
+  pendingFeedbackCount: number;
+  payoutRecipient?: string;
+  payoutIban?: string;
   isVerified: boolean;
   verificationStatus: VERIFICATION_STATUS;
-  onboardingPhase: 1 | 2 | 3; // 1=Applied, 2=Interview, 3=Approved
-
-  // Stripe Connect
+  onboardingPhase: 1 | 2 | 3;
   stripeConnectAccountId?: string;
   stripeOnboardingCompleted: boolean;
 };
@@ -116,18 +98,13 @@ export type IUser = {
   ratingsCount: number;
   about?: string;
   achievements?: AchievementType[];
-
-  // Role-specific profiles
   studentProfile?: StudentProfile;
   tutorProfile?: TutorProfile;
-
   authentication?: {
     isResetPassword: boolean;
     oneTimeCode: number;
     expireAt: Date;
   };
-
-  // Timestamps
   createdAt?: Date;
   updatedAt?: Date;
 };

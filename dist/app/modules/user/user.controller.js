@@ -29,218 +29,191 @@ const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const user_service_1 = require("./user.service");
 const user_1 = require("../../../enums/user");
-const createUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const userData = __rest(req.body, []);
-    const result = yield user_service_1.UserService.createUserToDB(userData);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.CREATED,
-        message: 'User created successfully',
-        data: result,
-    });
-}));
-const getUserProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = req.user;
-    const result = yield user_service_1.UserService.getUserProfileFromDB(user);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Profile data retrieved successfully',
-        data: result,
-    });
-}));
-const updateProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = req.user;
-    // All files + text data are in req.body
-    const payload = Object.assign({}, req.body);
-    const result = yield user_service_1.UserService.updateProfileToDB(user, payload);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Profile updated successfully',
-        data: result,
-    });
-}));
-const getAllUsers = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield user_service_1.UserService.getAllUsers(req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Users retrieved successfully',
-        pagination: result.pagination,
-        data: result.data,
-    });
-}));
-const blockUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.updateUserStatus(id, user_1.USER_STATUS.RESTRICTED);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User blocked successfully',
-        data: result,
-    });
-}));
-const unblockUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.updateUserStatus(id, user_1.USER_STATUS.ACTIVE);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User unblocked successfully',
-        data: result,
-    });
-}));
-const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.getUserById(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User data retrieved successfully',
-        data: result,
-    });
-}));
-const getUserDetailsById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.getUserDetailsById(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User details retrieved successfully',
-        data: result,
-    });
-}));
-// ============ ADMIN: STUDENT MANAGEMENT ============
-const getAllStudents = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield user_service_1.UserService.getAllStudents(req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Students retrieved successfully',
-        pagination: result.pagination,
-        data: result.data,
-    });
-}));
-const blockStudent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.blockStudent(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Student blocked successfully',
-        data: result,
-    });
-}));
-const unblockStudent = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.unblockStudent(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Student unblocked successfully',
-        data: result,
-    });
-}));
-/**
- * Admin: Update student profile (without password)
- */
-const adminUpdateStudentProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.adminUpdateStudentProfile(id, req.body);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Student profile updated successfully',
-        data: result,
-    });
-}));
-// ============ ADMIN: TUTOR MANAGEMENT ============
-const getAllTutors = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield user_service_1.UserService.getAllTutors(req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutors retrieved successfully',
-        pagination: result.pagination,
-        data: result.data,
-    });
-}));
-const blockTutor = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.blockTutor(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutor blocked successfully',
-        data: result,
-    });
-}));
-const unblockTutor = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.unblockTutor(id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutor unblocked successfully',
-        data: result,
-    });
-}));
-const updateTutorSubjects = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const { subjects } = req.body;
-    const result = yield user_service_1.UserService.updateTutorSubjects(id, subjects);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutor subjects updated successfully',
-        data: result,
-    });
-}));
-/**
- * Admin: Update tutor profile (without password)
- */
-const adminUpdateTutorProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const result = yield user_service_1.UserService.adminUpdateTutorProfile(id, req.body);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutor profile updated successfully',
-        data: result,
-    });
-}));
-// ============ TUTOR: STATISTICS ============
-const getTutorStatistics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = req.user;
-    const result = yield user_service_1.UserService.getTutorStatistics(user.id);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Tutor statistics retrieved successfully',
-        data: result,
-    });
-}));
 exports.UserController = {
-    createUser,
-    getUserProfile,
-    updateProfile,
-    getAllUsers,
-    blockUser,
-    unblockUser,
-    getUserById,
-    getUserDetailsById,
+    createUser: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const userData = __rest(req.body, []);
+        const result = yield user_service_1.UserService.createUserToDB(userData);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.CREATED,
+            message: 'User created successfully',
+            data: result,
+        });
+    })),
+    getUserProfile: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const user = req.user;
+        const result = yield user_service_1.UserService.getUserProfileFromDB(user);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Profile data retrieved successfully',
+            data: result,
+        });
+    })),
+    updateProfile: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const user = req.user;
+        // All files + text data are in req.body
+        const payload = Object.assign({}, req.body);
+        const result = yield user_service_1.UserService.updateProfileToDB(user, payload);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Profile updated successfully',
+            data: result,
+        });
+    })),
+    getAllUsers: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield user_service_1.UserService.getAllUsers(req.query);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Users retrieved successfully',
+            pagination: result.pagination,
+            data: result.data,
+        });
+    })),
+    blockUser: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.updateUserStatus(id, user_1.USER_STATUS.RESTRICTED);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'User blocked successfully',
+            data: result,
+        });
+    })),
+    unblockUser: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.updateUserStatus(id, user_1.USER_STATUS.ACTIVE);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'User unblocked successfully',
+            data: result,
+        });
+    })),
+    getUserById: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.getUserById(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'User data retrieved successfully',
+            data: result,
+        });
+    })),
+    getUserDetailsById: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.getUserDetailsById(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'User details retrieved successfully',
+            data: result,
+        });
+    })),
     // Admin: Student Management
-    getAllStudents,
-    blockStudent,
-    unblockStudent,
-    adminUpdateStudentProfile,
+    getAllStudents: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield user_service_1.UserService.getAllStudents(req.query);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Students retrieved successfully',
+            pagination: result.pagination,
+            data: result.data,
+        });
+    })),
+    blockStudent: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.blockStudent(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Student blocked successfully',
+            data: result,
+        });
+    })),
+    unblockStudent: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.unblockStudent(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Student unblocked successfully',
+            data: result,
+        });
+    })),
+    adminUpdateStudentProfile: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.adminUpdateStudentProfile(id, req.body);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Student profile updated successfully',
+            data: result,
+        });
+    })),
     // Admin: Tutor Management
-    getAllTutors,
-    blockTutor,
-    unblockTutor,
-    updateTutorSubjects,
-    adminUpdateTutorProfile,
+    getAllTutors: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield user_service_1.UserService.getAllTutors(req.query);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutors retrieved successfully',
+            pagination: result.pagination,
+            data: result.data,
+        });
+    })),
+    blockTutor: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.blockTutor(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutor blocked successfully',
+            data: result,
+        });
+    })),
+    unblockTutor: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.unblockTutor(id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutor unblocked successfully',
+            data: result,
+        });
+    })),
+    updateTutorSubjects: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const { subjects } = req.body;
+        const result = yield user_service_1.UserService.updateTutorSubjects(id, subjects);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutor subjects updated successfully',
+            data: result,
+        });
+    })),
+    adminUpdateTutorProfile: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const { id } = req.params;
+        const result = yield user_service_1.UserService.adminUpdateTutorProfile(id, req.body);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutor profile updated successfully',
+            data: result,
+        });
+    })),
     // Tutor: Statistics
-    getTutorStatistics,
+    getTutorStatistics: (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+        const user = req.user;
+        const result = yield user_service_1.UserService.getTutorStatistics(user.id);
+        (0, sendResponse_1.default)(res, {
+            success: true,
+            statusCode: http_status_codes_1.StatusCodes.OK,
+            message: 'Tutor statistics retrieved successfully',
+            data: result,
+        });
+    })),
 };

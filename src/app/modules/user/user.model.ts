@@ -28,7 +28,7 @@ const userSchema = new Schema<IUser, UserModal>(
       type: String,
       required: true,
       minlength: 8,
-      select: false, // hide password by default
+      select: false,
     },
     location: {
       type: String,
@@ -188,7 +188,13 @@ const userSchema = new Schema<IUser, UserModal>(
         },
         verificationStatus: {
           type: String,
-          enum: ['PENDING', 'DOCUMENT_APPROVED', 'INTERVIEW_SCHEDULED', 'APPROVED', 'REJECTED'],
+          enum: [
+            'PENDING',
+            'DOCUMENT_APPROVED',
+            'INTERVIEW_SCHEDULED',
+            'APPROVED',
+            'REJECTED',
+          ],
           default: 'PENDING',
         },
         onboardingPhase: {
@@ -223,7 +229,7 @@ const userSchema = new Schema<IUser, UserModal>(
       select: false, // hide auth info by default
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 //exist user check
@@ -240,7 +246,7 @@ userSchema.statics.isExistUserByEmail = async (email: string) => {
 //is match password
 userSchema.statics.isMatchPassword = async (
   password: string,
-  hashPassword: string
+  hashPassword: string,
 ): Promise<boolean> => {
   return await bcrypt.compare(password, hashPassword);
 };
@@ -248,9 +254,9 @@ userSchema.statics.isMatchPassword = async (
 //check user
 userSchema.pre('save', async function (next) {
   //check user - exclude current user from email uniqueness check
-  const isExist = await User.findOne({ 
+  const isExist = await User.findOne({
     email: this.email,
-    _id: { $ne: this._id } // exclude current user
+    _id: { $ne: this._id }, // exclude current user
   });
   if (isExist) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already exist!');
@@ -259,7 +265,7 @@ userSchema.pre('save', async function (next) {
   //password hash
   this.password = await bcrypt.hash(
     this.password,
-    Number(config.bcrypt_salt_rounds)
+    Number(config.bcrypt_salt_rounds),
   );
   next();
 });
@@ -269,19 +275,19 @@ userSchema.statics.addDeviceToken = async (userId: string, token: string) => {
   return await User.findByIdAndUpdate(
     userId,
     { $addToSet: { deviceTokens: token } }, // prevent duplicates
-    { new: true }
+    { new: true },
   );
 };
 
 // ✅ remove device token
 userSchema.statics.removeDeviceToken = async (
   userId: string,
-  token: string
+  token: string,
 ) => {
   return await User.findByIdAndUpdate(
     userId,
     { $pull: { deviceTokens: token } },
-    { new: true }
+    { new: true },
   );
 };
 

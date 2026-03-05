@@ -8,7 +8,6 @@ import {
   COMPLETION_STATUS,
 } from './session.interface';
 
-// Attendance tracking sub-schema
 const attendanceSchema = new Schema(
   {
     odId: {
@@ -37,10 +36,9 @@ const attendanceSchema = new Schema(
       default: 0,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
-// Reschedule request sub-schema
 const rescheduleRequestSchema = new Schema(
   {
     requestedBy: {
@@ -77,7 +75,7 @@ const rescheduleRequestSchema = new Schema(
       ref: 'User',
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const sessionSchema = new Schema<ISession>(
@@ -247,7 +245,7 @@ const sessionSchema = new Schema<ISession>(
     // Billing tracking (for monthly invoicing)
     isPaidUpfront: {
       type: Boolean,
-      default: false,  // True if covered by subscription upfront payment
+      default: false, // True if covered by subscription upfront payment
     },
     billingId: {
       type: Schema.Types.ObjectId,
@@ -257,7 +255,7 @@ const sessionSchema = new Schema<ISession>(
       type: Date,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes for performance
@@ -282,7 +280,11 @@ sessionSchema.index({ studentCompletionStatus: 1, studentCompletedAt: 1 });
 sessionSchema.index({ teacherCompletionStatus: 1, teacherCompletedAt: 1 });
 
 // Index for billing queries (sessions not yet billed)
-sessionSchema.index({ isPaidUpfront: 1, billingId: 1, studentCompletionStatus: 1 });
+sessionSchema.index({
+  isPaidUpfront: 1,
+  billingId: 1,
+  studentCompletionStatus: 1,
+});
 
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {

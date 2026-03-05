@@ -1,5 +1,9 @@
 import { model, Schema } from 'mongoose';
-import { ILegalPolicy, LegalPolicyModel, POLICY_TYPE } from './legalPolicy.interface';
+import {
+  ILegalPolicy,
+  LegalPolicyModel,
+  POLICY_TYPE,
+} from './legalPolicy.interface';
 
 const legalPolicySchema = new Schema<ILegalPolicy>(
   {
@@ -27,11 +31,10 @@ const legalPolicySchema = new Schema<ILegalPolicy>(
       ref: 'User',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// Index for faster queries
-legalPolicySchema.index({ type: 1 });
-legalPolicySchema.index({ isActive: 1 });
-
-export const LegalPolicy = model<ILegalPolicy, LegalPolicyModel>('LegalPolicy', legalPolicySchema);
+export const LegalPolicy = model<ILegalPolicy, LegalPolicyModel>(
+  'LegalPolicy',
+  legalPolicySchema,
+);

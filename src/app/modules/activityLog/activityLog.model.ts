@@ -1,5 +1,10 @@
 import { Schema, model, Document } from 'mongoose';
-import { IActivityLog, ACTION_TYPES, ENTITY_TYPES, ACTIVITY_STATUS } from './activityLog.interface';
+import {
+  IActivityLog,
+  ACTION_TYPES,
+  ENTITY_TYPES,
+  ACTIVITY_STATUS,
+} from './activityLog.interface';
 
 export interface IActivityLogDocument extends IActivityLog, Document {}
 
@@ -46,14 +51,10 @@ const activityLogSchema = new Schema<IActivityLogDocument>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Indexes for efficient querying
-activityLogSchema.index({ createdAt: -1 });
-activityLogSchema.index({ actionType: 1, createdAt: -1 });
-activityLogSchema.index({ userId: 1, createdAt: -1 });
-activityLogSchema.index({ entityType: 1, entityId: 1 });
-activityLogSchema.index({ status: 1, createdAt: -1 });
-
-export const ActivityLog = model<IActivityLogDocument>('ActivityLog', activityLogSchema);
+export const ActivityLog = model<IActivityLogDocument>(
+  'ActivityLog',
+  activityLogSchema,
+);

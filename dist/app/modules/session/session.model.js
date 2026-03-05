@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Session = void 0;
 const mongoose_1 = require("mongoose");
 const session_interface_1 = require("./session.interface");
-// Attendance tracking sub-schema
 const attendanceSchema = new mongoose_1.Schema({
     odId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -31,7 +30,6 @@ const attendanceSchema = new mongoose_1.Schema({
         default: 0,
     },
 }, { _id: false });
-// Reschedule request sub-schema
 const rescheduleRequestSchema = new mongoose_1.Schema({
     requestedBy: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -257,7 +255,11 @@ sessionSchema.index({ callId: 1 });
 sessionSchema.index({ studentCompletionStatus: 1, studentCompletedAt: 1 });
 sessionSchema.index({ teacherCompletionStatus: 1, teacherCompletedAt: 1 });
 // Index for billing queries (sessions not yet billed)
-sessionSchema.index({ isPaidUpfront: 1, billingId: 1, studentCompletionStatus: 1 });
+sessionSchema.index({
+    isPaidUpfront: 1,
+    billingId: 1,
+    studentCompletionStatus: 1,
+});
 // Validate endTime is after startTime
 sessionSchema.pre('save', function (next) {
     if (this.endTime <= this.startTime) {

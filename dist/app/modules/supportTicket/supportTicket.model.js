@@ -54,10 +54,6 @@ const supportTicketSchema = new mongoose_1.Schema({
         type: String,
         trim: true,
     },
-    assignedTo: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'User',
-    },
     resolvedAt: {
         type: Date,
     },
@@ -65,11 +61,4 @@ const supportTicketSchema = new mongoose_1.Schema({
         type: Date,
     },
 }, { timestamps: true });
-// Indexes for faster queries
-supportTicketSchema.index({ status: 1 });
-supportTicketSchema.index({ category: 1 });
-supportTicketSchema.index({ priority: 1 });
-supportTicketSchema.index({ user: 1 });
-supportTicketSchema.index({ ticketNumber: 1 });
-supportTicketSchema.index({ createdAt: -1 });
 exports.SupportTicket = (0, mongoose_1.model)('SupportTicket', supportTicketSchema);

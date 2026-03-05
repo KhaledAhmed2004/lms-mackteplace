@@ -18,10 +18,22 @@ export const ACTION_TYPES = [
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
-export const ENTITY_TYPES = ['USER', 'SESSION', 'PAYMENT', 'APPLICATION', 'SUBSCRIPTION', 'TRIAL_REQUEST'] as const;
+export const ENTITY_TYPES = [
+  'USER',
+  'SESSION',
+  'PAYMENT',
+  'APPLICATION',
+  'SUBSCRIPTION',
+  'TRIAL_REQUEST',
+] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
-export const ACTIVITY_STATUS = ['success', 'pending', 'warning', 'error'] as const;
+export const ACTIVITY_STATUS = [
+  'success',
+  'pending',
+  'warning',
+  'error',
+] as const;
 export type ActivityStatus = (typeof ACTIVITY_STATUS)[number];
 
 export interface IActivityLog {

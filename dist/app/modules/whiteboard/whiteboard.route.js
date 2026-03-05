@@ -10,12 +10,14 @@ const validateRequest_1 = __importDefault(require("../../middlewares/validateReq
 const whiteboard_controller_1 = require("./whiteboard.controller");
 const whiteboard_validation_1 = require("./whiteboard.validation");
 const router = express_1.default.Router();
+// ============ ROOM MANAGEMENT ============
 // Create a new whiteboard room
 router.post('/rooms', (0, auth_1.default)(), (0, validateRequest_1.default)(whiteboard_validation_1.WhiteboardValidation.createRoom), whiteboard_controller_1.WhiteboardController.createRoom);
 // Get user's whiteboard rooms
 router.get('/rooms', (0, auth_1.default)(), (0, validateRequest_1.default)(whiteboard_validation_1.WhiteboardValidation.getUserRooms), whiteboard_controller_1.WhiteboardController.getUserRooms);
 // Get or create whiteboard for a call
 router.post('/calls/:callId/room', (0, auth_1.default)(), (0, validateRequest_1.default)(whiteboard_validation_1.WhiteboardValidation.getOrCreateForCall), whiteboard_controller_1.WhiteboardController.getOrCreateForCall);
+// ============ ROOM ACCESS & SNAPSHOTS ============
 // Get room token
 router.post('/rooms/:roomId/token', (0, auth_1.default)(), (0, validateRequest_1.default)(whiteboard_validation_1.WhiteboardValidation.getRoomToken), whiteboard_controller_1.WhiteboardController.getRoomToken);
 // Get room snapshots

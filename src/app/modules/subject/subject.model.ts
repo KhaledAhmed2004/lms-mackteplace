@@ -13,10 +13,7 @@ const subjectSchema = new Schema<ISubject>(
       default: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
-
-// Index for faster queries
-subjectSchema.index({ isActive: 1 });
 
 export const Subject = model<ISubject, SubjectModel>('Subject', subjectSchema);

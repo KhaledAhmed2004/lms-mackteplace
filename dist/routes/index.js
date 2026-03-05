@@ -31,6 +31,7 @@ const legalPolicy_route_1 = require("../app/modules/legalPolicy/legalPolicy.rout
 const oerResource_route_1 = require("../app/modules/oerResource/oerResource.route");
 const supportTicket_route_1 = require("../app/modules/supportTicket/supportTicket.route");
 const pricingConfig_route_1 = require("../app/modules/pricingConfig/pricingConfig.route");
+const faq_route_1 = require("../app/modules/faq/faq.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -140,6 +141,10 @@ const apiRoutes = [
     {
         path: '/pricing',
         route: pricingConfig_route_1.PricingConfigRoutes,
+    },
+    {
+        path: '/faqs',
+        route: faq_route_1.FAQRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

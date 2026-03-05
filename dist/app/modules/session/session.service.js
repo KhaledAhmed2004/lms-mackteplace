@@ -525,8 +525,9 @@ const markAsCompleted = (sessionId) => __awaiter(void 0, void 0, void 0, functio
     if (!session) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
     }
-    if (session.status === session_interface_1.SESSION_STATUS.COMPLETED) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session is already completed');
+    const terminalStatuses = [session_interface_1.SESSION_STATUS.COMPLETED, session_interface_1.SESSION_STATUS.CANCELLED, session_interface_1.SESSION_STATUS.EXPIRED, session_interface_1.SESSION_STATUS.NO_SHOW];
+    if (terminalStatuses.includes(session.status)) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Cannot complete session with status: ${session.status}`);
     }
     // Update session
     session.status = session_interface_1.SESSION_STATUS.COMPLETED;
@@ -986,8 +987,9 @@ const markAsCompletedEnhanced = (sessionId) => __awaiter(void 0, void 0, void 0,
     if (!session) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
     }
-    if (session.status === session_interface_1.SESSION_STATUS.COMPLETED) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Session is already completed');
+    const terminalStatuses = [session_interface_1.SESSION_STATUS.COMPLETED, session_interface_1.SESSION_STATUS.CANCELLED, session_interface_1.SESSION_STATUS.EXPIRED, session_interface_1.SESSION_STATUS.NO_SHOW];
+    if (terminalStatuses.includes(session.status)) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `Cannot complete session with status: ${session.status}`);
     }
     // Update session
     session.status = session_interface_1.SESSION_STATUS.COMPLETED;
@@ -1193,6 +1195,12 @@ const completeSessionWithAttendanceCheck = (sessionId) => __awaiter(void 0, void
     const session = yield session_model_1.Session.findById(sessionId);
     if (!session) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Session not found');
+    }
+    // Guard: skip if session is already in a terminal state
+    const terminalStatuses = [session_interface_1.SESSION_STATUS.COMPLETED, session_interface_1.SESSION_STATUS.CANCELLED, session_interface_1.SESSION_STATUS.EXPIRED, session_interface_1.SESSION_STATUS.NO_SHOW];
+    if (terminalStatuses.includes(session.status)) {
+        const attendanceCheck = checkAttendanceRequirement(session);
+        return { session, attendanceCheck };
     }
     const now = new Date();
     // Simple join check - did they join at all? (No 80% attendance check)

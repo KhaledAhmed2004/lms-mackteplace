@@ -12,15 +12,22 @@ const fileHandler_1 = require("../../middlewares/fileHandler");
 const tutorSessionFeedback_controller_1 = require("./tutorSessionFeedback.controller");
 const tutorSessionFeedback_validation_1 = require("./tutorSessionFeedback.validation");
 const router = express_1.default.Router();
-// Admin routes (must be before parameterized routes)
+// ============ ADMIN ROUTES (must be before parameterized routes) ============
+// Get forfeited payments summary from missed feedback deadlines
 router.get('/admin/forfeited-summary', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getForfeitedPaymentsSummary);
+// Get detailed list of forfeited feedbacks
 router.get('/admin/forfeited-list', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getForfeitedFeedbacksList);
-// Tutor routes
+// ============ TUTOR ROUTES ============
+// Submit post-session feedback with optional audio attachment
 router.post('/', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), (0, fileHandler_1.fileHandler)([{ name: 'feedbackAudioUrl', maxCount: 1 }]), (0, validateRequest_1.default)(tutorSessionFeedback_validation_1.TutorSessionFeedbackValidation.createFeedbackZodSchema), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.submitFeedback);
+// Get sessions with pending feedback to submit
 router.get('/pending', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getPendingFeedbacks);
+// Get all feedbacks submitted by the tutor
 router.get('/my-feedbacks', (0, auth_1.default)(user_1.USER_ROLES.TUTOR), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getTutorFeedbacks);
-// Student routes
+// ============ STUDENT ROUTES ============
+// Get all session feedbacks received by the student
 router.get('/received', (0, auth_1.default)(user_1.USER_ROLES.STUDENT), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getMyReceivedFeedbacks);
-// Shared routes (tutor or student can view feedback for their sessions)
+// ============ SHARED ROUTES ============
+// Get feedback for a specific session
 router.get('/session/:sessionId', (0, auth_1.default)(user_1.USER_ROLES.TUTOR, user_1.USER_ROLES.STUDENT), tutorSessionFeedback_controller_1.TutorSessionFeedbackController.getFeedbackBySession);
 exports.TutorSessionFeedbackRoutes = router;
